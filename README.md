@@ -1,50 +1,54 @@
-﻿# axion-pay
+# AXION-PAY
 
-## Overview
+Rebuild completo do frontend do gateway da AXION mantendo o backend atual em Node/Express.
 
-axion-pay is maintained as a production-ready release copy generated from the SANDBOX workspace.
+## Stack
 
-## Repository role
+- React + Vite + TypeScript
+- React Router
+- TanStack Query
+- Zustand
+- Tailwind CSS
+- Framer Motion
+- React Hook Form + Zod
 
-- Bucket: `apps`
-- Project kind: `node-react-app`
-- Release strategy: `github-release-build-artifact`
-- Owner target: `axion-dev-enterprise`
-- Notes: Axion Dev Enterprise release repository.
+## Estrutura
 
-## Technology stack
+- `src/` backend existente
+- `webapp/src/` frontend rebrandado
+- `public/app/` build publicado pelo Express
+- `docs/openapi.yaml` contrato atual de payments/webhooks
 
-React, Node.js, npm
+## Fluxos principais
 
-## Quality gates
+- Site comercial premium
+- Login e cadastro por sessao
+- Dashboard merchant
+- Transacoes via `/payments` com API key
+- Checkout PRO configuravel
+- Checkout publico por slug
+- Docs e SDK onboarding
 
-- CI workflow: `.github/workflows/ci.yml`
-- Release workflow: `.github/workflows/release.yml`
-- Production hygiene validation: `D:\Projetos\SCRIPTS\verify-production-builds.ps1`
+## Scripts
 
-## Local setup
+- `npm run dev`
+- `npm run typecheck`
+- `npm run build`
+- `npm test`
 
-```bash
-npm install
-```
+## Validacao
 
-## Validation and build
+- `npm run typecheck`
+- `npm run build`
+- `npm test`
 
-```bash
-npm run build --if-present
-npm test --if-present
-```
+## Documentacao adicional
 
-## Release process
+- [ARCHITECTURE.md](./ARCHITECTURE.md)
+- [ROUTES.md](./ROUTES.md)
+- [INTEGRATIONS.md](./INTEGRATIONS.md)
+- [API_REFERENCE.md](./API_REFERENCE.md)
+- [SDK_GUIDE.md](./SDK_GUIDE.md)
+- [CHECKOUT_PRO.md](./CHECKOUT_PRO.md)
+- [FRONTEND_STATES.md](./FRONTEND_STATES.md)
 
-1. Develop and validate in `D:\Projetos\SANDBOX`.
-2. Sync the clean release copy into `D:\Projetos\PRODUCTION\apps\axion-pay`.
-3. Run CI and local validation.
-4. Create or update the GitHub repository for this project.
-5. Publish tagged releases through GitHub Actions.
-
-## Source of truth
-
-The development source of truth for this project lives in:
-
-`D:\Projetos\SANDBOX\apps\axion-pay`
