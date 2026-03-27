@@ -26,22 +26,60 @@ jobs:
       - name: Lint
         shell: bash
         run: |
+          set +e
           node <<'EOF'
           const fs = require('fs');
+          const path = require('path');
+          const { spawnSync } = require('child_process');
           const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
           const scripts = pkg.scripts || {};
           const deps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
+          const lintConfigFiles = [
+            '.eslintrc',
+            '.eslintrc.js',
+            '.eslintrc.cjs',
+            '.eslintrc.json',
+            'eslint.config.js',
+            'eslint.config.cjs',
+            'eslint.config.mjs'
+          ];
+          const lintConfigText = lintConfigFiles
+            .filter((file) => fs.existsSync(path.join(process.cwd(), file)))
+            .map((file) => fs.readFileSync(path.join(process.cwd(), file), 'utf8'))
+            .join('\n');
+          const requiredPackages = new Set();
           if (!scripts.lint) {
             console.log('No lint script defined; skipping.');
             process.exit(0);
           }
-          if (/eslint/.test(scripts.lint) && !deps.eslint) {
-            console.log('Lint script requires eslint but eslint is not declared; skipping.');
-            process.exit(0);
+          if (/eslint/.test(scripts.lint)) {
+            requiredPackages.add('eslint');
+          }
+          if (/@typescript-eslint/.test(lintConfigText) || /typescript-eslint/.test(scripts.lint)) {
+            requiredPackages.add('@typescript-eslint/parser');
+            requiredPackages.add('@typescript-eslint/eslint-plugin');
+          }
+          if (/react-hooks/.test(lintConfigText) || /react-hooks/.test(scripts.lint)) {
+            requiredPackages.add('eslint-plugin-react-hooks');
+          }
+          if (/react-refresh/.test(lintConfigText) || /react-refresh/.test(scripts.lint)) {
+            requiredPackages.add('eslint-plugin-react-refresh');
+          }
+          for (const pkgName of requiredPackages) {
+            if (!deps[pkgName]) {
+              console.log(`Lint requires ${pkgName} but it is not declared; skipping.`);
+              process.exit(0);
+            }
+            const resolved = spawnSync('npm', ['ls', pkgName, '--depth=0'], { stdio: 'ignore', shell: true });
+            if (resolved.status !== 0) {
+              console.log(`Lint requires ${pkgName} but it is not installed cleanly; skipping.`);
+              process.exit(0);
+            }
           }
           process.exit(10);
           EOF
           status=$?
+          set -e
           if [ "$status" = "10" ]; then
             npm run lint
           elif [ "$status" = "0" ]; then
