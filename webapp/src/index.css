@@ -1,18 +1,48 @@
-* {
-  box-sizing: border-box;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+    font-family: theme(fontFamily.sans);
+    background:
+      radial-gradient(circle at top left, rgba(56, 228, 143, 0.12), transparent 25%),
+      radial-gradient(circle at top right, rgba(74, 217, 210, 0.14), transparent 30%),
+      #04110d;
+  }
+
+  * {
+    @apply border-line;
+  }
+
+  html {
+    @apply scroll-smooth;
+  }
+
+  body {
+    @apply min-h-screen bg-canvas bg-shell text-ink antialiased;
+  }
 }
 
-html,
-body,
-#root {
-  min-height: 100%;
-}
+@layer components {
+  .page-wrap {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
 
-html,
-body {
-  overflow-x: hidden;
-}
+  .section-space {
+    @apply py-16 sm:py-20 lg:py-24;
+  }
 
-body {
-  margin: 0;
+  .headline {
+    @apply font-sans text-4xl font-extrabold tracking-[-0.05em] text-white sm:text-5xl lg:text-6xl;
+  }
+
+  .subheadline {
+    @apply max-w-3xl font-body text-base leading-7 text-mist sm:text-lg;
+  }
+
+  .surface-panel {
+    @apply rounded-3xl border border-white/10 bg-white/5 shadow-soft backdrop-blur-xl;
+  }
 }
