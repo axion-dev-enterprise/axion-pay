@@ -7,4 +7,6 @@ try {
   console.error("Failed to ensure admin user on Vercel initialization:", err);
 }
 
-export default app;
+export default function handler(req, res) {
+  return app(req, res);
+}
