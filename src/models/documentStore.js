@@ -6,7 +6,11 @@ import { config } from "../config/env.js";
 import { getUserById } from "./userStore.js";
 
 const uploadsDir = path.resolve(config.uploadsPath);
-fs.mkdirSync(uploadsDir, { recursive: true });
+try {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+} catch (err) {
+  // Ignored in read-only / serverless environments
+}
 
 function now() {
   return new Date().toISOString();

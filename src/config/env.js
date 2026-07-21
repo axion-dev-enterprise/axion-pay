@@ -105,7 +105,9 @@ export const config = {
     root: storageRoot,
     dataFile: storagePath
   },
-  uploadsPath: process.env.UPLOADS_PATH || "data/uploads",
+  uploadsPath: process.env.VERCEL
+    ? path.join(os.tmpdir(), "uploads")
+    : process.env.UPLOADS_PATH || "data/uploads",
   jsonBodyLimit: process.env.JSON_BODY_LIMIT || "1mb",
   auth: {
     required: parseBoolean(process.env.AUTH_REQUIRED, false),
