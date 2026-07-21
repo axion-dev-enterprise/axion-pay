@@ -32,7 +32,7 @@ const permissionSeed = [
 ];
 
 const storagePath = config.storage.dataFile;
-const memoryMode = config.dbPath === ":memory:";
+const memoryMode = config.dbPath === ":memory:" || Boolean(process.env.VERCEL);
 
 function clone(value) {
   if (value === null || value === undefined) return value;
