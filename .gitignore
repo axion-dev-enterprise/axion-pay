@@ -1,0 +1,51 @@
+# Dependencies
+**/node_modules/
+
+# Build output
+**/dist/
+**/build/
+**/out/
+**/.vite/
+**/data/
+**/*.db
+**/*.sqlite
+**/*.sqlite3
+public/app/
+store*.json
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Test/coverage artifacts
+coverage/
+**/coverage/
+.nyc_output/
+
+# OS files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# IDE/editor
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Misc
+*.tsbuildinfo
+.vercel
+.env*

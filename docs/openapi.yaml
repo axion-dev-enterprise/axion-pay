@@ -1,0 +1,825 @@
+openapi: 3.0.3
+info:
+  title: AxionPAY Payment API
+  version: 0.2.0
+servers:
+  - url: http://localhost:3060
+tags:
+  - name: Health
+  - name: Payments
+  - name: Webhooks
+security:
+  - ApiKeyAuth: []
+    BearerAuth: []
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: API health check
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /payments:
+    get:
+      tags: [Payments]
+      summary: List payments
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/PaymentStatus"
+        - name: method
+          in: query
+          schema:
+            $ref: "#/components/schemas/PaymentMethod"
+        - name: provider
+          in: query
+          schema:
+            type: string
+        - name: customer_id
+          in: query
+          schema:
+            type: string
+        - name: created_from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: created_to
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Payment list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/ServerError"
+    post:
+      tags: [Payments]
+      summary: Create payment (method required)
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePaymentRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /payments/pix:
+    post:
+      tags: [Payments]
+      summary: Create PIX payment
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePixPaymentRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /payments/card:
+    post:
+      tags: [Payments]
+      summary: Create card payment
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCardPaymentRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /payments/stats:
+    get:
+      tags: [Payments]
+      summary: Payment stats
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentStatsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /payments/status/{status}:
+    get:
+      tags: [Payments]
+      summary: List payments by status
+      parameters:
+        - name: status
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/PaymentStatus"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Payment list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /payments/method/{method}:
+    get:
+      tags: [Payments]
+      summary: List payments by method
+      parameters:
+        - name: method
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/PaymentMethod"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Payment list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /payments/provider/{providerReference}:
+    get:
+      tags: [Payments]
+      summary: Get payment by provider reference
+      parameters:
+        - name: providerReference
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Payment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /payments/{id}:
+    get:
+      tags: [Payments]
+      summary: Get payment by id
+      parameters:
+        - $ref: "#/components/parameters/PaymentId"
+      responses:
+        "200":
+          description: Payment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /payments/{id}/events:
+    get:
+      tags: [Payments]
+      summary: Get payment events
+      parameters:
+        - $ref: "#/components/parameters/PaymentId"
+      responses:
+        "200":
+          description: Events
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentEventsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /payments/{id}/confirm:
+    post:
+      tags: [Payments]
+      summary: Confirm PIX payment (manual)
+      parameters:
+        - $ref: "#/components/parameters/PaymentId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Payment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /payments/{id}/capture:
+    post:
+      tags: [Payments]
+      summary: Capture card payment
+      parameters:
+        - $ref: "#/components/parameters/PaymentId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Payment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /payments/{id}/cancel:
+    post:
+      tags: [Payments]
+      summary: Cancel payment
+      parameters:
+        - $ref: "#/components/parameters/PaymentId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Payment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /payments/{id}/refund:
+    post:
+      tags: [Payments]
+      summary: Refund payment (partial or total)
+      parameters:
+        - $ref: "#/components/parameters/PaymentId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefundRequest"
+      responses:
+        "200":
+          description: Payment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /payments/{id}/metadata:
+    patch:
+      tags: [Payments]
+      summary: Update payment metadata
+      parameters:
+        - $ref: "#/components/parameters/PaymentId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MetadataRequest"
+      responses:
+        "200":
+          description: Payment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /webhooks/pix:
+    post:
+      tags: [Webhooks]
+      summary: PIX webhook
+      security: []
+      parameters:
+        - name: x-pix-signature
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: x-webhook-signature
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: x-webhook-timestamp
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PixWebhookRequest"
+      responses:
+        "200":
+          description: Payment updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /webhooks/pagarme:
+    post:
+      tags: [Webhooks]
+      summary: Provider webhook (Pagar.me/Woovi payload)
+      security: []
+      parameters:
+        - name: x-woovi-signature
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: x-pagarme-signature
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: x-hub-signature
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: x-webhook-signature
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: x-webhook-timestamp
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Webhook processed
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /webhooks/woovi:
+    post:
+      tags: [Webhooks]
+      summary: Woovi webhook (alias)
+      security: []
+      parameters:
+        - name: x-woovi-signature
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: x-webhook-signature
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: x-webhook-timestamp
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Webhook processed
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/ServerError"
+components:
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+    Offset:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+    PaymentId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema:
+        type: string
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+    BearerAuth:
+      type: http
+      scheme: bearer
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: Conflict
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    UnprocessableEntity:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+  schemas:
+    HealthResponse:
+      type: object
+      required: [ok, status, env, uptime]
+      properties:
+        ok: { type: boolean }
+        status: { type: string }
+        env: { type: string }
+        uptime: { type: number }
+      example:
+        ok: true
+        status: ok
+        env: production
+        uptime: 12345
+    ErrorResponse:
+      type: object
+      required: [ok, message]
+      properties:
+        ok: { type: boolean, example: false }
+        error: { type: string }
+        message: { type: string }
+        details:
+          type: object
+          additionalProperties: true
+    AmountFields:
+      type: object
+      oneOf:
+        - required: [amount]
+          properties:
+            amount:
+              type: number
+              minimum: 0.01
+        - required: [amount_cents]
+          properties:
+            amount_cents:
+              type: integer
+              minimum: 1
+    PaymentMethod:
+      type: string
+      enum: [pix, card]
+    PaymentStatus:
+      type: string
+      enum: [pending, authorized, paid, failed, canceled, refunded, expired]
+    CreatePaymentRequest:
+      allOf:
+        - $ref: "#/components/schemas/AmountFields"
+        - type: object
+          required: [method]
+          properties:
+            method:
+              $ref: "#/components/schemas/PaymentMethod"
+            currency:
+              type: string
+              example: BRL
+            capture:
+              type: boolean
+            metadata:
+              type: object
+              additionalProperties: true
+            customer:
+              type: object
+              additionalProperties: true
+            card_hash:
+              type: string
+              description: Tokenized card hash. Prefer this over raw card data.
+            card:
+              $ref: "#/components/schemas/CardPayload"
+    CreatePixPaymentRequest:
+      allOf:
+        - $ref: "#/components/schemas/AmountFields"
+        - type: object
+          properties:
+            currency:
+              type: string
+            metadata:
+              type: object
+              additionalProperties: true
+            customer:
+              type: object
+              additionalProperties: true
+    CreateCardPaymentRequest:
+      allOf:
+        - $ref: "#/components/schemas/AmountFields"
+        - type: object
+          properties:
+            currency:
+              type: string
+            capture:
+              type: boolean
+            metadata:
+              type: object
+              additionalProperties: true
+            customer:
+              type: object
+              additionalProperties: true
+            card_hash:
+              type: string
+              description: Tokenized card hash. Prefer this over raw card data.
+            card:
+              $ref: "#/components/schemas/CardPayload"
+    CardPayload:
+      type: object
+      description: Raw card data. Use only in PCI-compliant environments; prefer card_hash when possible.
+      properties:
+        number: { type: string }
+        holder_name: { type: string }
+        exp_month: { type: integer }
+        exp_year: { type: integer }
+        cvv: { type: string }
+    RefundRequest:
+      allOf:
+        - $ref: "#/components/schemas/AmountFields"
+        - type: object
+      description: Omit request body for full refund.
+    MetadataRequest:
+      type: object
+      required: [metadata]
+      properties:
+        metadata:
+          type: object
+          additionalProperties: true
+    PixWebhookRequest:
+      type: object
+      required: [providerReference, event]
+      properties:
+        providerReference:
+          type: string
+        event:
+          type: string
+          enum: [PIX_CONFIRMED, PIX_FAILED, PIX_EXPIRED]
+    Transaction:
+      type: object
+      properties:
+        id: { type: string }
+        amount: { type: number }
+        amount_cents: { type: integer }
+        currency: { type: string }
+        method:
+          $ref: "#/components/schemas/PaymentMethod"
+        status:
+          $ref: "#/components/schemas/PaymentStatus"
+        capture: { type: boolean }
+        customer:
+          type: object
+          nullable: true
+        provider:
+          type: string
+          nullable: true
+        providerReference:
+          type: string
+          nullable: true
+        methodDetails:
+          type: object
+          nullable: true
+        metadata:
+          type: object
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaymentEvent"
+    PaymentEvent:
+      type: object
+      properties:
+        type: { type: string }
+        at:
+          type: string
+          format: date-time
+    PaymentResponse:
+      type: object
+      properties:
+        ok: { type: boolean }
+        transaction:
+          $ref: "#/components/schemas/Transaction"
+    PaymentEventsResponse:
+      type: object
+      properties:
+        ok: { type: boolean }
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaymentEvent"
+    PaymentListResponse:
+      type: object
+      properties:
+        ok: { type: boolean }
+        total: { type: integer }
+        count: { type: integer }
+        limit: { type: integer }
+        offset: { type: integer }
+        transactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Transaction"
+    PaymentStatsResponse:
+      type: object
+      properties:
+        ok: { type: boolean }
+        stats:
+          type: object
+          properties:
+            total: { type: integer }
+            total_amount_cents: { type: integer }
+            total_paid_cents: { type: integer }
+            by_status:
+              type: object
+              additionalProperties: true
+            by_method:
+              type: object
+              additionalProperties: true
