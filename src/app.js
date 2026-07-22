@@ -19,6 +19,7 @@ import documentsRoutes from "./routes/documents.js";
 import checkoutRoutes from "./routes/checkout.js";
 import cardTokensRoutes from "./routes/cardTokens.js";
 import payApiRoutes from "./routes/payApi.js";
+import flowApiRoutes from "./routes/flowApi.js";
 import { requireApiKey } from "./middlewares/auth.js";
 import { errorHandler, notFoundHandler } from "./middlewares/errors.js";
 
@@ -114,6 +115,7 @@ app.use("/api/dashboard/documents", documentsRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/checkout", checkoutRoutes);
 app.use("/api/pay", payApiRoutes);
+app.use("/api/flow", flowApiRoutes);
 
 // Expose OpenAPI spec file (docs content is kept in-repo, but the SPA handles /docs route).
 app.get("/openapi.yaml", (_req, res) => res.sendFile(path.join(docsDir, "openapi.yaml")));
@@ -122,7 +124,7 @@ app.get("/openapi.yaml", (_req, res) => res.sendFile(path.join(docsDir, "openapi
 app.use("/api", notFoundHandler);
 
 app.use(express.static(spaDir));
-app.get("*", (_req, res) => res.sendFile(path.join(spaDir, "index.html")));
+app.get("(.*)", (_req, res) => res.sendFile(path.join(spaDir, "index.html")));
 
 app.use(notFoundHandler);
 app.use(errorHandler);
