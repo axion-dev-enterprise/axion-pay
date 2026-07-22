@@ -115,7 +115,9 @@ app.use("/api/dashboard/documents", documentsRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/checkout", checkoutRoutes);
 app.use("/api/pay", payApiRoutes);
+app.use("/pay", payApiRoutes);
 app.use("/api/flow", flowApiRoutes);
+app.use("/flow", flowApiRoutes);
 
 // Expose OpenAPI spec file (docs content is kept in-repo, but the SPA handles /docs route).
 app.get("/openapi.yaml", (_req, res) => res.sendFile(path.join(docsDir, "openapi.yaml")));
