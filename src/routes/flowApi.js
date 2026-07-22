@@ -28,34 +28,6 @@ function getOrCreateUserAgents(userId) {
   return agentStore.get(userId);
 }
 
-function getOrCreateUserAiCredentials(userId) {
-  if (!aiCredentialStore.has(userId)) {
-    aiCredentialStore.set(userId, [
-      {
-        id: 'cred_nous_01',
-        provider: 'nous',
-        name: 'Nous Portal API Key',
-        endpoint: 'https://nous.axionenterprise.cloud/api/v1',
-        api_key: 'nous_sk_live_99812a874b3910c28374',
-        status: 'connected',
-        plan: 'Axion Enterprise',
-        created_at: new Date().toISOString()
-      },
-      {
-        id: 'cred_openrouter_01',
-        provider: 'openrouter',
-        name: 'OpenRouter Free Tier',
-        endpoint: 'https://openrouter.ai/api/v1',
-        api_key: 'sk-or-v1-axion-free-tier-2026-key',
-        status: 'connected',
-        plan: 'Free Tier',
-        created_at: new Date().toISOString()
-      }
-    ]);
-  }
-  return aiCredentialStore.get(userId);
-}
-
 router.use(requireRemoteSession);
 
 router.get('/stats', (req, res) => {
@@ -78,6 +50,47 @@ router.get('/agents', (req, res) => {
   res.json(getOrCreateUserAgents(userId));
 });
 
+router.post('/agents/:id/toggle', (req, res) => {
+  const userId = req.user?.id || 'demo';
+  const agents = getOrCreateUserAgents(userId);
+  const agent = agents.find(a => a.id === req.params.id);
+  if (!agent) {
+    return res.status(404).json({ ok: false, error: 'Agente não encontrado' });
+  }
+  agent.status = agent.status === 'active' ? 'inactive' : 'active';
+  return res.json({ ok: true, status: agent.status, agent });
+});
+
+router.post('/agents/provision', (req, res) => {
+  const userId = req.user?.id || 'demo';
+  const agents = getOrCreateUserAgents(userId);
+  const { name, type, model, systemPrompt } = req.body || {};
+  const newAgent = {
+    id: `ag_hermes_${randomUUID().slice(0, 8)}`,
+    name: name || 'Novo Agente Hermes',
+    type: type || 'qualificacao',
+    model: model || 'OpenRouter (gpt-4o-mini)',
+    systemPrompt: systemPrompt || 'Assistente comercial autônomo',
+    status: 'active',
+    leads_count: 0,
+    conversations_count: 0,
+    free_trial_remaining: 100,
+    created_at: new Date().toISOString()
+  };
+  agents.unshift(newAgent);
+  return res.json(newAgent);
+});
+
+router.post('/agents/:id/chat', (req, res) => {
+  const { message } = req.body || {};
+  const query = message || 'Olá';
+  return res.json({
+    ok: true,
+    sender: 'bot',
+    response: `[Agente Hermes]: Entendido! Processando sua solicitação sobre "${query}". Como posso agendar seu atendimento comercial?`
+  });
+});
+
 router.post('/ai-credentials/test', (req, res) => {
   const { provider, api_key } = req.body || {};
   if (!api_key || api_key.trim().length < 4) {
@@ -88,6 +101,31 @@ router.post('/ai-credentials/test', (req, res) => {
     status: 'connected',
     latencyMs: 142,
     message: `Conexão efetuada com sucesso com ${provider === 'nous' ? 'Nous Portal' : 'OpenRouter'}!`
+  });
+});
+
+router.post('/ai-credentials/save', (req, res) => {
+  const { provider } = req.body || {};
+  return res.json({
+    success: true,
+    message: `Credenciais de ${provider === 'nous' ? 'Nous Portal' : 'OpenRouter'} salvas com sucesso!`
+  });
+});
+
+router.post('/whatsapp/connect', (req, res) => {
+  return res.json({
+    success: true,
+    status: 'provisioning',
+    qr_code: 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=AXION_FLOW_WHATSAPP_PAIRING'
+  });
+});
+
+router.put('/whatsapp/phone', (req, res) => {
+  const { phone_number } = req.body || {};
+  return res.json({
+    success: true,
+    phone_number: phone_number || '+55 11 92476-5169',
+    message: 'Número atualizado com sucesso!'
   });
 });
 
