@@ -8,5 +8,9 @@ try {
 }
 
 export default function handler(req, res) {
+  const originalUrl = req.headers["x-matched-path"] || req.headers["x-invoke-path"];
+  if (originalUrl) {
+    req.url = originalUrl;
+  }
   return app(req, res);
 }
