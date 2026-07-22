@@ -1,48 +1,161 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-@layer base {
-  :root {
-    color-scheme: dark;
-    font-family: theme(fontFamily.sans);
-    background:
-      radial-gradient(circle at top left, rgba(56, 228, 143, 0.12), transparent 25%),
-      radial-gradient(circle at top right, rgba(74, 217, 210, 0.14), transparent 30%),
-      #04110d;
-  }
-
-  * {
-    @apply border-line;
-  }
-
-  html {
-    @apply scroll-smooth;
-  }
-
-  body {
-    @apply min-h-screen bg-canvas bg-shell text-ink antialiased;
-  }
+@theme {
+  --color-gold: #e8b923;
+  --color-gold-soft: #c79a1a;
+  --color-gold-glow: rgba(232, 185, 35, 0.15);
+  --font-display: "Sora", system-ui, sans-serif;
 }
 
-@layer components {
-  .page-wrap {
-    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
-  }
+:root {
+  color-scheme: dark;
+}
 
-  .section-space {
-    @apply py-16 sm:py-20 lg:py-24;
-  }
+html {
+  scroll-behavior: smooth;
+}
 
-  .headline {
-    @apply font-sans text-4xl font-extrabold tracking-[-0.05em] text-white sm:text-5xl lg:text-6xl;
-  }
+body {
+  margin: 0;
+  background: #040407;
+  color: #f5f5fa;
+  font-family: var(--font-display);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
 
-  .subheadline {
-    @apply max-w-3xl font-body text-base leading-7 text-mist sm:text-lg;
-  }
+/* Glassmorphism Classes */
+.glass-nav {
+  background: rgba(10, 10, 15, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
 
-  .surface-panel {
-    @apply rounded-3xl border border-white/10 bg-white/5 shadow-soft backdrop-blur-xl;
+.glass-card {
+  background: rgba(20, 20, 28, 0.5);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-card:hover {
+  border-color: rgba(232, 185, 35, 0.25);
+  box-shadow: 0 12px 40px 0 rgba(232, 185, 35, 0.06);
+  transform: translateY(-2px);
+}
+
+.glass-card-popular {
+  background: rgba(24, 22, 18, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(232, 185, 35, 0.3);
+  box-shadow: 0 8px 32px 0 rgba(232, 185, 35, 0.05);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-card-popular:hover {
+  border-color: rgba(232, 185, 35, 0.6);
+  box-shadow: 0 12px 40px 0 rgba(232, 185, 35, 0.1);
+  transform: translateY(-2px);
+}
+
+.glass-input {
+  background: rgba(5, 5, 8, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease-in-out;
+}
+
+.glass-input:focus {
+  border-color: var(--color-gold);
+  background: rgba(5, 5, 8, 0.9);
+  box-shadow: 0 0 16px var(--color-gold-glow);
+  outline: none;
+}
+
+/* Premium Gradients */
+.text-gradient-gold {
+  background: linear-gradient(135deg, #fff 30%, #e8b923 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.text-gradient-metal {
+  background: linear-gradient(135deg, #ffffff 0%, #a1a1aa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Glow Background Effects */
+.glow-bg-radial {
+  position: absolute;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(232, 185, 35, 0.08) 0%, rgba(0, 0, 0, 0) 70%);
+  top: -200px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: -1;
+  pointer-events: none;
+}
+
+.glow-bg-purple {
+  position: absolute;
+  width: 800px;
+  height: 800px;
+  background: radial-gradient(circle, rgba(147, 51, 234, 0.04) 0%, rgba(0, 0, 0, 0) 75%);
+  bottom: -200px;
+  right: -200px;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #040407;
+}
+::-webkit-scrollbar-thumb {
+  background: #22222e;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #333344;
+}
+
+/* Focus Indicator */
+:where(a, button, input, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 2px;
+}
+
+/* Accessibility */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: var(--color-gold);
+  color: #000;
+  padding: 8px 16px;
+  font-weight: 700;
+  z-index: 100;
+}
+.skip-link:focus {
+  left: 12px;
+  top: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
 }

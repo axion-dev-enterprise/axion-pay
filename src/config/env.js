@@ -146,6 +146,7 @@ export const config = {
       }
     }
   },
+  authServiceUrl: process.env.AUTH_SERVICE_URL || "https://auth.axionenterprise.cloud",
   csp: {
     connectSrc: cspConnectSrc
   },

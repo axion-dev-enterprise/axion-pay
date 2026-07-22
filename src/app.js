@@ -18,6 +18,7 @@ import dashboardRoutes from "./routes/dashboard.js";
 import documentsRoutes from "./routes/documents.js";
 import checkoutRoutes from "./routes/checkout.js";
 import cardTokensRoutes from "./routes/cardTokens.js";
+import payApiRoutes from "./routes/payApi.js";
 import { requireApiKey } from "./middlewares/auth.js";
 import { errorHandler, notFoundHandler } from "./middlewares/errors.js";
 
@@ -46,7 +47,8 @@ app.use(
       directives: {
         styleSrc: ["'self'", "https://fonts.googleapis.com", "'unsafe-inline'"],
         fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
-        connectSrc: config.csp?.connectSrc || ["'self'"]
+        imgSrc: ["'self'", "data:", "https://lh3.googleusercontent.com"],
+        connectSrc: ["'self'", "https://auth.axionenterprise.cloud"].concat(config.csp?.connectSrc || [])
       }
     }
   })
@@ -111,6 +113,7 @@ app.use("/admin", adminRoutes);
 app.use("/api/dashboard/documents", documentsRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/checkout", checkoutRoutes);
+app.use("/api/pay", payApiRoutes);
 
 // Expose OpenAPI spec file (docs content is kept in-repo, but the SPA handles /docs route).
 app.get("/openapi.yaml", (_req, res) => res.sendFile(path.join(docsDir, "openapi.yaml")));

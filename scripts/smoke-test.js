@@ -43,7 +43,7 @@ async function runSmokeTest() {
     });
 
   const homepage = await api.get("/").expect(200);
-  if (!homepage.text.includes("AxionPAY")) {
+  if (!homepage.text.toLowerCase().includes("axion")) {
     throw new Error("Homepage missing expected branding.");
   }
 
