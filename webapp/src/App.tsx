@@ -367,12 +367,12 @@ export default function App() {
       <main id="conteudo">
         
         {/* HERO SECTION */}
-        <section className="max-w-6xl mx-auto px-6 pt-16 pb-16 md:py-20 grid md:grid-cols-12 gap-8 md:gap-12 items-center relative grid-bg">
+        <section className="max-w-6xl mx-auto px-6 pt-12 pb-12 md:pt-16 md:pb-16 grid md:grid-cols-12 gap-6 md:gap-10 items-center relative grid-bg">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="md:col-span-7 text-left space-y-6"
+            className="md:col-span-7 text-left space-y-4"
           >
             <motion.div
               initial={{ opacity: 0, y: 10 }}
@@ -388,7 +388,7 @@ export default function App() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
-              className="text-4xl md:text-6xl font-extrabold tracking-tight leading-[1.1] text-gradient-metal"
+              className="text-3xl md:text-5xl font-extrabold tracking-tight leading-[1.1] text-gradient-metal"
             >
               A forma inteligente de <span className="text-gradient-gold">receber pagamentos.</span>
             </motion.h1>
@@ -397,12 +397,12 @@ export default function App() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.3 }}
-              className="text-zinc-400 text-lg leading-relaxed max-w-xl"
+              className="text-zinc-400 text-sm md:text-base leading-relaxed max-w-xl"
             >
               Simplifique o fluxo de caixa do seu negócio. Gere cobranças PIX instantâneas ou links de cartão de crédito e receba com a menor tarifa do mercado.
             </motion.p>
             
-            <div className="flex flex-col sm:flex-row gap-4 pt-4">
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
               <button 
                 onClick={() => handleOpenModal("150")}
                 className="px-6 py-3.5 rounded-xl text-xs font-bold tracking-[0.12em] uppercase bg-gradient-to-r from-amber-400 to-yellow-500 text-black hover:opacity-90 active:scale-98 transition-all shadow-xl shadow-yellow-500/10 flex items-center justify-center gap-2"
@@ -425,15 +425,15 @@ export default function App() {
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, ease: "easeOut" }}
-              className="glass-card rounded-2xl p-6 md:p-8 relative overflow-hidden"
+              className="glass-card rounded-2xl p-5 md:p-6 relative overflow-hidden"
             >
               <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-yellow-500/10 to-transparent pointer-events-none" />
               
-              <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+              <h3 className="text-sm font-bold mb-3 flex items-center gap-2">
                 Simulador de Vendas
               </h3>
               
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div>
                   <label htmlFor="simulador-valor" className="block text-[10px] font-mono tracking-[0.12em] uppercase text-zinc-500 mb-2">Valor da Venda</label>
                   <div className="relative">
@@ -525,8 +525,7 @@ export default function App() {
         </section>
 
         {/* BENEFICIOS / FEATURES */}
-        <section id="beneficios" className="py-16 md:py-20 relative bg-zinc-950/20">
-          {/* Gradient divider top */}
+        <section id="beneficios" className="py-12 md:py-16 relative bg-zinc-950/20 grid-bg">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-px bg-gradient-to-r from-transparent via-[#e8b923]/30 to-transparent" />
           <div className="max-w-6xl mx-auto px-6">
             <motion.div
@@ -534,16 +533,16 @@ export default function App() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.4 }}
-              className="text-center max-w-2xl mx-auto space-y-3 mb-12 md:mb-14"
+              className="text-center max-w-2xl mx-auto space-y-2 mb-8 md:mb-10"
             >
               <span className="inline-block text-[10px] font-mono tracking-[0.15em] uppercase text-zinc-500">Recursos</span>
-              <h2 className="text-3xl font-bold tracking-tight">Tudo que você precisa para <span className="text-gradient-gold">vender mais.</span></h2>
-              <p className="text-zinc-500 text-xs md:text-sm leading-relaxed max-w-lg mx-auto">
+              <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Tudo que você precisa para <span className="text-gradient-gold">vender mais.</span></h2>
+              <p className="text-zinc-500 text-xs leading-relaxed max-w-lg mx-auto">
                 Oferecemos uma suite completa de ferramentas financeiras projetadas para negócios de qualquer escala.
               </p>
             </motion.div>
             
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
               {[
                 { icon: QrCode, t: "PIX Instantâneo", d: "Geração de QR Codes dinâmicos em tempo real com conciliação bancária imediata." },
                 { icon: CreditCard, t: "Checkout Transparente", d: "Aceite cartões de crédito e débito direto na sua página sem redirecionamentos." },
@@ -556,7 +555,7 @@ export default function App() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ duration: 0.4, delay: i * 0.12 }}
-                  className="glass-card rounded-2xl p-6 relative overflow-hidden group hover-left-bar"
+                  className="glass-card rounded-xl p-5 relative overflow-hidden group hover-left-bar"
                 >
                   <div className="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mb-6 group-hover:border-[#e8b923]/50 transition-colors">
                     <f.icon className="w-5 h-5 text-[#e8b923]" />
@@ -570,24 +569,23 @@ export default function App() {
         </section>
 
         {/* PRICING / TARIFAS */}
-        <section id="tarifas" className="py-16 md:py-20 max-w-6xl mx-auto px-6 relative">
-          {/* Gradient divider top */}
+        <section id="tarifas" className="py-12 md:py-16 max-w-6xl mx-auto px-6 relative grid-bg">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-px bg-gradient-to-r from-transparent via-[#e8b923]/20 to-transparent" />
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.4 }}
-            className="text-center max-w-2xl mx-auto space-y-3 mb-12 md:mb-14"
+            className="text-center max-w-2xl mx-auto space-y-2 mb-8 md:mb-10"
           >
             <span className="inline-block text-[10px] font-mono tracking-[0.15em] uppercase text-zinc-500">Preços</span>
-            <h2 className="text-3xl font-bold tracking-tight">Tarifas transparentes, <span className="text-gradient-gold">sem surpresas.</span></h2>
-            <p className="text-zinc-500 text-xs md:text-sm leading-relaxed max-w-lg mx-auto">
+            <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Tarifas transparentes, <span className="text-gradient-gold">sem surpresas.</span></h2>
+            <p className="text-zinc-500 text-xs leading-relaxed max-w-lg mx-auto">
               Sem taxas de adesão, sem mensalidade nos planos iniciais. Você só paga quando vender.
             </p>
           </motion.div>
           
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-3 gap-5 md:gap-6">
             {PLANS.map((p, idx) => (
               <motion.div
                 key={p.name}
@@ -595,7 +593,7 @@ export default function App() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.5, delay: idx * 0.1 }}
-                className={p.popular ? "glass-card-popular rounded-3xl p-8 relative flex flex-col justify-between" : "glass-card rounded-3xl p-8 relative flex flex-col justify-between"}
+                className={p.popular ? "glass-card-popular rounded-2xl p-6 relative flex flex-col justify-between" : "glass-card rounded-2xl p-6 relative flex flex-col justify-between"}
               >
                 {p.popular && (
                   <span className="absolute -top-3 right-6 bg-[#e8b923] text-black text-[10px] font-mono tracking-[0.15em] uppercase font-bold px-4 py-1.5 shadow-lg">
@@ -610,7 +608,7 @@ export default function App() {
                   </div>
                   
                   <div className="flex items-baseline gap-1">
-                    <span className="text-4xl font-extrabold text-gradient-gold">{p.price}</span>
+                    <span className="text-3xl font-extrabold text-gradient-gold">{p.price}</span>
                     <span className="text-sm text-zinc-400 font-medium">{p.period}</span>
                   </div>
                   
@@ -644,9 +642,9 @@ export default function App() {
         </section>
 
         {/* DEVELOPER PLAYGROUND / INTEGRACAO */}
-        <section id="integracao" className="py-16 md:py-20 relative bg-zinc-950/20">
+        <section id="integracao" className="py-12 md:py-16 relative bg-zinc-950/20 grid-bg">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-px bg-gradient-to-r from-transparent via-[#e8b923]/30 to-transparent" />
-          <div className="max-w-6xl mx-auto px-6 grid lg:grid-cols-12 gap-12 items-center">
+          <div className="max-w-6xl mx-auto px-6 grid lg:grid-cols-12 gap-8 md:gap-10 items-center">
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               whileInView={{ opacity: 1, x: 0 }}
@@ -723,17 +721,17 @@ export default function App() {
         </section>
 
         {/* FAQ SECTION */}
-        <section id="faq" className="py-16 md:py-20 max-w-3xl mx-auto px-6 relative">
+        <section id="faq" className="py-12 md:py-16 max-w-3xl mx-auto px-6 relative grid-bg">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-px bg-gradient-to-r from-transparent via-[#e8b923]/20 to-transparent" />
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.4 }}
-            className="text-center space-y-3 mb-10"
+            className="text-center space-y-2 mb-8"
           >
             <span className="inline-block text-[10px] font-mono tracking-[0.15em] uppercase text-zinc-500">Suporte</span>
-            <h2 className="text-3xl font-bold tracking-tight">Perguntas <span className="text-gradient-gold">Frequentes</span></h2>
+            <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Perguntas <span className="text-gradient-gold">Frequentes</span></h2>
             <p className="text-zinc-500 text-xs max-w-md mx-auto">
               Tire suas principais dúvidas sobre o funcionamento e taxas da AxionPay.
             </p>
