@@ -255,10 +255,17 @@ export default function App() {
       <div className="scanline-overlay" />
       <div className="scan-line" />
       
+      <div className="fixed top-0 left-0 right-0 z-[60] bg-amber-500/10 border-b border-amber-500/20 backdrop-blur-md">
+        <div className="max-w-6xl mx-auto px-6 py-1 flex items-center justify-center gap-2 text-[10px] font-mono tracking-[0.12em] uppercase text-amber-400">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+          Preview Mode · v1.0.0-build.20260727
+        </div>
+      </div>
+      
       <a href="#conteudo" className="skip-link">Pular para o conteúdo</a>
 
       {/* Premium Navbar */}
-      <header className="sticky top-0 z-50 glass-nav" role="banner">
+      <header className="sticky top-[28px] z-50 glass-nav" role="banner">
         <div className="max-w-6xl mx-auto flex items-center justify-between px-6 py-4">
           <div className="flex items-center gap-2" aria-label="AxionPay Home">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-amber-400 to-yellow-600 flex items-center justify-center shadow-lg shadow-yellow-600/10">
