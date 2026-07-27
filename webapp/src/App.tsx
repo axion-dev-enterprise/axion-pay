@@ -204,6 +204,43 @@ export default function App() {
     }
   }
 
+  // Subscription state
+  const [subModalOpen, setSubModalOpen] = useState(false);
+  const [subPlan, setSubPlan] = useState<any>(null);
+  const [subLoading, setSubLoading] = useState(false);
+  const [subResult, setSubResult] = useState<any>(null);
+
+  async function handleSubscribe(plan: typeof PLANS[number]) {
+    setSubPlan(plan);
+    setSubResult(null);
+    setSubLoading(true);
+    setSubModalOpen(true);
+
+    if (plan.price === "Sob consulta") {
+      setSubResult({ success: true, plan_name: "Enterprise", amount_display: "Sob consulta", status: "contact_sales" });
+      setSubLoading(false);
+      return;
+    }
+
+    try {
+      const token = getToken();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const planId = plan.name.toLowerCase();
+      const r = await fetch("/api/pay/subscribe", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ plan: planId }),
+      });
+      const d = await r.json();
+      setSubResult(d);
+    } catch {
+      setSubResult({ success: false, error: "Erro de conexão com o servidor." });
+    } finally {
+      setSubLoading(false);
+    }
+  }
+
   // Simulate payment confirmation
   const handleSimulatePayment = () => {
     setPixPaid(true);
@@ -255,17 +292,10 @@ export default function App() {
       <div className="scanline-overlay" />
       <div className="scan-line" />
       
-      <div className="fixed top-0 left-0 right-0 z-[60] bg-amber-500/10 border-b border-amber-500/20 backdrop-blur-md">
-        <div className="max-w-6xl mx-auto px-6 py-1 flex items-center justify-center gap-2 text-[10px] font-mono tracking-[0.12em] uppercase text-amber-400">
-          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-          Preview Mode · v1.0.0-build.20260727
-        </div>
-      </div>
-      
       <a href="#conteudo" className="skip-link">Pular para o conteúdo</a>
 
       {/* Premium Navbar */}
-      <header className="sticky top-[28px] z-50 glass-nav" role="banner">
+      <header className="sticky top-0 z-50 glass-nav" role="banner">
         <div className="max-w-6xl mx-auto flex items-center justify-between px-6 py-4">
           <div className="flex items-center gap-2" aria-label="AxionPay Home">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-amber-400 to-yellow-600 flex items-center justify-center shadow-lg shadow-yellow-600/10">
@@ -413,7 +443,7 @@ export default function App() {
                 onClick={() => handleOpenModal("150")}
                 className="px-6 py-3.5 rounded-xl text-xs font-bold tracking-[0.12em] uppercase bg-gradient-to-r from-amber-400 to-yellow-500 text-black hover:opacity-90 active:scale-98 transition-all shadow-xl shadow-yellow-500/10 flex items-center justify-center gap-2"
               >
-                Testar Checkout
+                Criar Cobrança
                 <ArrowRight className="w-4 h-4" />
               </button>
               <a 
@@ -436,8 +466,8 @@ export default function App() {
               <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-yellow-500/10 to-transparent pointer-events-none" />
               
               <h3 className="text-sm font-bold mb-3 flex items-center gap-2">
-                Preview
-                <span className="text-[10px] font-mono tracking-[0.12em] uppercase text-zinc-500 font-normal">· Simulador de Taxas</span>
+                Simulador
+                <span className="text-[10px] font-mono tracking-[0.12em] uppercase text-zinc-500 font-normal">· Taxas</span>
               </h3>
               
               <div className="space-y-3">
@@ -523,7 +553,7 @@ export default function App() {
                   onClick={() => handleOpenModal(calcAmount)}
                   className="w-full mt-4 py-3 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-[#e8b923] hover:bg-zinc-900/80 text-white text-xs font-bold tracking-[0.12em] uppercase flex items-center justify-center gap-2 transition-all"
                 >
-                  Simular Cobrança
+                  Gerar Cobrança
                   <ArrowRight className="w-4 h-4 text-[#e8b923]" />
                 </button>
               </div>
@@ -631,20 +661,17 @@ export default function App() {
                   </ul>
                 </div>
                 
-                <div className="mt-8 space-y-2">
+                <div className="mt-8">
                   <button 
-                    onClick={() => handleOpenModal("100")}
+                    onClick={() => handleSubscribe(p)}
                     className={`w-full py-3.5 rounded-xl text-xs font-bold tracking-[0.12em] uppercase transition-all ${
                       p.popular 
                         ? "bg-[#e8b923] text-black hover:opacity-90" 
                         : "bg-zinc-900 border border-zinc-800 hover:border-[#e8b923] text-white"
                     }`}
                   >
-                    Simular Checkout
+                    {p.price === "Sob consulta" ? "Falar com Vendas" : "Assinar Agora"}
                   </button>
-                  <p className="text-[10px] text-zinc-600 text-center font-mono tracking-[0.08em]">
-                    Preview · Assinaturas em breve
-                  </p>
                 </div>
               </motion.div>
             ))}
@@ -844,7 +871,7 @@ export default function App() {
           <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[95%] sm:w-[90%] max-w-md bg-[#09090d] border border-zinc-800 rounded-2xl p-5 sm:p-6 shadow-2xl z-50 focus:outline-none max-h-[90vh] overflow-y-auto">
             
             <Dialog.Title className="text-lg font-bold text-white flex items-center justify-between">
-              Preview de Checkout
+              Checkout
               <button 
                 onClick={() => setOpenModal(false)}
                 className="text-zinc-500 hover:text-white font-normal text-[10px] font-mono tracking-[0.12em] uppercase"
@@ -854,7 +881,7 @@ export default function App() {
             </Dialog.Title>
             
             <Dialog.Description className="text-zinc-400 text-xs mt-1">
-              Simulação visual do fluxo de PIX e Cartão — sem processamento real.
+              Gere uma cobrança PIX para testar o fluxo de pagamento.
             </Dialog.Description>
             
             <div className="mt-6 space-y-4">
@@ -1025,6 +1052,75 @@ export default function App() {
               )}
             </div>
             
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
+      {/* SUBSCRIPTION MODAL */}
+      <Dialog.Root open={subModalOpen} onOpenChange={setSubModalOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 transition-opacity" />
+          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[95%] sm:w-[90%] max-w-md bg-[#09090d] border border-zinc-800 rounded-2xl p-5 sm:p-6 shadow-2xl z-50 focus:outline-none max-h-[90vh] overflow-y-auto">
+            
+            <Dialog.Title className="text-lg font-bold text-white flex items-center justify-between">
+              {subLoading ? "Processando..." : subResult?.success ? "Assinatura Confirmada" : "Assinar Plano"}
+              <button onClick={() => setSubModalOpen(false)} className="text-zinc-500 hover:text-white font-normal text-[10px] font-mono tracking-[0.12em] uppercase">fechar</button>
+            </Dialog.Title>
+
+            {subLoading && (
+              <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                <div className="w-10 h-10 border-2 border-[#e8b923] border-t-transparent rounded-full animate-spin" />
+                <p className="text-zinc-400 text-xs">Gerando pagamento...</p>
+              </div>
+            )}
+
+            {subResult?.success && !subLoading && (
+              <div className="mt-6 space-y-4">
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-green-500/10 border border-green-500/20">
+                  <CheckCircle2 className="w-6 h-6 text-green-500 shrink-0" />
+                  <div>
+                    <p className="text-sm font-bold text-green-400">{subResult.plan_name}</p>
+                    <p className="text-[10px] text-zinc-500">{subResult.amount_display}</p>
+                  </div>
+                </div>
+
+                {subResult.qr_code_base64 && (
+                  <div className="p-3 bg-white rounded-xl border border-zinc-200 inline-block shadow-lg mx-auto">
+                    <img src={`data:image/png;base64,${subResult.qr_code_base64}`} alt="PIX QR Code" className="w-[180px] h-[180px]" />
+                  </div>
+                )}
+
+                {subResult.pix_copy_paste && (
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-mono tracking-[0.12em] uppercase text-zinc-500">Código PIX Copia e Cola</p>
+                    <div className="flex gap-2">
+                      <input readOnly value={subResult.pix_copy_paste} className="flex-1 px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-[10px] text-zinc-400 font-mono truncate" />
+                      <button onClick={() => { navigator.clipboard.writeText(subResult.pix_copy_paste); }} className="px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-800 text-white hover:bg-zinc-800 text-[10px] font-mono transition-all">
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {subResult.ticket_url && (
+                  <a href={subResult.ticket_url} target="_blank" rel="noopener noreferrer" className="block w-full py-3 text-center rounded-xl bg-[#e8b923] text-black text-xs font-bold tracking-[0.12em] uppercase transition-all hover:opacity-90">
+                    Abrir Pagamento
+                  </a>
+                )}
+
+                <p className="text-[10px] text-zinc-600 text-center font-mono">
+                  Status: <span className="text-amber-400">{subResult.status === "approved" ? "Pago" : "Aguardando pagamento"}</span>
+                </p>
+              </div>
+            )}
+
+            {!subResult?.success && !subLoading && subResult && (
+              <div className="mt-6">
+                <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
+                  {subResult.error || "Erro ao processar assinatura."}
+                </div>
+              </div>
+            )}
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
