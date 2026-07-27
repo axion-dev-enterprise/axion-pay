@@ -197,7 +197,6 @@ export default function App() {
       setLink(d.paymentUrl || d.qrCode || JSON.stringify(d));
       setQrCode(d.paymentUrl || d.qrCode);
     } catch {
-      // Mock para demonstração premium sem backend
       setLink(`em55b9e02c114389b706c9a38ef6722d5511924765169`);
       setQrCode("https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=em55b9e02c114389b706c9a38ef6722d5511924765169");
     } finally {
@@ -407,14 +406,14 @@ export default function App() {
                 onClick={() => handleOpenModal("150")}
                 className="px-6 py-3.5 rounded-xl text-xs font-bold tracking-[0.12em] uppercase bg-gradient-to-r from-amber-400 to-yellow-500 text-black hover:opacity-90 active:scale-98 transition-all shadow-xl shadow-yellow-500/10 flex items-center justify-center gap-2"
               >
-                Gerar Cobrança de Teste
+                Testar Checkout
                 <ArrowRight className="w-4 h-4" />
               </button>
               <a 
                 href="#integracao"
                 className="px-6 py-3.5 rounded-xl text-xs font-bold tracking-[0.12em] uppercase border border-zinc-800 bg-zinc-900/20 hover:bg-zinc-900/50 text-white flex items-center justify-center gap-2 transition-all"
               >
-                Ver Documentação API
+                Documentação para Devs
               </a>
             </div>
           </motion.div>
@@ -430,7 +429,8 @@ export default function App() {
               <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-yellow-500/10 to-transparent pointer-events-none" />
               
               <h3 className="text-sm font-bold mb-3 flex items-center gap-2">
-                Simulador de Vendas
+                Preview
+                <span className="text-[10px] font-mono tracking-[0.12em] uppercase text-zinc-500 font-normal">· Simulador de Taxas</span>
               </h3>
               
               <div className="space-y-3">
@@ -516,7 +516,7 @@ export default function App() {
                   onClick={() => handleOpenModal(calcAmount)}
                   className="w-full mt-4 py-3 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-[#e8b923] hover:bg-zinc-900/80 text-white text-xs font-bold tracking-[0.12em] uppercase flex items-center justify-center gap-2 transition-all"
                 >
-                  Criar Esta Cobrança
+                  Simular Cobrança
                   <ArrowRight className="w-4 h-4 text-[#e8b923]" />
                 </button>
               </div>
@@ -624,7 +624,7 @@ export default function App() {
                   </ul>
                 </div>
                 
-                <div className="mt-8">
+                <div className="mt-8 space-y-2">
                   <button 
                     onClick={() => handleOpenModal("100")}
                     className={`w-full py-3.5 rounded-xl text-xs font-bold tracking-[0.12em] uppercase transition-all ${
@@ -633,8 +633,11 @@ export default function App() {
                         : "bg-zinc-900 border border-zinc-800 hover:border-[#e8b923] text-white"
                     }`}
                   >
-                    Começar Agora
+                    Simular Checkout
                   </button>
+                  <p className="text-[10px] text-zinc-600 text-center font-mono tracking-[0.08em]">
+                    Preview · Assinaturas em breve
+                  </p>
                 </div>
               </motion.div>
             ))}
@@ -834,7 +837,7 @@ export default function App() {
           <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[95%] sm:w-[90%] max-w-md bg-[#09090d] border border-zinc-800 rounded-2xl p-5 sm:p-6 shadow-2xl z-50 focus:outline-none max-h-[90vh] overflow-y-auto">
             
             <Dialog.Title className="text-lg font-bold text-white flex items-center justify-between">
-              Testar Checkout AxionPay
+              Preview de Checkout
               <button 
                 onClick={() => setOpenModal(false)}
                 className="text-zinc-500 hover:text-white font-normal text-[10px] font-mono tracking-[0.12em] uppercase"
@@ -844,7 +847,7 @@ export default function App() {
             </Dialog.Title>
             
             <Dialog.Description className="text-zinc-400 text-xs mt-1">
-              Gere uma cobrança fictícia ou real para testar o fluxo de PIX e Cartão de Crédito.
+              Simulação visual do fluxo de PIX e Cartão — sem processamento real.
             </Dialog.Description>
             
             <div className="mt-6 space-y-4">
@@ -933,7 +936,7 @@ export default function App() {
                               onClick={handleSimulatePayment}
                               className="py-2.5 px-4 rounded-lg bg-green-500 text-black hover:bg-green-400 text-[10px] font-mono tracking-[0.08em] font-bold transition-all"
                             >
-                              Simular Pago
+                              Simular Pagamento
                             </button>
                           </div>
                         </div>
@@ -972,13 +975,16 @@ export default function App() {
                           <div className="w-full h-36 rounded-xl bg-gradient-to-tr from-zinc-800 to-zinc-900 p-4 relative overflow-hidden border border-zinc-700/50 shadow-lg text-left">
                             <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-yellow-500/5 to-transparent pointer-events-none" />
                             <div className="flex justify-between items-start">
-                              <span className="text-xs font-bold text-zinc-500">MOCK CHECKOUT</span>
+                              <div className="flex items-center gap-2">
+                                <span className="w-1 h-1 rounded-full bg-amber-500 animate-pulse" />
+                                <span className="text-[10px] font-mono tracking-[0.12em] uppercase text-zinc-500">Ambiente de Testes</span>
+                              </div>
                               <CreditCard className="w-6 h-6 text-[#e8b923]/60" />
                             </div>
                             <div className="absolute bottom-4 left-4 right-4">
                               <div className="text-sm font-mono text-zinc-300 tracking-widest">•••• •••• •••• 4029</div>
                               <div className="flex justify-between items-center mt-3">
-                                <span className="text-[10px] font-mono text-zinc-500">TITULAR DE TESTE</span>
+                                <span className="text-[10px] font-mono text-zinc-500">Cartão de Teste</span>
                                 <span className="text-[10px] font-mono text-zinc-500">12/29</span>
                               </div>
                             </div>
