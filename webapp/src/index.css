@@ -112,6 +112,111 @@ body {
   pointer-events: none;
 }
 
+/* Grid Background Pattern */
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(232, 185, 35, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(232, 185, 35, 0.06) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+
+/* Scanline Layers */
+.scanline-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+  opacity: 0.04;
+  background: linear-gradient(to bottom, rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+  background-size: 100% 4px;
+}
+
+.scan-line {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 55;
+  overflow: hidden;
+}
+
+.scan-line::before {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 1px;
+  background: rgba(232, 185, 35, 0.08);
+  animation: moveScan 8s linear infinite;
+}
+
+/* Payment Animations */
+@keyframes moveScan {
+  0% { transform: translateY(-10px); }
+  100% { transform: translateY(100vh); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(1); opacity: 0.6; }
+  50% { transform: scale(1.15); opacity: 0.2; }
+  100% { transform: scale(1); opacity: 0.6; }
+}
+
+@keyframes shimmer-slide {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes countdown-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(232, 185, 35, 0.08); }
+  50% { box-shadow: 0 0 40px rgba(232, 185, 35, 0.18); }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Payment Success Ring */
+.pulse-ring {
+  animation: pulse-ring 2s ease-in-out infinite;
+}
+
+/* Shimmer Effect for Amounts */
+.shimmer-text {
+  background: linear-gradient(90deg, #e8b923 0%, #fff 50%, #e8b923 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer-slide 3s linear infinite;
+}
+
+/* Hover Bottom Bar for Cards */
+.hover-bar-bottom {
+  position: relative;
+}
+.hover-bar-bottom::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #e8b923, transparent);
+  transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.hover-bar-bottom:hover::after {
+  width: 100%;
+}
+
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;

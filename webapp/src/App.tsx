@@ -145,6 +145,9 @@ export default function App() {
   const [pixPaid, setPixPaid] = useState(false);
   const [countdown, setCountdown] = useState(300); // 5 minutes
 
+  // mobile nav state
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   // FAQ state
   const [faqOpen, setFaqOpen] = useState<number | null>(null);
   const [codeTab, setCodeTab] = useState<"curl" | "node" | "python">("curl");
@@ -249,6 +252,10 @@ export default function App() {
       <div className="glow-bg-radial" />
       <div className="glow-bg-purple" />
       
+      {/* Scanline Overlay */}
+      <div className="scanline-overlay" />
+      <div className="scan-line" />
+      
       <a href="#conteudo" className="skip-link">Pular para o conteúdo</a>
 
       {/* Premium Navbar */}
@@ -269,6 +276,17 @@ export default function App() {
             <a href="#integracao" className="hover:text-[#e8b923] transition-colors">Integração</a>
             <a href="#faq" className="hover:text-[#e8b923] transition-colors">Dúvidas</a>
           </nav>
+          
+          {/* Mobile Menu Button */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="md:hidden flex flex-col gap-1 p-2"
+            aria-label="Abrir menu"
+          >
+            <span className={`block w-5 h-px bg-zinc-400 transition-all duration-300 ${mobileMenuOpen ? 'rotate-45 translate-y-[5px]' : ''}`} />
+            <span className={`block w-5 h-px bg-zinc-400 transition-all duration-300 ${mobileMenuOpen ? 'opacity-0' : ''}`} />
+            <span className={`block w-5 h-px bg-zinc-400 transition-all duration-300 ${mobileMenuOpen ? '-rotate-45 -translate-y-[5px]' : ''}`} />
+          </button>
           
           <div className="flex items-center gap-3">
             {user ? (
@@ -321,25 +339,66 @@ export default function App() {
             </a>
           </div>
         </div>
+        
+        {/* Mobile Navigation Menu */}
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <motion.nav
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+              className="md:hidden overflow-hidden border-t border-zinc-800/60 bg-[#040407]/98 backdrop-blur-xl"
+              aria-label="Navegação Mobile"
+            >
+              <div className="flex flex-col px-6 py-4 space-y-3">
+                <a href="#beneficios" onClick={() => setMobileMenuOpen(false)} className="text-sm font-semibold text-zinc-400 hover:text-[#e8b923] transition-colors py-2">Benefícios</a>
+                <a href="#tarifas" onClick={() => setMobileMenuOpen(false)} className="text-sm font-semibold text-zinc-400 hover:text-[#e8b923] transition-colors py-2">Tarifas</a>
+                <a href="#integracao" onClick={() => setMobileMenuOpen(false)} className="text-sm font-semibold text-zinc-400 hover:text-[#e8b923] transition-colors py-2">Integração</a>
+                <a href="#faq" onClick={() => setMobileMenuOpen(false)} className="text-sm font-semibold text-zinc-400 hover:text-[#e8b923] transition-colors py-2">Dúvidas</a>
+              </div>
+            </motion.nav>
+          )}
+        </AnimatePresence>
       </header>
 
       <main id="conteudo">
         
         {/* HERO SECTION */}
-        <section className="max-w-6xl mx-auto px-6 pt-12 pb-20 md:py-24 grid md:grid-cols-12 gap-12 items-center">
-          <div className="md:col-span-7 text-left space-y-6">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-yellow-500/20 bg-yellow-500/5 text-[#e8b923] text-xs font-semibold">
+        <section className="max-w-6xl mx-auto px-6 pt-12 pb-20 md:py-24 grid md:grid-cols-12 gap-8 md:gap-12 items-center relative grid-bg">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="md:col-span-7 text-left space-y-6"
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.1 }}
+              className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-yellow-500/20 bg-yellow-500/5 text-[#e8b923] text-xs font-semibold"
+            >
               <Zap className="w-3.5 h-3.5" />
               Taxas reduzidas para PIX e Cartão
-            </div>
+            </motion.div>
             
-            <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight leading-[1.1] text-gradient-metal">
+            <motion.h1
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="text-4xl md:text-6xl font-extrabold tracking-tight leading-[1.1] text-gradient-metal"
+            >
               A forma inteligente de <span className="text-gradient-gold">receber pagamentos.</span>
-            </h1>
+            </motion.h1>
             
-            <p className="text-zinc-400 text-lg leading-relaxed max-w-xl">
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+              className="text-zinc-400 text-lg leading-relaxed max-w-xl"
+            >
               Simplifique o fluxo de caixa do seu negócio. Gere cobranças PIX instantâneas ou links de cartão de crédito e receba com a menor tarifa do mercado.
-            </p>
+            </motion.p>
             
             <div className="flex flex-col sm:flex-row gap-4 pt-4">
               <button 
@@ -356,7 +415,7 @@ export default function App() {
                 Ver Documentação API
               </a>
             </div>
-          </div>
+          </motion.div>
           
           {/* SIMULADOR INTERATIVO */}
           <div className="md:col-span-5">
@@ -421,19 +480,34 @@ export default function App() {
                     <span>Valor da Taxa:</span>
                     <span className="font-semibold text-white">{calcResults.feeText}</span>
                   </div>
-                  <div className="flex justify-between text-xs text-zinc-400">
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.2 }}
+                    className="flex justify-between text-xs text-zinc-400"
+                  >
                     <span>Prazo de Liberação:</span>
                     <span className="font-semibold text-amber-400 flex items-center gap-1">
                       <Clock className="w-3 h-3" />
                       {calcResults.days}
                     </span>
-                  </div>
-                  <div className="border-t border-zinc-800/80 pt-3 flex justify-between items-center">
+                  </motion.div>
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.3, duration: 0.3 }}
+                    className="border-t border-zinc-800/80 pt-3 flex justify-between items-center"
+                  >
                     <span className="text-sm font-bold">Você Recebe:</span>
-                    <span className="text-2xl font-extrabold text-gradient-gold">
+                    <motion.span
+                      key={calcResults.netText}
+                      initial={{ scale: 1.05 }}
+                      animate={{ scale: 1 }}
+                      className="text-2xl font-extrabold shimmer-text"
+                    >
                       {calcResults.netText}
-                    </span>
-                  </div>
+                    </motion.span>
+                  </motion.div>
                 </div>
                 
                 <button
@@ -451,12 +525,18 @@ export default function App() {
         {/* BENEFICIOS / FEATURES */}
         <section id="beneficios" className="py-20 border-t border-zinc-900 bg-zinc-950/20">
           <div className="max-w-6xl mx-auto px-6">
-            <div className="text-center max-w-2xl mx-auto space-y-4 mb-16">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.4 }}
+              className="text-center max-w-2xl mx-auto space-y-4 mb-16"
+            >
               <h2 className="text-3xl font-bold tracking-tight">Tudo que você precisa para <span className="text-gradient-gold">vender mais.</span></h2>
               <p className="text-zinc-400 text-sm md:text-base">
                 Oferecemos uma suite completa de ferramentas financeiras projetadas para negócios de qualquer escala.
               </p>
-            </div>
+            </motion.div>
             
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {[
@@ -465,16 +545,20 @@ export default function App() {
                 { icon: Zap, t: "Webhooks e Retorno", d: "Notificação instantânea em tempo real de transações pagas, recusadas ou estornadas." },
                 { icon: ShieldCheck, t: "Máxima Segurança", d: "Criptografia de ponta a ponta e tokenização de cartões aderente aos padrões PCI-DSS." },
               ].map((f, i) => (
-                <div
+                <motion.div
                   key={f.t}
-                  className="glass-card rounded-2xl p-6 relative overflow-hidden group"
+                  initial={{ opacity: 0, y: 24 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.4, delay: i * 0.12 }}
+                  className="glass-card rounded-2xl p-6 relative overflow-hidden group hover-bar-bottom"
                 >
                   <div className="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mb-6 group-hover:border-[#e8b923]/50 transition-colors">
                     <f.icon className="w-5 h-5 text-[#e8b923]" />
                   </div>
                   <h3 className="text-base font-bold mb-2">{f.t}</h3>
                   <p className="text-zinc-400 text-sm leading-relaxed">{f.d}</p>
-                </div>
+                </motion.div>
               ))}
             </div>
           </div>
@@ -482,17 +566,27 @@ export default function App() {
 
         {/* PRICING / TARIFAS */}
         <section id="tarifas" className="py-20 max-w-6xl mx-auto px-6">
-          <div className="text-center max-w-2xl mx-auto space-y-4 mb-16">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.4 }}
+            className="text-center max-w-2xl mx-auto space-y-4 mb-16"
+          >
             <h2 className="text-3xl font-bold tracking-tight">Tarifas transparentes, <span className="text-gradient-gold">sem surpresas.</span></h2>
             <p className="text-zinc-400 text-sm md:text-base">
               Sem taxas de adesão, sem mensalidade nos planos iniciais. Você só paga quando vender.
             </p>
-          </div>
+          </motion.div>
           
           <div className="grid md:grid-cols-3 gap-8">
-            {PLANS.map((p) => (
-              <div
+            {PLANS.map((p, idx) => (
+              <motion.div
                 key={p.name}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: idx * 0.1 }}
                 className={p.popular ? "glass-card-popular rounded-3xl p-8 relative flex flex-col justify-between" : "glass-card rounded-3xl p-8 relative flex flex-col justify-between"}
               >
                 {p.popular && (
@@ -536,7 +630,7 @@ export default function App() {
                     Começar Agora
                   </button>
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
         </section>
@@ -544,7 +638,13 @@ export default function App() {
         {/* DEVELOPER PLAYGROUND / INTEGRACAO */}
         <section id="integracao" className="py-20 border-t border-zinc-900 bg-zinc-950/20">
           <div className="max-w-6xl mx-auto px-6 grid lg:grid-cols-12 gap-12 items-center">
-            <div className="lg:col-span-5 space-y-6 text-left">
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5 }}
+              className="lg:col-span-5 space-y-6 text-left"
+            >
               <div className="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center">
                 <Terminal className="w-5 h-5 text-[#e8b923]" />
               </div>
@@ -564,9 +664,15 @@ export default function App() {
                   </li>
                 ))}
               </ul>
-            </div>
+            </motion.div>
             
-            <div className="lg:col-span-7">
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0.15 }}
+              className="lg:col-span-7"
+            >
               <div className="bg-[#08080c] border border-zinc-800/80 rounded-2xl overflow-hidden shadow-2xl">
                 <div className="flex items-center justify-between px-4 py-3 bg-zinc-950 border-b border-zinc-800/80">
                   <div className="flex items-center gap-1.5">
@@ -603,23 +709,33 @@ export default function App() {
                   </pre>
                 </div>
               </div>
-            </div>
+            </motion.div>
           </div>
         </section>
 
         {/* FAQ SECTION */}
         <section id="faq" className="py-20 max-w-3xl mx-auto px-6">
-          <div className="text-center space-y-4 mb-12">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.4 }}
+            className="text-center space-y-4 mb-12"
+          >
             <h2 className="text-3xl font-bold tracking-tight">Perguntas <span className="text-gradient-gold">Frequentes</span></h2>
             <p className="text-zinc-400 text-sm">
               Tire suas principais dúvidas sobre o funcionamento e taxas da AxionPay.
             </p>
-          </div>
+          </motion.div>
           
           <div className="space-y-4 text-left">
             {FAQ.map((item, idx) => (
-              <div 
+              <motion.div 
                 key={idx}
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.4, delay: idx * 0.08 }}
                 className="glass-card rounded-xl overflow-hidden"
               >
                 <button
@@ -630,16 +746,17 @@ export default function App() {
                     <HelpCircle className="w-4 h-4 text-[#e8b923] shrink-0" />
                     {item.q}
                   </span>
-                  <ChevronDown className={`w-4 h-4 text-zinc-500 transition-transform ${faqOpen === idx ? "rotate-180" : ""}`} />
+                  <ChevronDown className={`w-4 h-4 text-zinc-500 transition-transform duration-300 ${faqOpen === idx ? "rotate-180" : ""}`} />
                 </button>
                 
                 <AnimatePresence initial={false}>
                   {faqOpen === idx && (
                     <motion.div
+                      key="faq-answer"
                       initial={{ height: 0, opacity: 0 }}
                       animate={{ height: "auto", opacity: 1 }}
                       exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.25 }}
+                      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
                     >
                       <div className="p-5 pt-0 text-xs md:text-sm text-zinc-400 border-t border-zinc-900 bg-zinc-950/20 leading-relaxed">
                         {item.a}
@@ -647,7 +764,7 @@ export default function App() {
                     </motion.div>
                   )}
                 </AnimatePresence>
-              </div>
+              </motion.div>
             ))}
           </div>
         </section>
@@ -705,7 +822,7 @@ export default function App() {
       <Dialog.Root open={openModal} onOpenChange={setOpenModal}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 transition-opacity" />
-          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-md bg-[#09090d] border border-zinc-800 rounded-2xl p-6 shadow-2xl z-50 focus:outline-none">
+          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[95%] sm:w-[90%] max-w-md bg-[#09090d] border border-zinc-800 rounded-2xl p-5 sm:p-6 shadow-2xl z-50 focus:outline-none max-h-[90vh] overflow-y-auto">
             
             <Dialog.Title className="text-lg font-bold text-white flex items-center justify-between">
               Testar Checkout AxionPay
@@ -759,15 +876,27 @@ export default function App() {
                     <Tabs.Content value="pix" className="pt-4 space-y-4 text-center">
                       {pixPaid ? (
                         <motion.div 
-                          initial={{ scale: 0.9, opacity: 0 }}
+                          initial={{ scale: 0.8, opacity: 0 }}
                           animate={{ scale: 1, opacity: 1 }}
-                          className="py-6 flex flex-col items-center justify-center space-y-3"
+                          transition={{ type: "spring", stiffness: 200, damping: 15 }}
+                          className="py-6 flex flex-col items-center justify-center space-y-4"
                         >
-                          <div className="w-12 h-12 rounded-full bg-green-500/10 border border-green-500/20 flex items-center justify-center">
-                            <CheckCircle2 className="w-6 h-6 text-green-500" />
+                          <div className="relative">
+                            <div className="w-14 h-14 rounded-full bg-green-500/10 border border-green-500/20 flex items-center justify-center relative z-10">
+                              <CheckCircle2 className="w-7 h-7 text-green-500" />
+                            </div>
+                            <div className="absolute inset-0 w-14 h-14 rounded-full border-2 border-green-500/30 pulse-ring" />
                           </div>
-                          <h4 className="text-sm font-bold text-green-400">Pagamento Confirmado!</h4>
-                          <p className="text-zinc-500 text-xs">O webhook de confirmação foi enviado em tempo real para sua API.</p>
+                          <div className="text-center space-y-1">
+                            <h4 className="text-sm font-bold text-green-400">Pagamento Confirmado!</h4>
+                            <p className="text-zinc-500 text-xs">O webhook de confirmação foi enviado em tempo real para sua API.</p>
+                          </div>
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: "100%" }}
+                            transition={{ duration: 1, delay: 0.3 }}
+                            className="h-px bg-gradient-to-r from-transparent via-green-500/30 to-transparent"
+                          />
                         </motion.div>
                       ) : (
                         <div className="flex flex-col items-center justify-center space-y-4">
@@ -806,15 +935,27 @@ export default function App() {
                     <Tabs.Content value="card" className="pt-4 space-y-4">
                       {pixPaid ? (
                         <motion.div 
-                          initial={{ scale: 0.9, opacity: 0 }}
+                          initial={{ scale: 0.8, opacity: 0 }}
                           animate={{ scale: 1, opacity: 1 }}
-                          className="py-6 flex flex-col items-center justify-center space-y-3 text-center"
+                          transition={{ type: "spring", stiffness: 200, damping: 15 }}
+                          className="py-6 flex flex-col items-center justify-center space-y-4 text-center"
                         >
-                          <div className="w-12 h-12 rounded-full bg-green-500/10 border border-green-500/20 flex items-center justify-center">
-                            <CheckCircle2 className="w-6 h-6 text-green-500" />
+                          <div className="relative">
+                            <div className="w-14 h-14 rounded-full bg-green-500/10 border border-green-500/20 flex items-center justify-center relative z-10">
+                              <CheckCircle2 className="w-7 h-7 text-green-500" />
+                            </div>
+                            <div className="absolute inset-0 w-14 h-14 rounded-full border-2 border-green-500/30 pulse-ring" />
                           </div>
-                          <h4 className="text-sm font-bold text-green-400">Transação Aprovada!</h4>
-                          <p className="text-zinc-500 text-xs">A transação de crédito foi aprovada com sucesso. Saldo disponível em D+1.</p>
+                          <div className="text-center space-y-1">
+                            <h4 className="text-sm font-bold text-green-400">Transação Aprovada!</h4>
+                            <p className="text-zinc-500 text-xs">A transação de crédito foi aprovada com sucesso. Saldo disponível em D+1.</p>
+                          </div>
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: "100%" }}
+                            transition={{ duration: 1, delay: 0.3 }}
+                            className="h-px bg-gradient-to-r from-transparent via-green-500/30 to-transparent"
+                          />
                         </motion.div>
                       ) : (
                         <div className="space-y-3">
