@@ -199,22 +199,23 @@ body {
   animation: shimmer-slide 3s linear infinite;
 }
 
-/* Hover Bottom Bar for Cards */
-.hover-bar-bottom {
+/* Hover Left Bar for Cards (FLOW style) */
+.hover-left-bar {
   position: relative;
+  overflow: hidden;
 }
-.hover-bar-bottom::after {
+.hover-left-bar::after {
   content: '';
   position: absolute;
-  bottom: 0;
+  top: 0;
   left: 0;
-  width: 0;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, #e8b923, transparent);
-  transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  width: 2px;
+  height: 0;
+  background: linear-gradient(180deg, transparent, #e8b923, transparent);
+  transition: height 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.hover-bar-bottom:hover::after {
-  width: 100%;
+.hover-left-bar:hover::after {
+  height: 100%;
 }
 
 /* Custom Scrollbar */

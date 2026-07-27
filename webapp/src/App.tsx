@@ -270,11 +270,13 @@ export default function App() {
             </span>
           </div>
           
-          <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-zinc-400" aria-label="Navegação Principal">
-            <a href="#beneficios" className="hover:text-[#e8b923] transition-colors">Benefícios</a>
-            <a href="#tarifas" className="hover:text-[#e8b923] transition-colors">Tarifas</a>
-            <a href="#integracao" className="hover:text-[#e8b923] transition-colors">Integração</a>
-            <a href="#faq" className="hover:text-[#e8b923] transition-colors">Dúvidas</a>
+          <nav className="hidden md:flex items-center gap-8 text-xs font-mono tracking-[0.12em] text-zinc-400" aria-label="Navegação Principal">
+            {[{l:"Benefícios",h:"beneficios"},{l:"Tarifas",h:"tarifas"},{l:"Integração",h:"integracao"},{l:"Dúvidas",h:"faq"}].map(n => (
+              <a key={n.h} href={`#${n.h}`} className="relative group py-1">
+                {n.l}
+                <span className="absolute -bottom-px left-0 w-0 h-px bg-[#e8b923] group-hover:w-full transition-all duration-300" />
+              </a>
+            ))}
           </nav>
           
           {/* Mobile Menu Button */}
@@ -292,7 +294,7 @@ export default function App() {
             {user ? (
               <div className="relative">
                 <button onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold border border-zinc-700 bg-zinc-900/50 text-white hover:bg-zinc-800 transition-all shadow-md"
+                  className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-[10px] font-bold tracking-[0.08em] border border-zinc-700 bg-zinc-900/50 text-white hover:bg-zinc-800 transition-all shadow-md"
                 >
                   <img src={user.picture || 'https://lh3.googleusercontent.com/a/default-user=s96-c'} alt="" className="w-5 h-5 rounded-full" />
                   <span className="max-w-[100px] truncate">{user.name || user.email}</span>
@@ -320,7 +322,7 @@ export default function App() {
               </div>
             ) : (
               <button onClick={googleLogin}
-                className="px-3.5 py-2 rounded-xl text-xs font-bold border border-zinc-700 bg-white text-black hover:bg-zinc-200 flex items-center gap-1.5 transition-all shadow-md"
+                className="px-3.5 py-2 rounded-xl text-[10px] font-bold tracking-[0.12em] uppercase border border-zinc-700 bg-white text-black hover:bg-zinc-200 flex items-center gap-1.5 transition-all shadow-md"
               >
                 <svg className="w-3.5 h-3.5" viewBox="0 0 24 24">
                   <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -333,7 +335,7 @@ export default function App() {
             )}
             <a 
               href="https://wa.me/5511924765169" target="_blank" rel="noopener noreferrer"
-              className="px-3.5 py-2 rounded-xl text-xs font-bold border border-[#e8b923]/30 bg-[#e8b923]/10 text-[#e8b923] hover:bg-[#e8b923]/20 transition-all"
+              className="px-3.5 py-2 rounded-xl text-[10px] font-bold tracking-[0.08em] border border-[#e8b923]/30 bg-[#e8b923]/10 text-[#e8b923] hover:bg-[#e8b923]/20 transition-all"
             >
               +55 11 92476-5169
             </a>
@@ -351,11 +353,11 @@ export default function App() {
               className="md:hidden overflow-hidden border-t border-zinc-800/60 bg-[#040407]/98 backdrop-blur-xl"
               aria-label="Navegação Mobile"
             >
-              <div className="flex flex-col px-6 py-4 space-y-3">
-                <a href="#beneficios" onClick={() => setMobileMenuOpen(false)} className="text-sm font-semibold text-zinc-400 hover:text-[#e8b923] transition-colors py-2">Benefícios</a>
-                <a href="#tarifas" onClick={() => setMobileMenuOpen(false)} className="text-sm font-semibold text-zinc-400 hover:text-[#e8b923] transition-colors py-2">Tarifas</a>
-                <a href="#integracao" onClick={() => setMobileMenuOpen(false)} className="text-sm font-semibold text-zinc-400 hover:text-[#e8b923] transition-colors py-2">Integração</a>
-                <a href="#faq" onClick={() => setMobileMenuOpen(false)} className="text-sm font-semibold text-zinc-400 hover:text-[#e8b923] transition-colors py-2">Dúvidas</a>
+              <div className="flex flex-col px-6 py-4 space-y-1">
+                <a href="#beneficios" onClick={() => setMobileMenuOpen(false)} className="text-xs font-mono tracking-[0.12em] uppercase text-zinc-400 hover:text-[#e8b923] transition-colors py-3">Benefícios</a>
+                <a href="#tarifas" onClick={() => setMobileMenuOpen(false)} className="text-xs font-mono tracking-[0.12em] uppercase text-zinc-400 hover:text-[#e8b923] transition-colors py-3">Tarifas</a>
+                <a href="#integracao" onClick={() => setMobileMenuOpen(false)} className="text-xs font-mono tracking-[0.12em] uppercase text-zinc-400 hover:text-[#e8b923] transition-colors py-3">Integração</a>
+                <a href="#faq" onClick={() => setMobileMenuOpen(false)} className="text-xs font-mono tracking-[0.12em] uppercase text-zinc-400 hover:text-[#e8b923] transition-colors py-3">Dúvidas</a>
               </div>
             </motion.nav>
           )}
@@ -365,7 +367,7 @@ export default function App() {
       <main id="conteudo">
         
         {/* HERO SECTION */}
-        <section className="max-w-6xl mx-auto px-6 pt-12 pb-20 md:py-24 grid md:grid-cols-12 gap-8 md:gap-12 items-center relative grid-bg">
+        <section className="max-w-6xl mx-auto px-6 pt-16 pb-16 md:py-20 grid md:grid-cols-12 gap-8 md:gap-12 items-center relative grid-bg">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -376,9 +378,9 @@ export default function App() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.1 }}
-              className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-yellow-500/20 bg-yellow-500/5 text-[#e8b923] text-xs font-semibold"
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-yellow-500/20 bg-yellow-500/5 text-[#e8b923] text-[10px] font-mono tracking-[0.15em] uppercase"
             >
-              <Zap className="w-3.5 h-3.5" />
+              <Zap className="w-3 h-3" />
               Taxas reduzidas para PIX e Cartão
             </motion.div>
             
@@ -403,14 +405,14 @@ export default function App() {
             <div className="flex flex-col sm:flex-row gap-4 pt-4">
               <button 
                 onClick={() => handleOpenModal("150")}
-                className="px-6 py-3.5 rounded-xl text-sm font-bold bg-gradient-to-r from-amber-400 to-yellow-500 text-black hover:opacity-90 active:scale-98 transition-all shadow-xl shadow-yellow-500/10 flex items-center justify-center gap-2"
+                className="px-6 py-3.5 rounded-xl text-xs font-bold tracking-[0.12em] uppercase bg-gradient-to-r from-amber-400 to-yellow-500 text-black hover:opacity-90 active:scale-98 transition-all shadow-xl shadow-yellow-500/10 flex items-center justify-center gap-2"
               >
                 Gerar Cobrança de Teste
                 <ArrowRight className="w-4 h-4" />
               </button>
               <a 
                 href="#integracao"
-                className="px-6 py-3.5 rounded-xl text-sm font-bold border border-zinc-800 bg-zinc-900/20 hover:bg-zinc-900/50 text-white flex items-center justify-center gap-2 transition-all"
+                className="px-6 py-3.5 rounded-xl text-xs font-bold tracking-[0.12em] uppercase border border-zinc-800 bg-zinc-900/20 hover:bg-zinc-900/50 text-white flex items-center justify-center gap-2 transition-all"
               >
                 Ver Documentação API
               </a>
@@ -433,7 +435,7 @@ export default function App() {
               
               <div className="space-y-4">
                 <div>
-                  <label htmlFor="simulador-valor" className="block text-xs font-semibold text-zinc-400 mb-2">Valor da Venda</label>
+                  <label htmlFor="simulador-valor" className="block text-[10px] font-mono tracking-[0.12em] uppercase text-zinc-500 mb-2">Valor da Venda</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 text-sm font-bold">R$</span>
                     <input 
@@ -448,7 +450,7 @@ export default function App() {
                 </div>
                 
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-400 mb-2">Método de Recebimento</label>
+                  <label className="block text-[10px] font-mono tracking-[0.12em] uppercase text-zinc-500 mb-2">Método de Recebimento</label>
                   <div className="grid grid-cols-3 gap-2">
                     {[
                       { id: "pix", label: "PIX" },
@@ -472,22 +474,22 @@ export default function App() {
                 </div>
                 
                 <div className="border-t border-zinc-800/80 pt-4 space-y-3">
-                  <div className="flex justify-between text-xs text-zinc-400">
-                    <span>Taxa Aplicada:</span>
-                    <span className="font-semibold text-white">{calcResults.ratePercent}</span>
+                  <div className="flex justify-between text-[11px] text-zinc-400">
+                    <span className="font-mono text-[10px] tracking-[0.08em] uppercase text-zinc-500">Taxa Aplicada</span>
+                    <span className="font-semibold text-white font-mono text-xs">{calcResults.ratePercent}</span>
                   </div>
-                  <div className="flex justify-between text-xs text-zinc-400">
-                    <span>Valor da Taxa:</span>
-                    <span className="font-semibold text-white">{calcResults.feeText}</span>
+                  <div className="flex justify-between text-[11px] text-zinc-400">
+                    <span className="font-mono text-[10px] tracking-[0.08em] uppercase text-zinc-500">Valor da Taxa</span>
+                    <span className="font-semibold text-white font-mono text-xs">{calcResults.feeText}</span>
                   </div>
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.2 }}
-                    className="flex justify-between text-xs text-zinc-400"
+                    className="flex justify-between text-[11px] text-zinc-400"
                   >
-                    <span>Prazo de Liberação:</span>
-                    <span className="font-semibold text-amber-400 flex items-center gap-1">
+                    <span className="font-mono text-[10px] tracking-[0.08em] uppercase text-zinc-500">Prazo de Liberação</span>
+                    <span className="font-semibold text-amber-400 flex items-center gap-1 font-mono text-xs">
                       <Clock className="w-3 h-3" />
                       {calcResults.days}
                     </span>
@@ -498,7 +500,7 @@ export default function App() {
                     transition={{ delay: 0.3, duration: 0.3 }}
                     className="border-t border-zinc-800/80 pt-3 flex justify-between items-center"
                   >
-                    <span className="text-sm font-bold">Você Recebe:</span>
+                    <span className="text-xs font-mono tracking-[0.08em] uppercase text-zinc-300">Você Recebe</span>
                     <motion.span
                       key={calcResults.netText}
                       initial={{ scale: 1.05 }}
@@ -512,7 +514,7 @@ export default function App() {
                 
                 <button
                   onClick={() => handleOpenModal(calcAmount)}
-                  className="w-full mt-4 py-3 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-[#e8b923] hover:bg-zinc-900/80 text-white text-sm font-bold flex items-center justify-center gap-2 transition-all"
+                  className="w-full mt-4 py-3 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-[#e8b923] hover:bg-zinc-900/80 text-white text-xs font-bold tracking-[0.12em] uppercase flex items-center justify-center gap-2 transition-all"
                 >
                   Criar Esta Cobrança
                   <ArrowRight className="w-4 h-4 text-[#e8b923]" />
@@ -523,17 +525,20 @@ export default function App() {
         </section>
 
         {/* BENEFICIOS / FEATURES */}
-        <section id="beneficios" className="py-20 border-t border-zinc-900 bg-zinc-950/20">
+        <section id="beneficios" className="py-16 md:py-20 relative bg-zinc-950/20">
+          {/* Gradient divider top */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-px bg-gradient-to-r from-transparent via-[#e8b923]/30 to-transparent" />
           <div className="max-w-6xl mx-auto px-6">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.4 }}
-              className="text-center max-w-2xl mx-auto space-y-4 mb-16"
+              className="text-center max-w-2xl mx-auto space-y-3 mb-12 md:mb-14"
             >
+              <span className="inline-block text-[10px] font-mono tracking-[0.15em] uppercase text-zinc-500">Recursos</span>
               <h2 className="text-3xl font-bold tracking-tight">Tudo que você precisa para <span className="text-gradient-gold">vender mais.</span></h2>
-              <p className="text-zinc-400 text-sm md:text-base">
+              <p className="text-zinc-500 text-xs md:text-sm leading-relaxed max-w-lg mx-auto">
                 Oferecemos uma suite completa de ferramentas financeiras projetadas para negócios de qualquer escala.
               </p>
             </motion.div>
@@ -551,7 +556,7 @@ export default function App() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ duration: 0.4, delay: i * 0.12 }}
-                  className="glass-card rounded-2xl p-6 relative overflow-hidden group hover-bar-bottom"
+                  className="glass-card rounded-2xl p-6 relative overflow-hidden group hover-left-bar"
                 >
                   <div className="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mb-6 group-hover:border-[#e8b923]/50 transition-colors">
                     <f.icon className="w-5 h-5 text-[#e8b923]" />
@@ -565,16 +570,19 @@ export default function App() {
         </section>
 
         {/* PRICING / TARIFAS */}
-        <section id="tarifas" className="py-20 max-w-6xl mx-auto px-6">
+        <section id="tarifas" className="py-16 md:py-20 max-w-6xl mx-auto px-6 relative">
+          {/* Gradient divider top */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-px bg-gradient-to-r from-transparent via-[#e8b923]/20 to-transparent" />
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.4 }}
-            className="text-center max-w-2xl mx-auto space-y-4 mb-16"
+            className="text-center max-w-2xl mx-auto space-y-3 mb-12 md:mb-14"
           >
+            <span className="inline-block text-[10px] font-mono tracking-[0.15em] uppercase text-zinc-500">Preços</span>
             <h2 className="text-3xl font-bold tracking-tight">Tarifas transparentes, <span className="text-gradient-gold">sem surpresas.</span></h2>
-            <p className="text-zinc-400 text-sm md:text-base">
+            <p className="text-zinc-500 text-xs md:text-sm leading-relaxed max-w-lg mx-auto">
               Sem taxas de adesão, sem mensalidade nos planos iniciais. Você só paga quando vender.
             </p>
           </motion.div>
@@ -590,7 +598,7 @@ export default function App() {
                 className={p.popular ? "glass-card-popular rounded-3xl p-8 relative flex flex-col justify-between" : "glass-card rounded-3xl p-8 relative flex flex-col justify-between"}
               >
                 {p.popular && (
-                  <span className="absolute -top-3.5 right-6 bg-gradient-to-r from-amber-400 to-yellow-500 text-black text-xs font-black px-4 py-1.5 rounded-full shadow-lg">
+                  <span className="absolute -top-3 right-6 bg-[#e8b923] text-black text-[10px] font-mono tracking-[0.15em] uppercase font-bold px-4 py-1.5 shadow-lg">
                     RECOMENDADO
                   </span>
                 )}
@@ -621,7 +629,7 @@ export default function App() {
                 <div className="mt-8">
                   <button 
                     onClick={() => handleOpenModal("100")}
-                    className={`w-full py-3.5 rounded-xl text-sm font-bold transition-all ${
+                    className={`w-full py-3.5 rounded-xl text-xs font-bold tracking-[0.12em] uppercase transition-all ${
                       p.popular 
                         ? "bg-[#e8b923] text-black hover:opacity-90" 
                         : "bg-zinc-900 border border-zinc-800 hover:border-[#e8b923] text-white"
@@ -636,7 +644,8 @@ export default function App() {
         </section>
 
         {/* DEVELOPER PLAYGROUND / INTEGRACAO */}
-        <section id="integracao" className="py-20 border-t border-zinc-900 bg-zinc-950/20">
+        <section id="integracao" className="py-16 md:py-20 relative bg-zinc-950/20">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-px bg-gradient-to-r from-transparent via-[#e8b923]/30 to-transparent" />
           <div className="max-w-6xl mx-auto px-6 grid lg:grid-cols-12 gap-12 items-center">
             <motion.div
               initial={{ opacity: 0, x: -20 }}
@@ -691,7 +700,7 @@ export default function App() {
                       <button
                         key={tab.id}
                         onClick={() => setCodeTab(tab.id as any)}
-                        className={`px-2.5 py-1 rounded text-xs font-semibold transition-all ${
+                        className={`px-2.5 py-1 rounded text-[10px] font-mono tracking-[0.08em] font-semibold transition-all ${
                           codeTab === tab.id 
                             ? "bg-zinc-800 text-white" 
                             : "text-zinc-500 hover:text-zinc-300"
@@ -714,16 +723,18 @@ export default function App() {
         </section>
 
         {/* FAQ SECTION */}
-        <section id="faq" className="py-20 max-w-3xl mx-auto px-6">
+        <section id="faq" className="py-16 md:py-20 max-w-3xl mx-auto px-6 relative">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-px bg-gradient-to-r from-transparent via-[#e8b923]/20 to-transparent" />
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.4 }}
-            className="text-center space-y-4 mb-12"
+            className="text-center space-y-3 mb-10"
           >
+            <span className="inline-block text-[10px] font-mono tracking-[0.15em] uppercase text-zinc-500">Suporte</span>
             <h2 className="text-3xl font-bold tracking-tight">Perguntas <span className="text-gradient-gold">Frequentes</span></h2>
-            <p className="text-zinc-400 text-sm">
+            <p className="text-zinc-500 text-xs max-w-md mx-auto">
               Tire suas principais dúvidas sobre o funcionamento e taxas da AxionPay.
             </p>
           </motion.div>
@@ -828,7 +839,7 @@ export default function App() {
               Testar Checkout AxionPay
               <button 
                 onClick={() => setOpenModal(false)}
-                className="text-zinc-500 hover:text-white font-normal text-sm"
+                className="text-zinc-500 hover:text-white font-normal text-[10px] font-mono tracking-[0.12em] uppercase"
               >
                 fechar
               </button>
@@ -840,7 +851,7 @@ export default function App() {
             
             <div className="mt-6 space-y-4">
               <div>
-                <label htmlFor="modal-valor" className="block text-xs font-semibold text-zinc-400 mb-2">Valor da Cobrança (R$)</label>
+                <label htmlFor="modal-valor" className="block text-[10px] font-mono tracking-[0.12em] uppercase text-zinc-500 mb-2">Valor da Cobrança (R$)</label>
                 <form onSubmit={gerarCobranca} className="flex gap-2">
                   <input
                     id="modal-valor"
@@ -853,7 +864,7 @@ export default function App() {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="px-5 py-2.5 rounded-xl font-bold bg-[#e8b923] text-black disabled:opacity-60 text-xs shrink-0 cursor-pointer"
+                    className="px-5 py-2.5 rounded-xl font-bold bg-[#e8b923] text-black disabled:opacity-60 text-[10px] font-mono tracking-[0.12em] uppercase shrink-0 cursor-pointer"
                   >
                     {loading ? "Processando..." : "Gerar"}
                   </button>
@@ -864,10 +875,10 @@ export default function App() {
                 <div className="border-t border-zinc-900 pt-4 space-y-4">
                   <Tabs.Root defaultValue="pix">
                     <Tabs.List className="flex border-b border-zinc-800" aria-label="Escolha a forma de pagamento">
-                      <Tabs.Trigger value="pix" className="flex-1 pb-2.5 text-xs font-bold text-zinc-400 data-[state=active]:text-[#e8b923] data-[state=active]:border-b-2 data-[state=active]:border-[#e8b923]">
+                      <Tabs.Trigger value="pix" className="flex-1 pb-2.5 text-[10px] font-mono tracking-[0.12em] uppercase font-bold text-zinc-400 data-[state=active]:text-[#e8b923] data-[state=active]:border-b-2 data-[state=active]:border-[#e8b923]">
                         PIX
                       </Tabs.Trigger>
-                      <Tabs.Trigger value="card" className="flex-1 pb-2.5 text-xs font-bold text-zinc-400 data-[state=active]:text-[#e8b923] data-[state=active]:border-b-2 data-[state=active]:border-[#e8b923]">
+                      <Tabs.Trigger value="card" className="flex-1 pb-2.5 text-[10px] font-mono tracking-[0.12em] uppercase font-bold text-zinc-400 data-[state=active]:text-[#e8b923] data-[state=active]:border-b-2 data-[state=active]:border-[#e8b923]">
                         Cartão de Crédito
                       </Tabs.Trigger>
                     </Tabs.List>
@@ -914,7 +925,7 @@ export default function App() {
                           <div className="w-full flex gap-2">
                             <button
                               onClick={() => copyToClipboard(link)}
-                              className="flex-1 py-2.5 rounded-lg border border-zinc-800 bg-zinc-900 text-white hover:bg-zinc-800 text-xs font-bold flex items-center justify-center gap-2 transition-all"
+                              className="flex-1 py-2.5 rounded-lg border border-zinc-800 bg-zinc-900 text-white hover:bg-zinc-800 text-[10px] font-mono tracking-[0.08em] font-bold flex items-center justify-center gap-2 transition-all"
                             >
                               <Copy className="w-3.5 h-3.5" />
                               {copied ? "Copiado!" : "Copiar Chave Pix"}
@@ -922,7 +933,7 @@ export default function App() {
                             
                             <button
                               onClick={handleSimulatePayment}
-                              className="py-2.5 px-4 rounded-lg bg-green-500 text-black hover:bg-green-400 text-xs font-bold transition-all"
+                              className="py-2.5 px-4 rounded-lg bg-green-500 text-black hover:bg-green-400 text-[10px] font-mono tracking-[0.08em] font-bold transition-all"
                             >
                               Simular Pago
                             </button>
@@ -990,7 +1001,7 @@ export default function App() {
                           
                           <button
                             onClick={handleSimulatePayment}
-                            className="w-full py-2.5 rounded-lg bg-[#e8b923] text-black hover:opacity-90 text-xs font-bold flex items-center justify-center gap-2 transition-all"
+                            className="w-full py-2.5 rounded-lg bg-[#e8b923] text-black hover:opacity-90 text-[10px] font-mono tracking-[0.08em] font-bold flex items-center justify-center gap-2 transition-all"
                           >
                             <Lock className="w-3.5 h-3.5" />
                             Confirmar Pagamento de R$ {amount}
