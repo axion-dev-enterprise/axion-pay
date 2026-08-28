@@ -523,11 +523,8 @@ export const StylishStripeCheckout: React.FC<StylishStripeCheckoutProps> = ({
                 <div className="space-y-5 pt-1">
                   <PixPaymentDisplay
                     amount={finalPrice}
-                    pixPayload="00020126580014br.gov.bcb.pix0136e55b9e02c114389b706c9a38ef6722d55204000053039865406297.005802BR5921AXION ENTERPRISE LTDA6009SAO PAULO62070503***6304C9F1"
+                    copiaECola="00020126580014br.gov.bcb.pix0136e55b9e02c114389b706c9a38ef6722d55204000053039865406297.005802BR5921AXION ENTERPRISE LTDA6009SAO PAULO62070503***6304C9F1"
                     expiresInSeconds={600}
-                    onStatusChange={(status) => {
-                      if (status === 'paid') handleSimulateSuccess('PIX Instantâneo');
-                    }}
                   />
                   <button
                     type="button"
