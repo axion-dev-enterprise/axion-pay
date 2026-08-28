@@ -9,16 +9,20 @@ function getStripeKeys() {
   let publishableKey = process.env.STRIPE_PUBLISHABLE_KEY;
 
   if (!secretKey) {
-    const vaultMaster = "D:\\WORKSPACE\\SECURE\\VAULT\\tokens\\pagamentos\\stripe.env";
-    const vaultSensix = "D:\\WORKSPACE\\SECURE\\VAULT\\tokens\\pagamentos\\stripe_sensix.env";
-    const vaultPath = fs.existsSync(vaultMaster) ? vaultMaster : (fs.existsSync(vaultSensix) ? vaultSensix : null);
-    
-    if (vaultPath) {
-      const content = fs.readFileSync(vaultPath, "utf8");
-      const skMatch = content.match(/STRIPE_SECRET_KEY=(sk_[^\r\n]+)/);
-      const pkMatch = content.match(/STRIPE_PUBLISHABLE_KEY=(pk_[^\r\n]+)/);
-      if (skMatch) secretKey = skMatch[1].trim();
-      if (pkMatch) publishableKey = pkMatch[1].trim();
+    try {
+      const vaultMaster = "D:\\WORKSPACE\\SECURE\\VAULT\\tokens\\pagamentos\\stripe.env";
+      const vaultSensix = "D:\\WORKSPACE\\SECURE\\VAULT\\tokens\\pagamentos\\stripe_sensix.env";
+      const vaultPath = fs.existsSync(vaultMaster) ? vaultMaster : (fs.existsSync(vaultSensix) ? vaultSensix : null);
+      
+      if (vaultPath) {
+        const content = fs.readFileSync(vaultPath, "utf8");
+        const skMatch = content.match(/STRIPE_SECRET_KEY=(sk_[^\r\n]+)/);
+        const pkMatch = content.match(/STRIPE_PUBLISHABLE_KEY=(pk_[^\r\n]+)/);
+        if (skMatch) secretKey = skMatch[1].trim();
+        if (pkMatch) publishableKey = pkMatch[1].trim();
+      }
+    } catch (err) {
+      // Ignora erro em ambientes serverless Linux
     }
   }
 
