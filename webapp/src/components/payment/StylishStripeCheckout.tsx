@@ -1,12 +1,9 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
 import {
   CreditCard,
   QrCode,
   ShieldCheck,
   Check,
-  Copy,
-  Clock,
   CheckCircle2,
   Lock,
   Building2,
@@ -72,7 +69,6 @@ export const StylishStripeCheckout: React.FC<StylishStripeCheckoutProps> = ({
   const [stripeObj, setStripeObj] = useState<any>(null);
   const [cardElementObj, setCardElementObj] = useState<any>(null);
 
-  // Cálculo de Preços
   const basePrice = item.price;
   const pixDiscount = paymentMethod === 'pix' ? basePrice * 0.1 : 0;
   const couponDiscount = discountPercent > 0 ? (basePrice * discountPercent) / 100 : 0;
@@ -105,7 +101,6 @@ export const StylishStripeCheckout: React.FC<StylishStripeCheckoutProps> = ({
     setErrorMessage(null);
 
     try {
-      // 1. Criação do SetupIntent / PaymentIntent no Backend AxionPay
       const res = await fetch(`${apiBaseUrl}/api/trial/create-setup-intent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -123,7 +118,6 @@ export const StylishStripeCheckout: React.FC<StylishStripeCheckoutProps> = ({
         throw new Error('Módulo seguro da Stripe não inicializado.');
       }
 
-      // 2. Confirmação segura na Stripe com 3D Secure nativo
       const { setupIntent, error: stripeErr } = await stripeObj.confirmCardSetup(
         data.clientSecret,
         {
@@ -141,7 +135,6 @@ export const StylishStripeCheckout: React.FC<StylishStripeCheckoutProps> = ({
         throw new Error(stripeErr.message || 'Cartão recusado pela rede emissora.');
       }
 
-      // 3. Verificação no Backend e Emissão do Recibo
       const verifyRes = await fetch(`${apiBaseUrl}/api/trial/verify-setup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -189,18 +182,14 @@ export const StylishStripeCheckout: React.FC<StylishStripeCheckoutProps> = ({
       };
       setPaidReceipt(receipt);
       if (onSuccess) onSuccess(receipt);
-    }, 1200);
+    }, 1000);
   };
 
   return (
     <div className={`w-full max-w-5xl mx-auto ${className}`}>
       {paidReceipt ? (
         /* TELA DE SUCESSO / RECIBO */
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="p-8 sm:p-10 rounded-3xl bg-[#09090d]/90 backdrop-blur-2xl border border-zinc-800 shadow-2xl text-center space-y-6 max-w-xl mx-auto"
-        >
+        <div className="p-8 sm:p-10 rounded-3xl bg-[#09090d]/90 backdrop-blur-2xl border border-zinc-800 shadow-2xl text-center space-y-6 max-w-xl mx-auto animate-fadeIn">
           <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/10">
             <CheckCircle2 className="w-9 h-9" />
           </div>
@@ -261,7 +250,7 @@ export const StylishStripeCheckout: React.FC<StylishStripeCheckoutProps> = ({
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
-        </motion.div>
+        </div>
       ) : (
         /* GRID DE CHECKOUT COMPLETO */
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
