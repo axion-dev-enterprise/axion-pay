@@ -24,19 +24,17 @@ export const StripeCardElement: React.FC<StripeCardElementProps> = ({
   error: externalError,
   className = '',
 }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const mountRef = useRef<HTMLDivElement>(null);
   const [internalError, setInternalError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [stripeInstance, setStripeInstance] = useState<any>(null);
-  const [cardElementInstance, setCardElementInstance] = useState<any>(null);
 
   useEffect(() => {
     let mounted = true;
+    let cardInstance: any = null;
 
     const init = async () => {
       try {
         if (!window.Stripe) {
-          // Injeta script Stripe.js caso ainda não esteja carregado
           const script = document.createElement('script');
           script.src = 'https://js.stripe.com/v3/';
           script.async = true;
@@ -48,7 +46,7 @@ export const StripeCardElement: React.FC<StripeCardElementProps> = ({
           });
         }
 
-        if (!mounted || !window.Stripe || !containerRef.current) return;
+        if (!mounted || !window.Stripe || !mountRef.current) return;
 
         const stripe = window.Stripe(publishableKey);
         const elements = stripe.elements({
@@ -76,8 +74,8 @@ export const StripeCardElement: React.FC<StripeCardElementProps> = ({
           },
         });
 
-        containerRef.current.innerHTML = '';
-        card.mount(containerRef.current);
+        cardInstance = card;
+        card.mount(mountRef.current);
 
         card.on('change', (event: any) => {
           if (event.error) {
@@ -88,12 +86,10 @@ export const StripeCardElement: React.FC<StripeCardElementProps> = ({
           if (onChange) onChange(event);
         });
 
-        setStripeInstance(stripe);
-        setCardElementInstance(card);
         setLoading(false);
         if (onReady) onReady(stripe, card);
       } catch (err: any) {
-        console.error('Erro ao montar Stripe Card Element:', err);
+        console.error('Erro ao inicializar Stripe Elements:', err);
         setLoading(false);
         setInternalError('Falha ao inicializar Stripe Elements.');
       }
@@ -103,9 +99,10 @@ export const StripeCardElement: React.FC<StripeCardElementProps> = ({
 
     return () => {
       mounted = false;
-      if (cardElementInstance) {
+      if (cardInstance) {
         try {
-          cardElementInstance.destroy();
+          cardInstance.unmount();
+          cardInstance.destroy();
         } catch (e) {
           // ignore
         }
@@ -129,20 +126,19 @@ export const StripeCardElement: React.FC<StripeCardElementProps> = ({
 
       <div className="relative">
         <div
-          ref={containerRef}
+          ref={mountRef}
           className="w-full min-h-[46px] p-3 rounded-xl bg-zinc-950/80 border border-zinc-800 focus-within:border-[#e8b923] focus-within:ring-1 focus-within:ring-[#e8b923] transition-all"
-        >
-          {loading && (
-            <div className="text-xs text-zinc-500 font-mono py-1 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-[#e8b923] animate-ping" />
-              <span>Conectando ambiente seguro Stripe...</span>
-            </div>
-          )}
-        </div>
+        />
+        {loading && (
+          <div className="absolute inset-0 bg-zinc-950/90 rounded-xl p-3 flex items-center gap-2 text-xs text-zinc-500 font-mono pointer-events-none">
+            <span className="w-2 h-2 rounded-full bg-[#e8b923] animate-ping" />
+            <span>Conectando ambiente seguro Stripe...</span>
+          </div>
+        )}
       </div>
 
       {displayError && (
-        <div className="flex items-center gap-1.5 text-xs text-red-400 font-mono mt-1 animate-fadeIn">
+        <div className="flex items-center gap-1.5 text-xs text-red-400 font-mono mt-1">
           <AlertCircle className="w-3.5 h-3.5 shrink-0" />
           <span>{displayError}</span>
         </div>

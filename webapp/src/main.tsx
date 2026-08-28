@@ -18,18 +18,16 @@ const LazyLoad = ({ children }: { children: React.ReactNode }) => (
 );
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<App />} />
-        <Route path="/dashboard/*" element={<LazyLoad><PayDashboard /></LazyLoad>} />
-        <Route path="/checkout" element={<CheckoutPage />} />
-        <Route path="/checkout/*" element={<CheckoutPage />} />
-        <Route path="/checkout-pro" element={<CheckoutPage />} />
-        <Route path="/checkout-pro/*" element={<CheckoutPage />} />
-        <Route path="/checkout/:slug" element={<CheckoutPage />} />
-        <Route path="/checkout/products/:slug" element={<CheckoutPage />} />
-      </Routes>
-    </BrowserRouter>
-  </React.StrictMode>
+  <BrowserRouter>
+    <Routes>
+      <Route path="/" element={<App />} />
+      <Route path="/dashboard/*" element={<LazyLoad><PayDashboard /></LazyLoad>} />
+      <Route path="/checkout" element={<CheckoutPage />} />
+      <Route path="/checkout/*" element={<CheckoutPage />} />
+      <Route path="/checkout-pro" element={<CheckoutPage />} />
+      <Route path="/checkout-pro/*" element={<CheckoutPage />} />
+      <Route path="/checkout/:slug" element={<CheckoutPage />} />
+      <Route path="/checkout/products/:slug" element={<CheckoutPage />} />
+    </Routes>
+  </BrowserRouter>
 );
