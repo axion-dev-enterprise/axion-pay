@@ -16,6 +16,7 @@ import { createCardTransactionWithWoovi } from "./providers/wooviProvider.js";
 import { createCardTransactionWithInfinite } from "./providers/infiniteProvider.js";
 import { createCardTransactionWithMock } from "./providers/cardProviderMock.js";
 import { createPixTransactionWithMercadoPago, createCardTransactionWithMercadoPago } from "./providers/mercadopagoProvider.js";
+import { createCardTransactionWithStripe, createCheckoutSessionWithStripe } from "./providers/stripeProvider.js";
 import { createPixTransactionWithPagarme, createCardTransactionWithPagarme } from "./providers/pagarmeProvider.js";
 import { createPixTransactionWithBancoCentral } from "./providers/bancoCentralProvider.js";
 import { logger } from "../utils/logger.js";
@@ -242,6 +243,16 @@ export async function createPayment({
       });
     } else if (provider === "mercadopago") {
       result = await createCardTransactionWithMercadoPago({
+        amount,
+        amount_cents,
+        capture,
+        card,
+        card_hash,
+        customer,
+        metadata: mergedMetadata
+      });
+    } else if (provider === "stripe") {
+      result = await createCardTransactionWithStripe({
         amount,
         amount_cents,
         capture,

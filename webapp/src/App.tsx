@@ -11,19 +11,28 @@ import * as Dialog from "@radix-ui/react-dialog";
 
 const AUTH_API = "https://auth.axionenterprise.cloud";
 
+function getCookie(name: string) {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
+  return match ? decodeURIComponent(match[2]) : null;
+}
+
 function getToken() {
-  const stored = sessionStorage.getItem("axion_token");
-  if (stored) return stored;
+  if (typeof window === "undefined") return null;
   const params = new URLSearchParams(window.location.search);
   const urlToken = params.get("token");
   if (urlToken) {
-    sessionStorage.setItem("axion_token", urlToken);
+    try {
+      sessionStorage.setItem("axion_token", urlToken);
+      document.cookie = `axion_token=${urlToken}; domain=.axionenterprise.cloud; path=/; max-age=604800; SameSite=Lax`;
+    } catch {}
     params.delete("token");
-    const newUrl = window.location.pathname + (params.toString() ? "?" + params.toString() : "") + window.location.hash;
-    window.history.replaceState({}, "", newUrl);
+    const newSearch = params.toString();
+    const newUrl = window.location.pathname + (newSearch ? "?" + newSearch : "") + window.location.hash;
+    window.history.replaceState({}, document.title, newUrl);
     return urlToken;
   }
-  return null;
+  return sessionStorage.getItem("axion_token") || getCookie("axion_token") || getCookie("axion_session");
 }
 
 async function checkAuth() {
@@ -37,13 +46,8 @@ async function checkAuth() {
   } catch { return null; }
 }
 
-async function googleLogin() {
-  try {
-    const res = await fetch(`${AUTH_API}/api/auth/google/url?redirect_to=${encodeURIComponent(window.location.origin)}`);
-    const data = await res.json();
-    if (data.url) window.location.href = data.url;
-    else window.location.href = `${AUTH_API}/`;
-  } catch { window.location.href = `${AUTH_API}/`; }
+function googleLogin() {
+  window.location.href = `${AUTH_API}/api/auth/google/login?redirect_to=${encodeURIComponent(window.location.origin)}`;
 }
 
 async function googleLogout() {

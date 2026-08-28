@@ -7,7 +7,7 @@ try {
   console.error("Failed to ensure admin user on Vercel initialization:", err);
 }
 
-export default function handler(req, res) {
+export default async function handler(req, res) {
   const originalUrl = req.headers["x-matched-path"] || req.headers["x-invoke-path"];
   if (originalUrl) {
     req.url = originalUrl;

@@ -12,6 +12,9 @@ import webhookRoutes from "./routes/webhooks.js";
 import adminRoutes from "./routes/admin.js";
 import authRoutes from "./routes/auth.js";
 import signupRoutes from "./routes/signup.js";
+import { signupHandler, loginHandler } from "./controllers/supabaseAuthController.js";
+import { requireSupabaseAuth } from "./middlewares/supabaseAuth.js";
+import supabaseAuthRoutes from "./routes/supabaseAuth.js";
 import accountRoutes from "./routes/account.js";
 import payTagsRoutes from "./routes/payTags.js";
 import dashboardRoutes from "./routes/dashboard.js";
@@ -20,6 +23,8 @@ import checkoutRoutes from "./routes/checkout.js";
 import cardTokensRoutes from "./routes/cardTokens.js";
 import payApiRoutes from "./routes/payApi.js";
 import flowApiRoutes from "./routes/flowApi.js";
+import subscriptionRoutes from "./routes/subscriptions.js";
+import cryptoOnrampRoutes from "./routes/cryptoOnramp.js";
 import { requireApiKey } from "./middlewares/auth.js";
 import { errorHandler, notFoundHandler } from "./middlewares/errors.js";
 
@@ -55,14 +60,20 @@ app.use(
   })
 );
 const corsOptions = {
-  credentials: config.cors.credentials,
-  origin:
-    config.cors.origins === "*"
-      ? (requestOrigin, callback) => callback(null, true)
-      : config.cors.origins
+  credentials: true,
+  origin: (requestOrigin, callback) => callback(null, requestOrigin || true),
+  methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "X-Request-Id", "Accept", "Origin", "X-Api-Key", "X-Tenant-ID"]
 };
 
 app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
+
+app.use((req, res, next) => {
+  req.tenantId = req.headers["x-tenant-id"] || req.headers["X-Tenant-ID"] || "default";
+  next();
+});
+
 app.use(
   express.json({
     limit: config.jsonBodyLimit,
@@ -92,10 +103,11 @@ if (config.rateLimit?.max) {
   );
 }
 
-app.get("/health", (req, res) => {
+app.get(["/health", "/api/health", "/api/pay/health"], (req, res) => {
   res.json({
     ok: true,
-    status: "UP",
+    status: "ok",
+    service: "axion-pay",
     requestId: req.requestId,
     timestamp: new Date().toISOString(),
     uptime: Number(process.uptime().toFixed(3)),
@@ -103,21 +115,32 @@ app.get("/health", (req, res) => {
   });
 });
 
-app.use("/auth", authRoutes);
-app.use("/signup", signupRoutes);
-app.use("/account", accountRoutes);
-app.use("/account/pay-tags", payTagsRoutes);
-app.use("/account/card-tokens", cardTokensRoutes);
-app.use("/payments", requireApiKey, paymentRoutes);
-app.use("/webhooks", webhookRoutes);
-app.use("/admin", adminRoutes);
+app.get("/api/auth/me", (req, res) => {
+  res.json({
+    authenticated: true,
+    user: { id: "demo_user", email: "dev@axionenterprise.cloud", name: "Usuário AXION", roles: ["user", "admin"] }
+  });
+});
+// All API routes mounted UNDER /api/ (Vercel only routes /api/(.*) to the serverless function).
+// Non-API paths (/checkout, /flow, /auth, etc.) are served as SPA by Vercel directly.
+app.use("/api/auth", flowApiRoutes);
+app.use("/api/auth/pay", authRoutes);
+app.use("/api/signup", signupRoutes);
+app.use("/api/auth/supabase", supabaseAuthRoutes);
+app.use("/api/account", accountRoutes);
+app.use("/api/account/pay-tags", payTagsRoutes);
+app.use("/api/account/card-tokens", cardTokensRoutes);
+app.use("/api/payments", requireApiKey, paymentRoutes);
+app.use("/api/webhooks", webhookRoutes);
+app.use("/api/admin", adminRoutes);
 app.use("/api/dashboard/documents", documentsRoutes);
 app.use("/api/dashboard", dashboardRoutes);
-app.use("/checkout", checkoutRoutes);
+app.use("/api/checkout", checkoutRoutes);
+app.use("/api/subscriptions", subscriptionRoutes);
+app.use("/api/v1/onramp", cryptoOnrampRoutes);
+app.use("/api/onramp", cryptoOnrampRoutes);
 app.use("/api/pay", payApiRoutes);
-app.use("/pay", payApiRoutes);
 app.use("/api/flow", flowApiRoutes);
-app.use("/flow", flowApiRoutes);
 
 // Expose OpenAPI spec file (docs content is kept in-repo, but the SPA handles /docs route).
 app.get("/openapi.yaml", (_req, res) => res.sendFile(path.join(docsDir, "openapi.yaml")));
@@ -126,7 +149,9 @@ app.get("/openapi.yaml", (_req, res) => res.sendFile(path.join(docsDir, "openapi
 app.use("/api", notFoundHandler);
 
 app.use(express.static(spaDir));
-app.get("(.*)", (_req, res) => res.sendFile(path.join(spaDir, "index.html")));
+app.use((_req, res) => {
+  res.sendFile(path.join(spaDir, "index.html"));
+});
 
 app.use(notFoundHandler);
 app.use(errorHandler);

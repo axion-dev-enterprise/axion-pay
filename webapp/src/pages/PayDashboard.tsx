@@ -36,7 +36,9 @@ function authHeaders() {
 async function apiFetch(path: string, options: RequestInit = {}) {
   try {
     const res = await fetch(`${API_BASE}${path}`, { ...options, headers: { ...authHeaders(), ...(options.headers as Record<string, string> || {}) }, credentials: "include" });
-    return await res.json();
+    const data = await res.json().catch(() => null);
+    if (!res.ok) return { error: data?.error || data?.message || `HTTP ${res.status}` };
+    return data || { error: "Resposta vazia do servidor" };
   } catch { return { error: "Erro de conexão com o servidor" }; }
 }
 
@@ -46,8 +48,8 @@ async function checkAuth() {
   if (token) headers["Authorization"] = `Bearer ${token}`;
   try {
     const res = await fetch(`${AUTH_API}/api/auth/me`, { credentials: "include", headers });
-    const data = await res.json();
-    return data.authenticated ? data.user : null;
+    const data = await res.json().catch(() => null);
+    return (res.ok && data?.authenticated) ? data.user : null;
   } catch { return null; }
 }
 
@@ -57,7 +59,9 @@ async function authApiFetch(path: string, options: RequestInit = {}) {
   if (token) headers["Authorization"] = `Bearer ${token}`;
   try {
     const res = await fetch(`${AUTH_API}${path}`, { ...options, headers: { ...headers, ...(options.headers as Record<string, string> || {}) }, credentials: "include" });
-    return await res.json();
+    const data = await res.json().catch(() => null);
+    if (!res.ok) return { error: data?.error || data?.message || `HTTP ${res.status}` };
+    return data || { error: "Resposta vazia do servidor de autenticação" };
   } catch { return { error: "Erro de conexão com o servidor de autenticação" }; }
 }
 
@@ -101,10 +105,22 @@ function CopyBtn({ text }: { text: string }) {
 
 function NotificationBell() {
   const [open, setOpen] = useState(false);
-  const [count, setCount] = useState(1);
-  const [notifications] = useState<Array<any>>([
-    { id: "n1", event: "Novo pagamento PIX de R$ 297,00 recebido", created_at: new Date().toISOString() }
-  ]);
+  const [count, setCount] = useState(0);
+  const [notifications, setNotifications] = useState<Array<any>>([]);
+
+  useEffect(() => {
+    apiFetch("/api/pay/notifications").then(data => {
+      if (data?.ok && Array.isArray(data.notifications)) {
+        setNotifications(data.notifications);
+        setCount(data.unread || 0);
+      }
+    }).catch(() => {});
+  }, []);
+
+  const markRead = () => {
+    apiFetch("/api/pay/notifications/read-all", { method: "POST" });
+    setCount(0);
+  };
 
   return (
     <div className="relative">
@@ -120,7 +136,7 @@ function NotificationBell() {
           <div className="absolute right-0 top-full mt-2 w-80 bg-[#09090d] border border-zinc-800 rounded-xl shadow-2xl z-50 overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
               <h4 className="text-xs font-bold text-white uppercase tracking-wider">Notificações</h4>
-              <button onClick={() => setCount(0)} className="text-[10px] text-zinc-500 hover:text-white transition-colors">Marcar lidas</button>
+              <button onClick={markRead} className="text-[10px] text-zinc-500 hover:text-white transition-colors">Marcar lidas</button>
             </div>
             <div className="max-h-80 overflow-y-auto">
               {notifications.map((n, i) => (
@@ -148,18 +164,38 @@ function TwoFactorSetup() {
 
   const startSetup = async () => {
     setStatus('');
-    const data = await authApiFetch('/api/auth/2fa/setup', { method: 'POST' });
-    if (!data.error) setSetupData(data);
+    let data = await authApiFetch('/api/auth/2fa/setup', { method: 'POST' });
+    if (data?.error || !data?.qrCode) {
+      data = await apiFetch('/api/flow/2fa/setup', { method: 'POST' });
+    }
+    if (data && data.qrCode) {
+      setSetupData(data);
+    } else {
+      setStatus(data?.error || 'Erro ao gerar QR Code de 2FA');
+    }
   };
 
   const verifyCode = async () => {
-    const data = await authApiFetch('/api/auth/2fa/verify', { method: 'POST', body: JSON.stringify({ code }) });
-    if (!data.error || code.length === 6) { setEnabled(true); setSetupData(null); setCode(''); setStatus('2FA ativado com sucesso!'); }
-    else setStatus(data.error || 'Erro ao verificar código');
+    let data = await authApiFetch('/api/auth/2fa/verify', { method: 'POST', body: JSON.stringify({ code }) });
+    if (data?.error) {
+      data = await apiFetch('/api/flow/2fa/verify', { method: 'POST', body: JSON.stringify({ code }) });
+    }
+    if (!data?.error || code.length === 6) {
+      setEnabled(true);
+      setSetupData(null);
+      setCode('');
+      setStatus('2FA ativado com sucesso!');
+    } else {
+      setStatus(data?.error || 'Erro ao verificar código');
+    }
   };
 
   const disable2FA = async () => {
-    setEnabled(false); setCode(''); setStatus('2FA desativado.');
+    await authApiFetch('/api/auth/2fa/disable', { method: 'POST' }).catch(() => {});
+    await apiFetch('/api/flow/2fa/disable', { method: 'POST' }).catch(() => {});
+    setEnabled(false);
+    setCode('');
+    setStatus('2FA desativado.');
   };
 
   return (
@@ -206,8 +242,7 @@ function TwoFactorSetup() {
   );
 }
 
-function Sidebar({ activeSection, setActiveSection, user }: { activeSection: string; setActiveSection: (s: string) => void; user: any }) {
-  const [collapsed, setCollapsed] = useState(false);
+function Sidebar({ activeSection, setActiveSection, user, mobileOpen, setMobileOpen, collapsed }: { activeSection: string; setActiveSection: (s: string) => void; user: any; mobileOpen: boolean; setMobileOpen: (o: boolean) => void; collapsed: boolean }) {
   const items = [
     { id: "overview", label: "Visão Geral", icon: BarChart3 },
     { id: "tenants", label: "Tenants", icon: Building2 },
@@ -218,48 +253,61 @@ function Sidebar({ activeSection, setActiveSection, user }: { activeSection: str
   ];
 
   return (
-    <aside className={`fixed left-0 top-0 h-screen bg-[#020204] border-r border-zinc-800 z-40 flex flex-col transition-all duration-300 ${collapsed ? "w-16" : "w-64"}`}>
-      <div className="flex items-center justify-between px-4 h-16 border-b border-zinc-800">
-        {!collapsed && (
-          <a href="/" className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-amber-400 to-yellow-600 flex items-center justify-center">
-              <CreditCard className="w-4 h-4 text-black" />
-            </div>
-            <span className="text-sm font-extrabold tracking-tight text-white">Axion<span className="text-[#e8b923]">Pay</span></span>
-          </a>
-        )}
-        <div className="flex items-center gap-2">
-          <NotificationBell />
-          <button onClick={() => setCollapsed(!collapsed)} className="text-zinc-500 hover:text-white transition-colors">
-            <Menu className="w-5 h-5" />
-          </button>
-        </div>
-      </div>
-      <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
-        {items.map(item => (
-          <button key={item.id} onClick={() => setActiveSection(item.id)}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all duration-200 ${
-              activeSection === item.id
-                ? "bg-[#e8b923]/10 text-[#e8b923] border border-[#e8b923]/20"
-                : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5 border border-transparent"
-            }`}>
-            <item.icon className="w-4 h-4 shrink-0" />
-            {!collapsed && <span>{item.label}</span>}
-          </button>
-        ))}
-      </nav>
-      <div className="p-3 border-t border-zinc-800">
-        {user && !collapsed && (
-          <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-white/5">
-            <img src={user.picture || ""} alt="" className="w-7 h-7 rounded-full" />
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold text-white truncate">{user.name}</p>
-              <p className="text-[10px] text-zinc-500 truncate">{user.email}</p>
-            </div>
+    <>
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40 md:hidden transition-opacity"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      <aside
+        className={`fixed left-0 top-0 h-screen bg-[#020204] border-r border-zinc-800 z-50 flex flex-col transition-all duration-300 ${
+          mobileOpen ? "translate-x-0 w-64" : "-translate-x-full md:translate-x-0"
+        } ${collapsed ? "md:w-16" : "md:w-64"}`}
+      >
+        <div className="flex items-center justify-between px-4 h-16 border-b border-zinc-800">
+          {(!collapsed || mobileOpen) && (
+            <a href="/" className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-amber-400 to-yellow-600 flex items-center justify-center">
+                <CreditCard className="w-4 h-4 text-black" />
+              </div>
+              <span className="text-sm font-extrabold tracking-tight text-white">Axion<span className="text-[#e8b923]">Pay</span></span>
+            </a>
+          )}
+          <div className="flex items-center gap-2">
+            <NotificationBell />
+            <button onClick={() => setMobileOpen(false)} className="md:hidden p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10">
+              <X className="w-5 h-5" />
+            </button>
           </div>
-        )}
-      </div>
-    </aside>
+        </div>
+        <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
+          {items.map(item => (
+            <button key={item.id} onClick={() => { setActiveSection(item.id); setMobileOpen(false); }}
+              className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 min-h-[44px] ${
+                activeSection === item.id
+                  ? "bg-[#e8b923]/10 text-[#e8b923] border border-[#e8b923]/20"
+                  : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5 border border-transparent"
+              }`}>
+              <item.icon className="w-4 h-4 shrink-0" />
+              {(!collapsed || mobileOpen) && <span>{item.label}</span>}
+            </button>
+          ))}
+        </nav>
+        <div className="p-3 border-t border-zinc-800">
+          {user && (!collapsed || mobileOpen) && (
+            <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-white/5">
+              <img src={user.picture || ""} alt="" className="w-7 h-7 rounded-full" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-white truncate">{user.name}</p>
+                <p className="text-[10px] text-zinc-500 truncate">{user.email}</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </aside>
+    </>
   );
 }
 
@@ -314,7 +362,12 @@ function TenantsSection() {
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
-    apiFetch("/api/pay/tenants").then(data => { if (!data.error) setTenants(data); });
+    apiFetch("/api/pay/tenants").then(data => {
+      if (!data?.error) {
+        const list = Array.isArray(data) ? data : (Array.isArray(data?.tenants) ? data.tenants : []);
+        setTenants(list);
+      }
+    });
   }, []);
 
   const createTenant = async (e: React.FormEvent) => {
@@ -322,8 +375,9 @@ function TenantsSection() {
     if (!formData.name) return;
     setCreating(true);
     const data = await apiFetch("/api/pay/tenants", { method: "POST", body: JSON.stringify(formData) });
-    if (!data.error) {
-      setTenants([data, ...tenants]);
+    if (!data?.error && data?.id) {
+      const list = Array.isArray(tenants) ? tenants : [];
+      setTenants([data, ...list]);
       setFormData({ name: "", document: "", email: "" });
       setShowForm(false);
     }
@@ -332,17 +386,21 @@ function TenantsSection() {
 
   const toggleTenant = async (id: string) => {
     const data = await apiFetch(`/api/pay/tenants/${id}/toggle`, { method: "PATCH" });
-    if (!data.error) {
-      setTenants(tenants.map(t => t.id === id ? { ...t, status: data.status } : t));
+    if (!data?.error) {
+      const list = Array.isArray(tenants) ? tenants : [];
+      setTenants(list.map(t => t.id === id ? { ...t, status: data.status || (t.status === "active" ? "inactive" : "active") } : t));
     }
   };
 
   const deleteTenant = async (id: string) => {
     const data = await apiFetch(`/api/pay/tenants/${id}`, { method: "DELETE" });
-    if (!data.error) {
-      setTenants(tenants.filter(t => t.id !== id));
+    if (!data?.error) {
+      const list = Array.isArray(tenants) ? tenants : [];
+      setTenants(list.filter(t => t.id !== id));
     }
   };
+
+  const tenantList = Array.isArray(tenants) ? tenants : [];
 
   return (
     <div className="space-y-6">
@@ -395,30 +453,38 @@ function TenantsSection() {
       </AnimatePresence>
 
       <div className="grid gap-4">
-        {tenants.map((t) => (
-          <div key={t.id} className="bg-[#09090d] border border-zinc-800 rounded-xl p-5 hover:border-[#e8b923]/25 transition-all">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[#e8b923]/10 border border-[#e8b923]/20 flex items-center justify-center">
-                  <Building2 className="w-5 h-5 text-[#e8b923]" />
+        {tenantList.length === 0 ? (
+          <div className="bg-[#09090d] border border-zinc-800 rounded-xl p-8 text-center">
+            <Building2 className="w-8 h-8 text-zinc-600 mx-auto mb-2" />
+            <p className="text-xs text-zinc-400 font-bold">Nenhum Tenant cadastrado</p>
+            <p className="text-[10px] text-zinc-500 mt-1">Clique em "Novo Tenant" para cadastrar sua primeira organização</p>
+          </div>
+        ) : (
+          tenantList.map((t) => (
+            <div key={t.id || Math.random()} className="bg-[#09090d] border border-zinc-800 rounded-xl p-5 hover:border-[#e8b923]/25 transition-all">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#e8b923]/10 border border-[#e8b923]/20 flex items-center justify-center">
+                    <Building2 className="w-5 h-5 text-[#e8b923]" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm text-white">{t.name || "Tenant sem nome"}</h4>
+                    <p className="font-mono text-[10px] text-zinc-500">{t.document || "CNPJ não informado"} • {t.email || "Sem e-mail"}</p>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="font-bold text-sm text-white">{t.name}</h4>
-                  <p className="font-mono text-[10px] text-zinc-500">{t.document} • {t.email}</p>
+                <div className="flex items-center gap-2">
+                  <StatusBadge status={t.status || "active"} />
+                  <button onClick={() => toggleTenant(t.id)} className="px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs font-bold text-zinc-300 hover:bg-zinc-800">
+                    {t.status === "active" ? "Pausar" : "Ativar"}
+                  </button>
+                  <button onClick={() => deleteTenant(t.id)} className="p-1.5 text-red-400 hover:bg-red-400/10 rounded-lg">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <StatusBadge status={t.status} />
-                <button onClick={() => toggleTenant(t.id)} className="px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs font-bold text-zinc-300 hover:bg-zinc-800">
-                  {t.status === "active" ? "Pausar" : "Ativar"}
-                </button>
-                <button onClick={() => deleteTenant(t.id)} className="p-1.5 text-red-400 hover:bg-red-400/10 rounded-lg">
-                  <Trash2 className="w-4 h-4" />
-                </button>
               </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );
@@ -433,7 +499,12 @@ function ApiKeysSection() {
   const [showKey, setShowKey] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    apiFetch("/api/pay/api-keys").then(data => { if (!data.error) setKeys(data); });
+    apiFetch("/api/pay/api-keys").then(data => {
+      if (!data?.error) {
+        const list = Array.isArray(data) ? data : (Array.isArray(data?.keys) ? data.keys : []);
+        setKeys(list);
+      }
+    });
   }, []);
 
   const generateKey = async (e: React.FormEvent) => {
@@ -441,8 +512,9 @@ function ApiKeysSection() {
     if (!newKeyName) return;
     setCreating(true);
     const data = await apiFetch("/api/pay/api-keys", { method: "POST", body: JSON.stringify({ name: newKeyName }) });
-    if (!data.error) {
-      setKeys([data, ...keys]);
+    if (!data?.error && data?.api_key) {
+      const list = Array.isArray(keys) ? keys : [];
+      setKeys([data, ...list]);
       setNewKeyResult(data.api_key);
       setNewKeyName("");
     }
@@ -451,15 +523,20 @@ function ApiKeysSection() {
 
   const revokeKey = async (id: string) => {
     const data = await apiFetch(`/api/pay/api-keys/${id}/revoke`, { method: "POST" });
-    if (!data.error) setKeys(keys.map(k => k.id === id ? { ...k, status: "revoked" } : k));
+    if (!data?.error) {
+      const list = Array.isArray(keys) ? keys : [];
+      setKeys(list.map(k => k.id === id ? { ...k, status: "revoked" } : k));
+    }
   };
+
+  const keyList = Array.isArray(keys) ? keys : [];
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-extrabold tracking-tight text-white">API Keys</h2>
-          <p className="text-xs text-zinc-500 mt-1">Gerencie chaves de API Live e Test</p>
+          <p className="text-xs text-zinc-500 mt-1">Gerencie chaves de API Live e Test para integração</p>
         </div>
         <button onClick={() => { setShowForm(!showForm); setNewKeyResult(null); }}
           className="flex items-center gap-2 px-4 py-2.5 bg-[#e8b923] text-black font-bold text-xs uppercase tracking-widest rounded-xl hover:opacity-90 transition-all shadow-lg shadow-yellow-500/10">
@@ -497,7 +574,7 @@ function ApiKeysSection() {
               <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
               <div>
                 <h4 className="text-sm font-bold text-amber-400">Key Live Gerada com Sucesso!</h4>
-                <p className="text-xs text-zinc-400 mt-1">Copie esta chave agora. Ela não será mostrada novamente.</p>
+                <p className="text-xs text-zinc-400 mt-1">Copie esta chave agora. Ela é secreta e autoriza pagamentos em sua conta.</p>
               </div>
             </div>
             <div className="flex items-center gap-2 bg-black rounded-xl p-3 border border-zinc-800">
@@ -510,34 +587,41 @@ function ApiKeysSection() {
       </AnimatePresence>
 
       <div className="grid gap-4">
-        {keys.map((k) => (
-          <div key={k.id} className="bg-[#09090d] border border-zinc-800 rounded-xl p-5 hover:border-[#e8b923]/25 transition-all">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-3">
-                <Key className="w-5 h-5 text-[#e8b923]" />
-                <div>
-                  <h4 className="font-bold text-sm text-white">{k.name || k.key_name}</h4>
-                  <p className="font-mono text-[10px] text-zinc-500">Criada em {k.created_at ? new Date(k.created_at).toLocaleDateString("pt-BR") : "-"}</p>
-                </div>
-              </div>
-              <StatusBadge status={k.status} />
-            </div>
-            <div className="flex items-center gap-2 bg-black rounded-xl p-3 border border-zinc-800">
-              <code className="flex-1 text-xs font-mono text-zinc-400">
-                {showKey[k.id] ? (k.api_key || k.key) : `${(k.api_key || k.key).slice(0, 12)}...${(k.api_key || k.key).slice(-4)}`}
-              </code>
-              <button onClick={() => setShowKey({ ...showKey, [k.id]: !showKey[k.id] })} className="text-zinc-500 hover:text-white p-1">
-                {showKey[k.id] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-              <CopyBtn text={k.api_key || k.key} />
-              {k.status !== "revoked" && (
-                <button onClick={() => revokeKey(k.id)} className="p-1.5 text-red-400 hover:bg-red-400/10 rounded-lg">
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              )}
-            </div>
+        {keyList.length === 0 ? (
+          <div className="bg-[#09090d] border border-zinc-800 rounded-xl p-8 text-center">
+            <Key className="w-8 h-8 text-zinc-600 mx-auto mb-2" />
+            <p className="text-xs text-zinc-400 font-bold">Nenhuma API Key encontrada</p>
           </div>
-        ))}
+        ) : (
+          keyList.map((k) => (
+            <div key={k.id || Math.random()} className="bg-[#09090d] border border-zinc-800 rounded-xl p-5 hover:border-[#e8b923]/25 transition-all">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <Key className="w-5 h-5 text-[#e8b923]" />
+                  <div>
+                    <h4 className="font-bold text-sm text-white">{k.name || k.key_name || "API Key Live"}</h4>
+                    <p className="font-mono text-[10px] text-zinc-500">Criada em {k.created_at ? new Date(k.created_at).toLocaleDateString("pt-BR") : "-"}</p>
+                  </div>
+                </div>
+                <StatusBadge status={k.status || "active"} />
+              </div>
+              <div className="flex items-center gap-2 bg-black rounded-xl p-3 border border-zinc-800">
+                <code className="flex-1 text-xs font-mono text-zinc-400">
+                  {showKey[k.id] ? (k.api_key || k.key || "") : `${(k.api_key || k.key || "sec_key_live_xxx").slice(0, 12)}...${(k.api_key || k.key || "xxx").slice(-4)}`}
+                </code>
+                <button onClick={() => setShowKey({ ...showKey, [k.id]: !showKey[k.id] })} className="text-zinc-500 hover:text-white p-1">
+                  {showKey[k.id] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+                <CopyBtn text={k.api_key || k.key || ""} />
+                {k.status !== "revoked" && (
+                  <button onClick={() => revokeKey(k.id)} className="p-1.5 text-red-400 hover:bg-red-400/10 rounded-lg">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
@@ -547,8 +631,15 @@ function TransactionsSection() {
   const [transactions, setTransactions] = useState<Array<any>>([]);
 
   useEffect(() => {
-    apiFetch("/api/pay/transactions").then(data => { if (!data.error) setTransactions(data); });
+    apiFetch("/api/pay/transactions").then(data => {
+      if (!data?.error) {
+        const list = Array.isArray(data) ? data : (Array.isArray(data?.transactions) ? data.transactions : []);
+        setTransactions(list);
+      }
+    });
   }, []);
+
+  const txList = Array.isArray(transactions) ? transactions : [];
 
   return (
     <div className="space-y-6">
@@ -569,15 +660,21 @@ function TransactionsSection() {
               </tr>
             </thead>
             <tbody>
-              {transactions.map((t, i) => (
-                <tr key={i} className="border-b border-zinc-800/50">
-                  <td className="py-3 text-xs text-white font-mono">{t.id}</td>
-                  <td className="py-3 text-xs text-white font-bold">R$ {(t.amount || 0).toFixed(2)}</td>
-                  <td className="py-3"><StatusBadge status={t.status || "pending"} /></td>
-                  <td className="py-3 text-xs text-zinc-400">{t.payment_method || "-"}</td>
-                  <td className="py-3 text-xs text-zinc-400">{t.created_at ? new Date(t.created_at).toLocaleString("pt-BR") : "-"}</td>
+              {txList.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-6 text-center text-xs text-zinc-500 font-mono">Nenhuma transação registrada até o momento.</td>
                 </tr>
-              ))}
+              ) : (
+                txList.map((t, i) => (
+                  <tr key={t.id || i} className="border-b border-zinc-800/50">
+                    <td className="py-3 text-xs text-white font-mono">{t.id}</td>
+                    <td className="py-3 text-xs text-white font-bold">R$ {(t.amount || 0).toFixed(2)}</td>
+                    <td className="py-3"><StatusBadge status={t.status || "pending"} /></td>
+                    <td className="py-3 text-xs text-zinc-400">{t.payment_method || "-"}</td>
+                    <td className="py-3 text-xs text-zinc-400">{t.created_at ? new Date(t.created_at).toLocaleString("pt-BR") : "-"}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -589,6 +686,8 @@ function TransactionsSection() {
 function IntegrationsSection() {
   const [webhookUrl, setWebhookUrl] = useState("https://minhaempresa.com/api/webhooks/axionpay");
   const [webhookSecret, setWebhookSecret] = useState("whsec_axion_2026_super_secret_hash");
+  const [activeModal, setActiveModal] = useState<string | null>(null);
+  const [testStatus, setTestStatus] = useState<string | null>(null);
   const [gateways, setGateways] = useState({
     stripe: true,
     mercadopago: true,
@@ -598,7 +697,7 @@ function IntegrationsSection() {
 
   useEffect(() => {
     apiFetch("/api/pay/integrations").then(data => {
-      if (!data.error && data.webhookUrl) {
+      if (!data?.error && data?.webhookUrl) {
         setWebhookUrl(data.webhookUrl);
         if (data.webhookSecret) setWebhookSecret(data.webhookSecret);
         if (data.gateways) setGateways(data.gateways);
@@ -615,60 +714,166 @@ function IntegrationsSection() {
     setTimeout(() => setSaved(false), 3000);
   };
 
+  const testWebhookPing = async () => {
+    if (!webhookUrl || !webhookUrl.startsWith("https://")) {
+      setTestStatus("URL inválida. Use HTTPS.");
+      return;
+    }
+    setTestStatus("Enviando evento ping...");
+    try {
+      const res = await fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Axion-Ping": "true" },
+        body: JSON.stringify({ event: "ping", timestamp: new Date().toISOString() })
+      });
+      setTestStatus(`HTTP ${res.status} — ${res.ok ? "Callback recebido com sucesso!" : "Falha no callback."}`);
+    } catch {
+      setTestStatus("Erro de conexão ao testar callback. Verifique a URL.");
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-extrabold tracking-tight text-white">Integrações & Webhooks</h2>
-        <p className="text-xs text-zinc-500 mt-1">Conecte webhooks em tempo real e alterne gateways de pagamento</p>
+        <h2 className="text-2xl font-extrabold tracking-tight text-white">Integrações</h2>
+        <p className="text-xs text-zinc-500 mt-1">Conecte AxionPay ao seu ecossistema</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <DashboardCard icon={Globe} title="Configuração de Webhook">
-          <div className="space-y-4">
-            <div>
-              <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1.5">URL de Callback (HTTP POST)</label>
-              <input type="text" value={webhookUrl} onChange={e => setWebhookUrl(e.target.value)}
-                className="w-full px-4 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-xs font-mono text-white focus:border-[#e8b923] focus:outline-none" />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-[#09090d] border border-zinc-800 rounded-xl p-6 flex flex-col justify-between hover:border-[#e8b923]/30 transition-all">
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <Terminal className="w-6 h-6 text-[#e8b923]" />
+              <StatusBadge status="active" />
             </div>
-            <div>
-              <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1.5">Webhook HMAC Secret</label>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 px-3 py-2 bg-black rounded-xl text-xs font-mono text-amber-300 border border-zinc-800">{webhookSecret}</code>
-                <CopyBtn text={webhookSecret} />
-              </div>
-            </div>
-            {saved && <p className="text-xs text-[#e8b923] font-mono">Integração salva com sucesso!</p>}
-            <button onClick={saveIntegrations} className="w-full py-2.5 bg-[#e8b923] text-black font-bold text-xs rounded-xl hover:opacity-90">
-              Salvar Webhook
-            </button>
+            <h3 className="text-base font-bold text-white">API REST</h3>
+            <p className="text-xs text-zinc-500 mt-1">Integração direta via HTTP com endpoints de cobrança e PIX.</p>
           </div>
-        </DashboardCard>
+          <button onClick={() => setActiveModal("api_rest")} className="mt-6 w-full py-2 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-xs font-bold text-white rounded-lg transition-all">
+            Configurar
+          </button>
+        </div>
 
-        <DashboardCard icon={Terminal} title="Gateways Ativos">
-          <div className="space-y-3">
-            {[
-              { id: "mercadopago", name: "Mercado Pago (PIX & Cartão)", desc: "Aprovação instantânea" },
-              { id: "stripe", name: "Stripe International", desc: "Cobranças em USD, EUR, BRL" },
-              { id: "asaas", name: "Asaas Boleto & PIX", desc: "Gestão de inadimplência" }
-            ].map(gw => (
-              <div key={gw.id} className="flex items-center justify-between p-3 bg-zinc-950 rounded-xl border border-zinc-800">
-                <div>
-                  <p className="text-xs font-bold text-white">{gw.name}</p>
-                  <p className="text-[10px] text-zinc-500">{gw.desc}</p>
+        <div className="bg-[#09090d] border border-zinc-800 rounded-xl p-6 flex flex-col justify-between hover:border-[#e8b923]/30 transition-all">
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <Globe className="w-6 h-6 text-[#e8b923]" />
+              <StatusBadge status={webhookUrl ? "active" : "inactive"} />
+            </div>
+            <h3 className="text-base font-bold text-white">Webhooks</h3>
+            <p className="text-xs text-zinc-500 mt-1">Notificações em tempo real assinadas via HMAC Secret.</p>
+          </div>
+          <button onClick={() => setActiveModal("webhooks")} className="mt-6 w-full py-2 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-xs font-bold text-white rounded-lg transition-all">
+            Configurar
+          </button>
+        </div>
+
+        <div className="bg-[#09090d] border border-zinc-800 rounded-xl p-6 flex flex-col justify-between hover:border-[#e8b923]/30 transition-all">
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <FileText className="w-6 h-6 text-[#e8b923]" />
+              <StatusBadge status="active" />
+            </div>
+            <h3 className="text-base font-bold text-white">Checkout Pro</h3>
+            <p className="text-xs text-zinc-500 mt-1">Página de checkout pronta, responsiva e white-label.</p>
+          </div>
+          <button onClick={() => setActiveModal("checkout_pro")} className="mt-6 w-full py-2 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-xs font-bold text-white rounded-lg transition-all">
+            Configurar
+          </button>
+        </div>
+      </div>
+
+      <DashboardCard icon={Terminal} title="Gateways de Pagamento Ativos">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[
+            { id: "mercadopago", name: "Mercado Pago", desc: "PIX & Cartão Nacional" },
+            { id: "stripe", name: "Stripe International", desc: "USD, EUR, BRL Global" },
+            { id: "asaas", name: "Asaas Payments", desc: "Boleto & Recorrência" }
+          ].map(gw => (
+            <div key={gw.id} className="flex items-center justify-between p-4 bg-zinc-950 rounded-xl border border-zinc-800">
+              <div>
+                <p className="text-xs font-bold text-white">{gw.name}</p>
+                <p className="text-[10px] text-zinc-500 mt-0.5">{gw.desc}</p>
+              </div>
+              <button onClick={() => setGateways({ ...gateways, [gw.id]: !gateways[gw.id as keyof typeof gateways] })}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                  gateways[gw.id as keyof typeof gateways]
+                    ? "bg-green-500/10 text-green-400 border-green-400/30"
+                    : "bg-zinc-900 text-zinc-500 border-zinc-800"
+                }`}>
+                {gateways[gw.id as keyof typeof gateways] ? "Ativo" : "Inativo"}
+              </button>
+            </div>
+          ))}
+        </div>
+      </DashboardCard>
+
+      {activeModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#09090d] border border-zinc-800 rounded-2xl max-w-lg w-full p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+              <h3 className="text-base font-bold text-white uppercase tracking-tight">
+                {activeModal === "api_rest" && "Configuração da API REST"}
+                {activeModal === "webhooks" && "Configuração de Webhooks"}
+                {activeModal === "checkout_pro" && "Configuração do Checkout Pro"}
+              </h3>
+              <button onClick={() => setActiveModal(null)} className="text-zinc-500 hover:text-white p-1">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {activeModal === "api_rest" && (
+              <div className="space-y-4">
+                <p className="text-xs text-zinc-400">Envie requisições HTTP autorizadas via Header `Authorization: Bearer sec_key_live_...`</p>
+                <div className="bg-black p-3 rounded-xl border border-zinc-800 space-y-2">
+                  <p className="text-[10px] text-zinc-500 uppercase font-mono">Endpoint de Cobrança PIX/Cartão:</p>
+                  <code className="text-xs font-mono text-amber-300 block break-all">POST https://pay.axionenterprise.cloud/payments/charge</code>
                 </div>
-                <button onClick={() => setGateways({ ...gateways, [gw.id]: !gateways[gw.id as keyof typeof gateways] })}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
-                    gateways[gw.id as keyof typeof gateways]
-                      ? "bg-green-500/10 text-green-400 border-green-400/30"
-                      : "bg-zinc-900 text-zinc-500 border-zinc-800"
-                  }`}>
-                  {gateways[gw.id as keyof typeof gateways] ? "Ativo" : "Inativo"}
-                </button>
+                <div className="flex justify-end gap-2">
+                  <button onClick={() => setActiveModal(null)} className="px-4 py-2 bg-zinc-900 border border-zinc-800 text-xs font-bold text-white rounded-lg">Fechar</button>
+                </div>
               </div>
-            ))}
+            )}
+
+            {activeModal === "webhooks" && (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">URL de Callback (HTTP POST)</label>
+                  <input type="text" value={webhookUrl} onChange={e => setWebhookUrl(e.target.value)} className="w-full px-3 py-2 bg-black border border-zinc-800 rounded-lg text-xs font-mono text-white focus:border-[#e8b923] focus:outline-none" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Webhook Secret HMAC</label>
+                  <div className="flex gap-2">
+                    <code className="flex-1 px-3 py-2 bg-black rounded-lg text-xs font-mono text-amber-300 border border-zinc-800 break-all">{webhookSecret}</code>
+                    <CopyBtn text={webhookSecret} />
+                  </div>
+                </div>
+                {testStatus && <p className="text-xs text-green-400 font-mono bg-green-500/10 p-2 rounded-lg border border-green-500/20">{testStatus}</p>}
+                <div className="flex gap-2">
+                  <button onClick={testWebhookPing} className="flex-1 py-2 bg-zinc-800 text-white text-xs font-bold rounded-lg hover:bg-zinc-700">Testar Webhook</button>
+                  <button onClick={() => { saveIntegrations(); setActiveModal(null); }} className="flex-1 py-2 bg-[#e8b923] text-black text-xs font-bold rounded-lg hover:opacity-90">Salvar e Fechar</button>
+                </div>
+              </div>
+            )}
+
+            {activeModal === "checkout_pro" && (
+              <div className="space-y-4">
+                <p className="text-xs text-zinc-400">Página de checkout integrada e otimizada para conversão instantânea.</p>
+                <div className="bg-black p-3 rounded-xl border border-zinc-800 space-y-2">
+                  <p className="text-[10px] text-zinc-500 uppercase font-mono">URL de Checkout:</p>
+                  <code className="text-xs font-mono text-amber-300 block break-all">https://pay.axionenterprise.cloud/checkout</code>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <a href="/checkout" target="_blank" rel="noreferrer" className="px-4 py-2 bg-[#e8b923] text-black text-xs font-bold rounded-lg hover:opacity-90 inline-flex items-center gap-1">
+                    Abrir Checkout <ExternalLink className="w-3 h-3" />
+                  </a>
+                  <button onClick={() => setActiveModal(null)} className="px-4 py-2 bg-zinc-900 border border-zinc-800 text-xs font-bold text-white rounded-lg">Fechar</button>
+                </div>
+              </div>
+            )}
           </div>
-        </DashboardCard>
-      </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -733,6 +938,8 @@ export default function PayDashboard() {
   const [user, setUser] = useState<any>(null);
   const [authLoaded, setAuthLoaded] = useState(false);
   const [activeSection, setActiveSection] = useState("overview");
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
     checkAuth().then(u => {
@@ -763,21 +970,38 @@ export default function PayDashboard() {
 
   return (
     <div className="min-h-screen bg-[#040407] text-[#f5f5fa] relative overflow-x-hidden">
-      <Sidebar activeSection={activeSection} setActiveSection={setActiveSection} user={user} />
-      <main className="ml-64 min-h-screen relative z-10">
-        <header className="sticky top-0 z-20 bg-[#040407]/80 backdrop-blur-xl border-b border-zinc-800">
-          <div className="flex items-center justify-end px-8 h-16 gap-4">
-            <a href="/" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider text-zinc-400 hover:text-white hover:bg-white/5 transition-all border border-transparent hover:border-zinc-800">
-              <Home className="w-3.5 h-3.5" /> Landing
-            </a>
-            <div className="flex items-center gap-2.5 pl-4 border-l border-zinc-800">
-              <img src={user?.picture || ""} alt="" className="w-7 h-7 rounded-full" />
-              <span className="text-xs font-bold text-white hidden sm:block">{user?.name}</span>
+      <Sidebar activeSection={activeSection} setActiveSection={setActiveSection} user={user} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} collapsed={collapsed} />
+      <main className="ml-0 md:ml-64 min-h-screen relative z-10 transition-all duration-300">
+        <header className="sticky top-0 z-30 bg-[#040407]/90 backdrop-blur-xl border-b border-zinc-800">
+          <div className="flex items-center justify-between md:justify-end px-4 sm:px-6 md:px-8 h-16 gap-4">
+            <div className="flex items-center gap-3 md:hidden">
+              <button onClick={() => setMobileOpen(true)} className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white">
+                <Menu className="w-5 h-5" />
+              </button>
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-amber-400 to-yellow-600 flex items-center justify-center">
+                  <CreditCard className="w-4 h-4 text-black" />
+                </div>
+                <span className="text-sm font-extrabold tracking-tight text-white">Axion<span className="text-[#e8b923]">Pay</span></span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button onClick={() => setCollapsed(!collapsed)} className="hidden md:flex p-2 rounded-xl text-zinc-500 hover:text-white hover:bg-white/5 transition-all" title="Alternar sidebar">
+                <Menu className="w-4 h-4" />
+              </button>
+              <a href="/" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider text-zinc-400 hover:text-white hover:bg-white/5 transition-all border border-transparent hover:border-zinc-800">
+                <Home className="w-3.5 h-3.5" /> Landing
+              </a>
+              <div className="flex items-center gap-2.5 pl-3 border-l border-zinc-800">
+                <img src={user?.picture || ""} alt="" className="w-7 h-7 rounded-full" />
+                <span className="text-xs font-bold text-white hidden sm:block">{user?.name}</span>
+              </div>
             </div>
           </div>
         </header>
 
-        <div className="p-6 md:p-8 lg:p-10 max-w-7xl mx-auto">
+        <div className="p-4 sm:p-6 md:p-8 lg:p-10 max-w-7xl mx-auto">
           <motion.div key={activeSection} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
             {sections[activeSection]}
           </motion.div>

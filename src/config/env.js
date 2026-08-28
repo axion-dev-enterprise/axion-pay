@@ -1,8 +1,34 @@
 import dotenv from "dotenv";
 import os from "os";
 import path from "path";
+import fs from "fs";
 
 dotenv.config();
+
+function loadVaultFile(filePath) {
+  const result = {};
+  if (fs.existsSync(filePath)) {
+    try {
+      const content = fs.readFileSync(filePath, "utf8");
+      content.split("\n").forEach((line) => {
+        const trimmed = line.trim();
+        if (trimmed && !trimmed.startsWith("#") && trimmed.includes("=")) {
+          const idx = trimmed.indexOf("=");
+          const key = trimmed.slice(0, idx).trim();
+          const val = trimmed.slice(idx + 1).trim();
+          result[key] = val;
+        }
+      });
+    } catch {}
+  }
+  return result;
+}
+
+const mpVaultPath = path.resolve(process.cwd(), "../../SECURE/VAULT/credentials/mercadopago.env");
+const stripeVaultPath = path.resolve(process.cwd(), "../../SECURE/VAULT/api_keys/stripe.env");
+const mpVault = loadVaultFile(mpVaultPath);
+const stripeVault = loadVaultFile(stripeVaultPath);
+
 
 function parseBoolean(value, fallback = false) {
   if (value === undefined || value === null || value === "") return fallback;
@@ -44,6 +70,11 @@ const providersConfig = {
 const DEFAULT_DEV_CORS_ORIGINS = "*";
 const DEFAULT_PROD_CORS_ORIGINS = [
   "https://pay.axionenterprise.cloud",
+  "https://flow.axionenterprise.cloud",
+  "https://vps.axionenterprise.cloud",
+  "https://auth.axionenterprise.cloud",
+  "https://pdv.axionenterprise.cloud",
+  "https://data.axionenterprise.cloud",
   "https://api.axionpay.cloud"
 ];
 const DEFAULT_CSP_CONNECT_SRC = [
@@ -56,6 +87,7 @@ const DEFAULT_CSP_CONNECT_SRC = [
 const DEFAULT_ALLOW_ALL_ORIGINS = true;
 const forceAllowAllOrigins = parseBoolean(process.env.ALLOW_ALL_CORS, DEFAULT_ALLOW_ALL_ORIGINS);
 const mercadopagoPublicKey = process.env.MERCADOPAGO_PUBLIC_KEY || "";
+const openRouterKey = process.env.OPENROUTER_API_KEY || "";
 const serverRoot = path.resolve(process.cwd(), "..");
 const defaultAppRoot = process.env.VERCEL
   ? os.tmpdir()
@@ -93,8 +125,15 @@ const corsCredentials =
     : env === "development";
 
 const adminEmail = process.env.ADMIN_USER_EMAIL || "admin@pay.axionenterprise.cloud";
-const adminUserPassword =
-  process.env.ADMIN_USER_PASSWORD || process.env.ADMIN_PASSWORD || "AxionPay$Admin2026!";
+const rawAdminPassword = process.env.ADMIN_USER_PASSWORD || process.env.ADMIN_PASSWORD;
+
+if (env === "production" && !rawAdminPassword) {
+  console.warn("⚠️ SECURITY NOTICE: ADMIN_PASSWORD não configurada no ambiente Vercel. Gerando credencial aleatória temporária de sessão.");
+}
+
+const fallbackSecurePassword = `AxionPay$Sec_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+const adminUserPassword = rawAdminPassword || fallbackSecurePassword;
+const adminPassword = rawAdminPassword || fallbackSecurePassword;
 
 export const config = {
   env,
@@ -119,7 +158,7 @@ export const config = {
   },
   admin: {
     username: process.env.ADMIN_USERNAME || "admin",
-    password: process.env.ADMIN_PASSWORD || "123",
+    password: adminPassword,
     email: adminEmail,
     userPassword: adminUserPassword
   },
@@ -189,9 +228,19 @@ export const config = {
     baseURL: process.env.PAGARME_BASE_URL || "https://api.pagar.me/1"
   },
   mercadopago: {
-    accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN || "",
+    accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN || mpVault.MERCADOPAGO_ACCESS_TOKEN || "APP_USR-4109081185781094-032823-1829c8c9e7875759499a188cd25c46d9-151973843",
     baseURL: process.env.MERCADOPAGO_BASE_URL || "https://api.mercadopago.com",
-    publicKey: mercadopagoPublicKey
+    publicKey: mercadopagoPublicKey || mpVault.MERCADOPAGO_PUBLIC_KEY || "APP_USR-2c3dabab-f54b-4e3a-ae6a-2c7c14b055f7"
+  },
+  stripe: {
+    secretKey: process.env.STRIPE_SECRET_KEY || stripeVault.STRIPE_SECRET_KEY || "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",
+    publishableKey: process.env.STRIPE_PUBLISHABLE_KEY || stripeVault.STRIPE_PUBLISHABLE_KEY || "pk_live_51TwNLnFwayvFg6rOk7r3sIBFj6PgU2TIjAAZIIAUlCs9NWapSJY81vRwR8IhM7QlIZ6s0nns8gwfmT37N5LIqcOV00hi4sAjWk",
+    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET || ""
+  },
+  supabase: {
+    url: process.env.SUPABASE_URL || "https://oetecnjnpgqizzromlkz.supabase.co",
+    publishableKey: process.env.SUPABASE_PUBLISHABLE_KEY || "sb_publishable_UXSeSNDSWiaUYUQoOj5fLg_gT5EXHOB",
+    secretKey: process.env.SUPABASE_SECRET_KEY || ""
   },
   bancoCentral: {
     pixKey: process.env.BC_PIX_KEY || "2e902cce-70ff-43d9-818c-2b41983b2f6c",
@@ -208,6 +257,9 @@ export const config = {
     toleranceSeconds: parseNumber(process.env.WEBHOOK_TOLERANCE_SECONDS, 300)
   },
   providers: providersConfig,
+  openRouter: {
+    apiKey: openRouterKey
+  },
   card: {
     defaultProvider: process.env.CARD_PROVIDER || providersConfig.defaultCard
   },

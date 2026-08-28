@@ -4,11 +4,20 @@
   --color-gold: #e8b923;
   --color-gold-soft: #c79a1a;
   --color-gold-glow: rgba(232, 185, 35, 0.15);
-  --font-display: "Sora", system-ui, sans-serif;
+  --color-cyan: #58c6ff;
+  --font-sans: "IBM Plex Sans", "Inter", system-ui, sans-serif;
+  --font-display: "Space Grotesk", "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", "JetBrains Mono", monospace;
 }
 
 :root {
   color-scheme: dark;
+  --bg: #090714;
+  --bg-soft: #121021;
+  --panel: rgba(20, 20, 37, 0.82);
+  --line: rgba(141, 165, 221, 0.28);
+  --text: #ecf1ff;
+  --muted: #b2bfdf;
 }
 
 html {
@@ -17,10 +26,14 @@ html {
 
 body {
   margin: 0;
-  background: #040407;
-  color: #f5f5fa;
-  font-family: var(--font-display);
+  color: #ecf1ff;
+  font-family: var(--font-sans);
+  background:
+    radial-gradient(980px 520px at 8% 0%, rgba(88, 198, 255, 0.18), transparent 62%),
+    radial-gradient(820px 460px at 90% 10%, rgba(232, 185, 35, 0.16), transparent 66%),
+    linear-gradient(180deg, #090714, #121021);
   -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
   overflow-x: hidden;
 }
 

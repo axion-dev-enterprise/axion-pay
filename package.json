@@ -1,6 +1,6 @@
 {
   "name": "axion-pay-payment",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Payment Service API",
   "type": "module",
   "main": "src/index.js",
@@ -31,6 +31,7 @@
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-slot": "^1.2.3",
     "@radix-ui/react-tabs": "^1.1.18",
+    "@supabase/supabase-js": "^2.110.8",
     "@tanstack/react-query": "^5.90.2",
     "axios": "^1.6.0",
     "class-variance-authority": "^0.7.1",
@@ -56,6 +57,7 @@
     "react-router-dom": "^6.30.4",
     "sonner": "^2.0.7",
     "speakeasy": "^2.0.0",
+    "stripe": "^22.3.2",
     "tailwind-merge": "^3.3.1",
     "uuid": "^9.0.0",
     "zod": "^3.25.76",

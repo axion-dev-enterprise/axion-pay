@@ -1,29 +1,20 @@
 import { config } from "../config/env.js";
-import { AppError } from "../utils/errors.js";
-import { isValidCpf, normalizeCpf } from "../utils/cpf.js";
-import { hashPassword, verifyPassword } from "../utils/password.js";
-import { randomUUID } from "node:crypto";
-import { normalizeWhatsapp } from "../utils/validation.js";
 import {
-  createApiKey,
-  createEmailToken,
-  createSession,
-  consumeEmailToken,
+  createUser,
   getUserByEmail,
-  getUserByEmailWithPassword,
-  getUserById,
   getUserByWhatsapp,
-  getUserByWhatsappWithPassword,
+  getUserById,
   listApiKeys,
   revokeApiKey,
-  revokeSession,
-  setEmailVerified,
-  createUser,
-  markDocsSent,
+  createApiKey,
+  setUserDefaultPayoutDestination,
   getUserDefaultPayoutDestination,
-  setUserDefaultPayoutDestination
+  markDocsSent,
+  updateUserStatus,
 } from "../models/userStore.js";
+import { getSupabaseClient, saveTransactionToSupabase } from "../services/supabaseDatabaseService.js";
 import { sendEmail } from "../utils/mailer.js";
+import { hashPassword, verifyPassword } from "../utils/password.js";
 
 const EMAIL_TOKEN_HOURS = 24;
 
