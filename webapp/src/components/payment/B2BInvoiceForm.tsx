@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileText, Building, Mail, Calendar, ShieldCheck } from 'lucide-react';
+import { FileText, Building, Mail } from 'lucide-react';
 
 export interface B2BInvoiceData {
   cnpj: string;
@@ -28,7 +28,6 @@ export const B2BInvoiceForm: React.FC<B2BInvoiceFormProps> = ({
   const [dueDays, setDueDays] = useState(30);
   const [purchaseOrder, setPurchaseOrder] = useState('');
 
-  // Formatador de CNPJ
   const handleCnpjChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let v = e.target.value.replace(/\D/g, '').substring(0, 14);
     v = v.replace(/^(\d{2})(\d)/, '$1.$2');
@@ -51,8 +50,7 @@ export const B2BInvoiceForm: React.FC<B2BInvoiceFormProps> = ({
 
   return (
     <form onSubmit={handleSubmit} className={`space-y-4 ${className}`}>
-      
-      <!-- CNPJ -->
+      {/* CNPJ */}
       <div>
         <label className="block text-xs font-medium text-zinc-300 mb-1.5">CNPJ da Empresa</label>
         <div className="relative">
@@ -68,7 +66,7 @@ export const B2BInvoiceForm: React.FC<B2BInvoiceFormProps> = ({
         </div>
       </div>
 
-      <!-- Razão Social -->
+      {/* Razão Social */}
       <div>
         <label className="block text-xs font-medium text-zinc-300 mb-1.5">Razão Social</label>
         <input
@@ -81,7 +79,7 @@ export const B2BInvoiceForm: React.FC<B2BInvoiceFormProps> = ({
         />
       </div>
 
-      <!-- Email do Financeiro -->
+      {/* Email do Financeiro */}
       <div>
         <label className="block text-xs font-medium text-zinc-300 mb-1.5">E-mail para Envio da Fatura & NF-e</label>
         <div className="relative">
@@ -97,7 +95,7 @@ export const B2BInvoiceForm: React.FC<B2BInvoiceFormProps> = ({
         </div>
       </div>
 
-      <!-- Prazo de Faturamento & Pedido de Compra -->
+      {/* Prazo de Faturamento & Pedido de Compra */}
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-xs font-medium text-zinc-300 mb-1.5">Prazo de Pagamento</label>
@@ -124,7 +122,7 @@ export const B2BInvoiceForm: React.FC<B2BInvoiceFormProps> = ({
         </div>
       </div>
 
-      <!-- Submit Button -->
+      {/* Submit Button */}
       <button
         type="submit"
         disabled={loading}

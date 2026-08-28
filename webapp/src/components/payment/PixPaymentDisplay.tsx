@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Copy, Check, QrCode, Clock, ShieldCheck, RefreshCw } from 'lucide-react';
+import { Copy, Check, QrCode, Clock, RefreshCw } from 'lucide-react';
 
 interface PixPaymentDisplayProps {
   amount: number;
@@ -41,7 +41,6 @@ export const PixPaymentDisplay: React.FC<PixPaymentDisplayProps> = ({
 
   return (
     <div className={`p-6 rounded-2xl bg-zinc-900/80 border border-zinc-800 text-center space-y-5 ${className}`}>
-      
       <div className="flex justify-between items-center pb-3 border-b border-zinc-800">
         <div className="flex items-center gap-2">
           <QrCode className="w-5 h-5 text-emerald-400" />
@@ -53,7 +52,7 @@ export const PixPaymentDisplay: React.FC<PixPaymentDisplayProps> = ({
         </div>
       </div>
 
-      <!-- QR Code Image -->
+      {/* QR Code Image */}
       <div className="flex flex-col items-center justify-center p-4 bg-white rounded-xl max-w-[220px] mx-auto shadow-xl">
         {qrCodeUrl ? (
           <img src={qrCodeUrl} alt="QR Code PIX" className="w-48 h-48 object-contain" />
@@ -71,7 +70,7 @@ export const PixPaymentDisplay: React.FC<PixPaymentDisplayProps> = ({
         </div>
       </div>
 
-      <!-- Copia e Cola Input + Button -->
+      {/* Copia e Cola Input + Button */}
       <div className="space-y-2 text-left">
         <label className="block text-xs font-medium text-zinc-300">Código PIX Copia e Cola</label>
         <div className="flex gap-2">
@@ -96,7 +95,7 @@ export const PixPaymentDisplay: React.FC<PixPaymentDisplayProps> = ({
         </div>
       </div>
 
-      <!-- Live Polling Indicator -->
+      {/* Live Polling Indicator */}
       <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-850 flex items-center justify-between text-xs text-zinc-400">
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />

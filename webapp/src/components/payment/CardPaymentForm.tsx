@@ -30,10 +30,8 @@ export const CardPaymentForm: React.FC<CardPaymentFormProps> = ({
   const [expiry, setExpiry] = useState('');
   const [cvv, setCvv] = useState('');
   const [installments, setInstallments] = useState(1);
-  const [isFlipped, setIsFlipped] = useState(false);
   const [showCvv, setShowCvv] = useState(false);
 
-  // Detecta bandeira do cartão
   const detectBrand = (num: string) => {
     const clean = num.replace(/\D/g, '');
     if (/^4/.test(clean)) return { brand: 'VISA', color: 'from-blue-600 to-indigo-900' };
@@ -46,21 +44,18 @@ export const CardPaymentForm: React.FC<CardPaymentFormProps> = ({
 
   const cardInfo = detectBrand(cardNumber);
 
-  // Formatador de número
   const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const v = e.target.value.replace(/\D/g, '').substring(0, 16);
     const formatted = v.replace(/(\d{4})(?=\d)/g, '$1 ');
     setCardNumber(formatted);
   };
 
-  // Formatador de validade MM/AA
   const handleExpiryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let v = e.target.value.replace(/\D/g, '').substring(0, 4);
     if (v.length > 2) v = `${v.substring(0, 2)}/${v.substring(2)}`;
     setExpiry(v);
   };
 
-  // Formatador de CVV
   const handleCvvChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const v = e.target.value.replace(/\D/g, '').substring(0, 4);
     setCvv(v);
@@ -81,8 +76,7 @@ export const CardPaymentForm: React.FC<CardPaymentFormProps> = ({
 
   return (
     <div className={`space-y-6 ${className}`}>
-      
-      <!-- Visual Card Preview -->
+      {/* Visual Card Preview */}
       <div className="perspective-1000 max-w-sm mx-auto">
         <div
           className={`w-full h-48 rounded-2xl p-5 bg-gradient-to-tr ${cardInfo.color} border border-white/10 shadow-2xl flex flex-col justify-between text-white relative transition-transform duration-500`}
@@ -115,10 +109,9 @@ export const CardPaymentForm: React.FC<CardPaymentFormProps> = ({
         </div>
       </div>
 
-      <!-- Form Inputs -->
+      {/* Form Inputs */}
       <form onSubmit={handleSubmit} className="space-y-4">
-        
-        <!-- Número do Cartão -->
+        {/* Número do Cartão */}
         <div>
           <label className="block text-xs font-medium text-zinc-300 mb-1.5">Número do Cartão</label>
           <div className="relative">
@@ -134,7 +127,7 @@ export const CardPaymentForm: React.FC<CardPaymentFormProps> = ({
           </div>
         </div>
 
-        <!-- Nome no Cartão -->
+        {/* Nome no Cartão */}
         <div>
           <label className="block text-xs font-medium text-zinc-300 mb-1.5">Nome Impresso no Cartão</label>
           <div className="relative">
@@ -150,7 +143,7 @@ export const CardPaymentForm: React.FC<CardPaymentFormProps> = ({
           </div>
         </div>
 
-        <!-- Validade & CVV -->
+        {/* Validade & CVV */}
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-medium text-zinc-300 mb-1.5">Validade (MM/AA)</label>
@@ -190,7 +183,7 @@ export const CardPaymentForm: React.FC<CardPaymentFormProps> = ({
           </div>
         </div>
 
-        <!-- Parcelamento -->
+        {/* Parcelamento */}
         <div>
           <label className="block text-xs font-medium text-zinc-300 mb-1.5">Opções de Parcelamento</label>
           <select
@@ -209,7 +202,7 @@ export const CardPaymentForm: React.FC<CardPaymentFormProps> = ({
           </select>
         </div>
 
-        <!-- Submit Button -->
+        {/* Submit Button */}
         <button
           type="submit"
           disabled={loading}
