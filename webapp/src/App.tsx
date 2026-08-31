@@ -974,10 +974,12 @@ export default function App() {
                             </button>
                             
                             <button
-                              onClick={handleSimulatePayment}
-                              className="py-2.5 px-4 rounded-lg bg-green-500 text-black hover:bg-green-400 text-[10px] font-mono tracking-[0.08em] font-bold transition-all"
+                              type="button"
+                              disabled
+                              title="O status é confirmado exclusivamente pelo webhook assinado."
+                              className="py-2.5 px-4 rounded-lg bg-zinc-800 text-zinc-500 text-[10px] font-mono tracking-[0.08em] font-bold cursor-not-allowed"
                             >
-                              Simular Pagamento
+                              Aguardando webhook
                             </button>
                           </div>
                         </div>
