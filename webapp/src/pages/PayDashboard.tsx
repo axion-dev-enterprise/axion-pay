@@ -1,1012 +1,977 @@
-import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import React, { useState, useEffect } from "react";
 import {
-  Building2, CreditCard, Key, Plus, Copy, Check, Trash2, Eye, EyeOff, QrCode,
-  ChevronDown, LogIn, LayoutDashboard, ExternalLink, Settings, User, Shield,
-  Zap, Clock, DollarSign, ArrowRight, Menu, Bell, Home, BarChart3, Users,
-  Wallet, Activity, RefreshCw, Search, Loader2, AlertCircle, CheckCircle2,
-  Terminal, Globe, Lock, X, ArrowUpRight, FileText, HelpCircle
+  Building2,
+  Key,
+  Plus,
+  Copy,
+  Check,
+  Trash2,
+  LogIn,
+  LogOut,
+  LayoutDashboard,
+  ExternalLink,
+  Settings,
+  User,
+  Shield,
+  Zap,
+  Clock,
+  ArrowRight,
+  Menu,
+  Bell,
+  BarChart3,
+  Wallet,
+  Activity,
+  RefreshCw,
+  Search,
+  Loader2,
+  AlertCircle,
+  CheckCircle2,
+  Terminal,
+  Globe,
+  Lock,
+  X,
+  CreditCard,
+  Building,
+  Sparkles,
+  QrCode,
 } from "lucide-react";
 
 const AUTH_API = "https://auth.axionenterprise.cloud";
-const API_BASE = "";
+const API_BASE = "https://api.axionenterprise.cloud";
 
-function getToken() {
-  const stored = sessionStorage.getItem("axion_token");
+function getToken(): string | null {
+  const stored = sessionStorage.getItem("axion_token") || localStorage.getItem("axion_token");
   if (stored) return stored;
   const params = new URLSearchParams(window.location.search);
   const urlToken = params.get("token");
   if (urlToken) {
     sessionStorage.setItem("axion_token", urlToken);
+    localStorage.setItem("axion_token", urlToken);
     params.delete("token");
-    const newUrl = window.location.pathname + (params.toString() ? "?" + params.toString() : "") + window.location.hash;
+    const newUrl =
+      window.location.pathname +
+      (params.toString() ? "?" + params.toString() : "") +
+      window.location.hash;
     window.history.replaceState({}, "", newUrl);
     return urlToken;
   }
   return null;
 }
 
-function authHeaders() {
-  const token = getToken();
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-  return headers;
+function clearAuth() {
+  sessionStorage.removeItem("axion_token");
+  localStorage.removeItem("axion_token");
 }
 
 async function apiFetch(path: string, options: RequestInit = {}) {
+  const token = getToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
   try {
-    const res = await fetch(`${API_BASE}${path}`, { ...options, headers: { ...authHeaders(), ...(options.headers as Record<string, string> || {}) }, credentials: "include" });
+    const res = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers: { ...headers, ...((options.headers as Record<string, string>) || {}) },
+    });
     const data = await res.json().catch(() => null);
-    if (!res.ok) return { error: data?.error || data?.message || `HTTP ${res.status}` };
+    if (!res.ok) {
+      return { error: data?.error || data?.message || `HTTP ${res.status}` };
+    }
     return data || { error: "Resposta vazia do servidor" };
-  } catch { return { error: "Erro de conexão com o servidor" }; }
+  } catch (err: any) {
+    return { error: "Erro de conexão com o servidor de pagamentos." };
+  }
 }
 
 async function checkAuth() {
   const token = getToken();
-  const headers: Record<string, string> = {};
-  if (token) headers["Authorization"] = `Bearer ${token}`;
+  if (!token) return null;
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${token}`,
+    Accept: "application/json",
+  };
   try {
-    const res = await fetch(`${AUTH_API}/api/auth/me`, { credentials: "include", headers });
+    const res = await fetch(`${AUTH_API}/api/auth/me`, { headers });
     const data = await res.json().catch(() => null);
-    return (res.ok && data?.authenticated) ? data.user : null;
-  } catch { return null; }
-}
-
-async function authApiFetch(path: string, options: RequestInit = {}) {
-  const token = getToken();
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-  try {
-    const res = await fetch(`${AUTH_API}${path}`, { ...options, headers: { ...headers, ...(options.headers as Record<string, string> || {}) }, credentials: "include" });
-    const data = await res.json().catch(() => null);
-    if (!res.ok) return { error: data?.error || data?.message || `HTTP ${res.status}` };
-    return data || { error: "Resposta vazia do servidor de autenticação" };
-  } catch { return { error: "Erro de conexão com o servidor de autenticação" }; }
+    return res.ok && data?.authenticated ? data.user : null;
+  } catch {
+    return null;
+  }
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    active: "bg-green-500/10 text-green-400 border-green-400/30",
-    inactive: "bg-zinc-800 text-zinc-400 border-zinc-700",
-    revoked: "bg-red-500/10 text-red-400 border-red-400/30",
-    paid: "bg-green-500/10 text-green-400 border-green-400/30",
-    pending: "bg-yellow-500/10 text-yellow-400 border-yellow-400/30",
-  };
+  const normalized = (status || "").toLowerCase();
+  const isOk = normalized === "active" || normalized === "paid";
+  const isPending = normalized === "pending" || normalized === "creating";
+  const isBad = normalized === "revoked" || normalized === "failed" || normalized === "expired" || normalized === "inactive";
+
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${colors[status] || colors.inactive}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${status === "active" || status === "paid" ? "bg-green-400 animate-pulse" : "bg-zinc-500"}`} />
+    <span
+      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider border ${
+        isOk
+          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+          : isPending
+          ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+          : isBad
+          ? "bg-red-500/10 text-red-400 border-red-500/20"
+          : "bg-zinc-800 text-zinc-400 border-zinc-700"
+      }`}
+    >
+      <span
+        className={`w-1.5 h-1.5 rounded-full ${
+          isOk ? "bg-emerald-400 animate-pulse" : isPending ? "bg-amber-400 animate-spin" : "bg-zinc-500"
+        }`}
+      />
       {status}
     </span>
-  );
-}
-
-function DashboardCard({ icon: Icon, title, children, className = "" }: { icon: any; title: string; children: React.ReactNode; className?: string }) {
-  return (
-    <div className={`bg-[#09090d] border border-zinc-800 rounded-xl overflow-hidden ${className}`}>
-      <div className="flex items-center gap-3 px-6 py-4 border-b border-zinc-800 bg-zinc-950/50">
-        <Icon className="w-5 h-5 text-[#e8b923]" />
-        <h3 className="font-bold text-white tracking-tight text-sm">{title}</h3>
-      </div>
-      <div className="p-6">{children}</div>
-    </div>
   );
 }
 
 function CopyBtn({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   return (
-    <button onClick={() => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
-      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-mono text-zinc-300 transition-all border border-zinc-700">
-      {copied ? <><Check className="w-3 h-3 text-[#e8b923]" /> Copiado</> : <><Copy className="w-3 h-3" /> Copiar</>}
+    <button
+      onClick={() => {
+        navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }}
+      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-mono text-zinc-300 transition-all border border-zinc-700 cursor-pointer"
+    >
+      {copied ? (
+        <>
+          <Check className="w-3.5 h-3.5 text-emerald-400" />
+          <span className="text-emerald-400">Copiado</span>
+        </>
+      ) : (
+        <>
+          <Copy className="w-3.5 h-3.5" />
+          <span>Copiar</span>
+        </>
+      )}
     </button>
   );
 }
 
-function NotificationBell() {
-  const [open, setOpen] = useState(false);
-  const [count, setCount] = useState(0);
-  const [notifications, setNotifications] = useState<Array<any>>([]);
+export default function PayDashboard() {
+  const [activeSection, setActiveSection] = useState<string>("overview");
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
+  const [authLoading, setAuthLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
+
+  // Estados dos Dados Reais da API
+  const [overview, setOverview] = useState<{
+    merchants: number;
+    activeKeys: number;
+    transactionsToday: number;
+    volumeMonthCents: number;
+  }>({
+    merchants: 0,
+    activeKeys: 0,
+    transactionsToday: 0,
+    volumeMonthCents: 0,
+  });
+
+  const [merchants, setMerchants] = useState<Array<any>>([]);
+  const [apiKeys, setApiKeys] = useState<Array<any>>([]);
+  const [transactions, setTransactions] = useState<Array<any>>([]);
+  const [integrations, setIntegrations] = useState<any>(null);
+  const [settings, setSettings] = useState<{ organizationName: string | null }>({
+    organizationName: null,
+  });
+
+  const [loadingData, setLoadingData] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Modais de Criação
+  const [merchantModal, setMerchantModal] = useState(false);
+  const [newMerchantName, setNewMerchantName] = useState("");
+  const [newMerchantDoc, setNewMerchantDoc] = useState("");
+  const [newMerchantEmail, setNewMerchantEmail] = useState("");
+
+  const [apiKeyModal, setApiKeyModal] = useState(false);
+  const [keyMerchantId, setKeyMerchantId] = useState("");
+  const [keyName, setKeyName] = useState("");
+  const [generatedKey, setGeneratedKey] = useState<string | null>(null);
+
+  // 1. Inicialização de Autenticação
   useEffect(() => {
-    apiFetch("/api/pay/notifications").then(data => {
-      if (data?.ok && Array.isArray(data.notifications)) {
-        setNotifications(data.notifications);
-        setCount(data.unread || 0);
+    checkAuth().then((authUser) => {
+      if (authUser) {
+        setUser(authUser);
+        loadAllData();
       }
-    }).catch(() => {});
+      setAuthLoading(false);
+    });
   }, []);
 
-  const markRead = () => {
-    apiFetch("/api/pay/notifications/read-all", { method: "POST" });
-    setCount(0);
+  const loadAllData = async () => {
+    setLoadingData(true);
+    setErrorMessage(null);
+    try {
+      const [ovRes, mRes, kRes, txRes, intRes, stRes] = await Promise.all([
+        apiFetch("/v1/dashboard/overview"),
+        apiFetch("/v1/dashboard/merchants"),
+        apiFetch("/v1/dashboard/api-keys"),
+        apiFetch("/v1/dashboard/transactions"),
+        apiFetch("/v1/dashboard/integrations"),
+        apiFetch("/v1/dashboard/settings"),
+      ]);
+
+      if (ovRes && !ovRes.error) setOverview(ovRes);
+      if (mRes?.merchants) setMerchants(mRes.merchants);
+      if (kRes?.keys) setApiKeys(kRes.keys);
+      if (txRes?.transactions) setTransactions(txRes.transactions);
+      if (intRes && !intRes.error) setIntegrations(intRes);
+      if (stRes?.settings) setSettings(stRes.settings);
+    } catch (err: any) {
+      setErrorMessage("Erro ao carregar dados do dashboard.");
+    } finally {
+      setLoadingData(false);
+    }
   };
 
-  return (
-    <div className="relative">
-      <button onClick={() => setOpen(!open)} className="relative p-2 rounded-lg hover:bg-white/5 transition-all">
-        <Bell className="w-5 h-5 text-zinc-400" />
-        {count > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-[#e8b923] text-black rounded-full text-[9px] font-bold flex items-center justify-center">{count}</span>
-        )}
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-50" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-2 w-80 bg-[#09090d] border border-zinc-800 rounded-xl shadow-2xl z-50 overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
-              <h4 className="text-xs font-bold text-white uppercase tracking-wider">Notificações</h4>
-              <button onClick={markRead} className="text-[10px] text-zinc-500 hover:text-white transition-colors">Marcar lidas</button>
-            </div>
-            <div className="max-h-80 overflow-y-auto">
-              {notifications.map((n, i) => (
-                <div key={i} className="flex items-start gap-3 px-4 py-3 border-b border-zinc-800/50 hover:bg-white/5 transition-all">
-                  <div className="w-2 h-2 mt-1.5 rounded-full bg-[#e8b923] shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-zinc-300 truncate">{n.event}</p>
-                    <p className="text-[10px] font-mono text-zinc-500">{new Date(n.created_at).toLocaleString("pt-BR")}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-function TwoFactorSetup() {
-  const [enabled, setEnabled] = useState(false);
-  const [setupData, setSetupData] = useState<{secret:string;qrCode:string;otpauth:string}|null>(null);
-  const [code, setCode] = useState('');
-  const [status, setStatus] = useState('');
-
-  const startSetup = async () => {
-    setStatus('');
-    let data = await authApiFetch('/api/auth/2fa/setup', { method: 'POST' });
-    if (data?.error || !data?.qrCode) {
-      data = await apiFetch('/api/flow/2fa/setup', { method: 'POST' });
-    }
-    if (data && data.qrCode) {
-      setSetupData(data);
+  const handleCreateMerchant = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMerchantName.trim()) return;
+    const res = await apiFetch("/v1/dashboard/merchants", {
+      method: "POST",
+      body: JSON.stringify({
+        name: newMerchantName.trim(),
+        document: newMerchantDoc.trim() || undefined,
+        billingEmail: newMerchantEmail.trim() || undefined,
+      }),
+    });
+    if (res?.merchant) {
+      setMerchantModal(false);
+      setNewMerchantName("");
+      setNewMerchantDoc("");
+      setNewMerchantEmail("");
+      loadAllData();
     } else {
-      setStatus(data?.error || 'Erro ao gerar QR Code de 2FA');
+      alert(res?.error || "Falha ao cadastrar merchant.");
     }
   };
 
-  const verifyCode = async () => {
-    let data = await authApiFetch('/api/auth/2fa/verify', { method: 'POST', body: JSON.stringify({ code }) });
-    if (data?.error) {
-      data = await apiFetch('/api/flow/2fa/verify', { method: 'POST', body: JSON.stringify({ code }) });
+  const handleToggleMerchantStatus = async (id: string, currentStatus: string) => {
+    const nextStatus = currentStatus === "ACTIVE" ? "INACTIVE" : "ACTIVE";
+    const res = await apiFetch(`/v1/dashboard/merchants/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: nextStatus }),
+    });
+    if (res?.merchant) {
+      loadAllData();
     }
-    if (!data?.error || code.length === 6) {
-      setEnabled(true);
-      setSetupData(null);
-      setCode('');
-      setStatus('2FA ativado com sucesso!');
+  };
+
+  const handleCreateApiKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!keyMerchantId || !keyName.trim()) return;
+    const res = await apiFetch("/v1/dashboard/api-keys", {
+      method: "POST",
+      body: JSON.stringify({
+        merchantId: keyMerchantId,
+        name: keyName.trim(),
+      }),
+    });
+    if (res?.key) {
+      setGeneratedKey(res.key.secret);
+      loadAllData();
     } else {
-      setStatus(data?.error || 'Erro ao verificar código');
+      alert(res?.error || "Falha ao gerar chave de API.");
     }
   };
 
-  const disable2FA = async () => {
-    await authApiFetch('/api/auth/2fa/disable', { method: 'POST' }).catch(() => {});
-    await apiFetch('/api/flow/2fa/disable', { method: 'POST' }).catch(() => {});
-    setEnabled(false);
-    setCode('');
-    setStatus('2FA desativado.');
+  const handleRevokeApiKey = async (id: string) => {
+    if (!window.confirm("Deseja realmente revogar esta chave de API? Aplicações usando esta chave pararão de funcionar imediatamente.")) return;
+    const res = await apiFetch(`/v1/dashboard/api-keys/${id}/revoke`, {
+      method: "POST",
+    });
+    if (res?.key) {
+      loadAllData();
+    }
   };
 
-  return (
-    <div>
-      {status && <p className="text-xs text-green-400 mb-3 font-mono">{status}</p>}
-      
-      {!enabled && !setupData && (
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs text-zinc-300 font-bold">Proteja sua conta com autenticação de dois fatores</p>
-            <p className="text-[10px] text-zinc-500 mt-1">Use Google Authenticator, Authy ou similar</p>
-          </div>
-          <button onClick={startSetup} className="px-4 py-2 rounded-lg bg-[#e8b923]/10 text-[#e8b923] border border-[#e8b923]/20 text-xs font-bold hover:bg-[#e8b923]/20 transition-all">Configurar 2FA</button>
-        </div>
-      )}
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const org = settings.organizationName?.trim();
+    if (!org) return;
+    const res = await apiFetch("/v1/dashboard/settings", {
+      method: "POST",
+      body: JSON.stringify({ organizationName: org }),
+    });
+    if (res?.settings) {
+      alert("Configurações salvas com sucesso!");
+      loadAllData();
+    }
+  };
 
-      {setupData && (
-        <div className="space-y-4">
-          <p className="text-xs text-zinc-400">Escaneie o QR Code com seu aplicativo autenticador:</p>
-          <div className="flex justify-center">
-            <img src={setupData.qrCode} alt="QR Code 2FA" className="w-40 h-40 rounded-lg border border-zinc-800" />
-          </div>
-          <div>
-            <p className="text-[10px] text-zinc-500 mb-1">Ou insira manualmente a chave:</p>
-            <code className="block px-3 py-2 bg-black rounded-lg text-xs font-mono text-amber-300 border border-zinc-800 break-all">{setupData.secret}</code>
-          </div>
-          <div className="flex gap-2">
-            <input type="text" value={code} onChange={e => setCode(e.target.value)} maxLength={6} placeholder="000000" className="flex-1 px-3 py-2 bg-black border border-zinc-800 rounded-lg text-sm text-white font-mono text-center tracking-widest focus:border-[#e8b923] focus:outline-none" />
-            <button onClick={verifyCode} disabled={code.length !== 6} className="px-4 py-2 rounded-lg bg-[#e8b923] text-black text-xs font-bold hover:opacity-90 disabled:opacity-50 transition-all">Verificar</button>
-          </div>
+  // Se carregando autenticação
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#040407] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-8 h-8 text-[#e8b923] animate-spin" />
+          <span className="text-xs font-mono text-zinc-400">Verificando sessão segura AXION...</span>
         </div>
-      )}
+      </div>
+    );
+  }
 
-      {enabled && (
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Shield className="w-4 h-4 text-green-400" />
-            <span className="text-xs text-green-400 font-bold">2FA TOTP Ativo</span>
+  // Falha Fechada (Fail-Closed): Se não logado, exibe tela de login oficial AXION Auth
+  if (!user) {
+    const returnUrl = encodeURIComponent(window.location.href);
+    return (
+      <div className="min-h-screen bg-[#040407] flex items-center justify-center p-4">
+        <div className="w-full max-w-md p-8 rounded-3xl bg-[#09090d]/90 border border-zinc-800 shadow-2xl text-center space-y-6">
+          <div className="w-14 h-14 rounded-2xl bg-[#e8b923]/10 border border-[#e8b923]/20 flex items-center justify-center mx-auto">
+            <Lock className="w-7 h-7 text-[#e8b923]" />
           </div>
-          <button onClick={disable2FA} className="px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 text-xs font-bold hover:bg-red-500/20 transition-all">Desativar</button>
+          <div className="space-y-1.5">
+            <h2 className="text-xl font-bold text-white tracking-tight">Painel de Controle AxionPay</h2>
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              Autenticação obrigatória. Faça login com sua conta corporativa AXION para acessar o gateway industrial.
+            </p>
+          </div>
+          <a
+            href={`${AUTH_API}/login?return_to=${returnUrl}`}
+            className="w-full py-3.5 bg-[#e8b923] hover:bg-amber-400 text-black font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-yellow-500/10 flex items-center justify-center gap-2"
+          >
+            <LogIn className="w-4 h-4" />
+            <span>Entrar com AXION Single Sign-On</span>
+          </a>
         </div>
-      )}
-    </div>
-  );
-}
+      </div>
+    );
+  }
 
-function Sidebar({ activeSection, setActiveSection, user, mobileOpen, setMobileOpen, collapsed }: { activeSection: string; setActiveSection: (s: string) => void; user: any; mobileOpen: boolean; setMobileOpen: (o: boolean) => void; collapsed: boolean }) {
-  const items = [
+  const navItems = [
     { id: "overview", label: "Visão Geral", icon: BarChart3 },
-    { id: "tenants", label: "Tenants", icon: Building2 },
-    { id: "api-keys", label: "API Keys", icon: Key },
+    { id: "merchants", label: "Merchants & Operações", icon: Building2 },
+    { id: "api-keys", label: "Chaves de API", icon: Key },
     { id: "transactions", label: "Transações", icon: Wallet },
     { id: "integrations", label: "Integrações", icon: Globe },
     { id: "settings", label: "Configurações", icon: Settings },
   ];
 
   return (
-    <>
-      {mobileOpen && (
-        <div
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40 md:hidden transition-opacity"
-          onClick={() => setMobileOpen(false)}
-        />
-      )}
-
+    <div className="min-h-screen bg-[#040407] text-[#f5f5fa] font-sans antialiased flex flex-col md:flex-row">
+      {/* SIDEBAR */}
       <aside
-        className={`fixed left-0 top-0 h-screen bg-[#020204] border-r border-zinc-800 z-50 flex flex-col transition-all duration-300 ${
-          mobileOpen ? "translate-x-0 w-64" : "-translate-x-full md:translate-x-0"
+        className={`fixed md:sticky top-0 h-screen bg-[#09090d] border-r border-zinc-800/80 z-40 flex flex-col justify-between transition-all duration-300 ${
+          mobileOpen ? "left-0 w-64" : "-left-64 md:left-0"
         } ${collapsed ? "md:w-16" : "md:w-64"}`}
       >
-        <div className="flex items-center justify-between px-4 h-16 border-b border-zinc-800">
-          {(!collapsed || mobileOpen) && (
-            <a href="/" className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-amber-400 to-yellow-600 flex items-center justify-center">
-                <CreditCard className="w-4 h-4 text-black" />
-              </div>
-              <span className="text-sm font-extrabold tracking-tight text-white">Axion<span className="text-[#e8b923]">Pay</span></span>
-            </a>
-          )}
-          <div className="flex items-center gap-2">
-            <NotificationBell />
-            <button onClick={() => setMobileOpen(false)} className="md:hidden p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10">
+        <div>
+          <div className="flex items-center justify-between px-5 h-16 border-b border-zinc-800/80">
+            {(!collapsed || mobileOpen) && (
+              <a href="/" className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-[#e8b923]/10 border border-[#e8b923]/30 flex items-center justify-center">
+                  <Zap className="w-4 h-4 text-[#e8b923]" />
+                </div>
+                <span className="text-base font-extrabold tracking-tight text-white">
+                  Axion<span className="text-[#e8b923]">Pay</span>
+                </span>
+              </a>
+            )}
+            <button
+              onClick={() => setMobileOpen(false)}
+              className="md:hidden p-1 text-zinc-400 hover:text-white"
+            >
               <X className="w-5 h-5" />
             </button>
           </div>
+
+          <nav className="p-3 space-y-1">
+            {navItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => {
+                  setActiveSection(item.id);
+                  setMobileOpen(false);
+                }}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  activeSection === item.id
+                    ? "bg-[#e8b923] text-black shadow-lg shadow-yellow-500/10"
+                    : "text-zinc-400 hover:text-white hover:bg-zinc-900"
+                }`}
+              >
+                <item.icon className="w-4 h-4 shrink-0" />
+                {(!collapsed || mobileOpen) && <span>{item.label}</span>}
+              </button>
+            ))}
+          </nav>
         </div>
-        <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
-          {items.map(item => (
-            <button key={item.id} onClick={() => { setActiveSection(item.id); setMobileOpen(false); }}
-              className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 min-h-[44px] ${
-                activeSection === item.id
-                  ? "bg-[#e8b923]/10 text-[#e8b923] border border-[#e8b923]/20"
-                  : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5 border border-transparent"
-              }`}>
-              <item.icon className="w-4 h-4 shrink-0" />
-              {(!collapsed || mobileOpen) && <span>{item.label}</span>}
-            </button>
-          ))}
-        </nav>
-        <div className="p-3 border-t border-zinc-800">
-          {user && (!collapsed || mobileOpen) && (
-            <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-white/5">
-              <img src={user.picture || ""} alt="" className="w-7 h-7 rounded-full" />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-white truncate">{user.name}</p>
-                <p className="text-[10px] text-zinc-500 truncate">{user.email}</p>
-              </div>
+
+        {/* User Card no rodapé da Sidebar */}
+        <div className="p-4 border-t border-zinc-800/80">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-white font-bold text-xs">
+              {user.name ? user.name.slice(0, 2).toUpperCase() : "AX"}
             </div>
-          )}
+            {(!collapsed || mobileOpen) && (
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-bold text-white truncate">{user.name || "Usuário AXION"}</p>
+                <p className="text-[10px] font-mono text-zinc-500 truncate">{user.email}</p>
+              </div>
+            )}
+            <button
+              onClick={() => {
+                clearAuth();
+                window.location.reload();
+              }}
+              title="Sair"
+              className="p-1.5 text-zinc-500 hover:text-red-400 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </aside>
-    </>
-  );
-}
 
-function OverviewSection() {
-  const [stats, setStats] = useState([
-    { label: "Volume no Mês", value: "R$ 48.950,00", change: "+15%", icon: DollarSign },
-    { label: "Pagamentos Hoje", value: "312", change: "+8", icon: Activity },
-    { label: "Tenants Ativos", value: "1", change: "0", icon: Building2 },
-    { label: "API Keys", value: "1", change: "0", icon: Key },
-  ]);
-
-  useEffect(() => {
-    apiFetch("/api/pay/stats").then(data => {
-      if (!data.error) {
-        setStats([
-          { label: "Volume no Mês", value: data.totalVolume || "R$ 48.950,00", change: "+15%", icon: DollarSign },
-          { label: "Pagamentos Hoje", value: String(data.totalTransactions || 312), change: "+8", icon: Activity },
-          { label: "Tenants Ativos", value: String(data.tenants || 1), change: "0", icon: Building2 },
-          { label: "API Keys", value: String(data.apiKeys || 1), change: "0", icon: Key },
-        ]);
-      }
-    });
-  }, []);
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-extrabold tracking-tight text-white">Visão Geral</h2>
-        <p className="text-xs text-zinc-500 mt-1">Resumo da sua operação AxionPay</p>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((s, i) => (
-          <motion.div key={s.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
-            className="bg-[#09090d] border border-zinc-800 rounded-xl p-5 hover:border-[#e8b923]/30 transition-all">
-            <div className="flex items-center justify-between mb-3">
-              <s.icon className="w-5 h-5 text-[#e8b923]" />
-              <span className="text-xs font-bold font-mono text-green-400">{s.change}</span>
+      {/* CONTEÚDO PRINCIPAL */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* TOPBAR */}
+        <header className="h-16 px-6 border-b border-zinc-800/80 flex items-center justify-between bg-[#040407]/80 backdrop-blur-md sticky top-0 z-30">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setMobileOpen(true)}
+              className="md:hidden p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-900"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <div className="flex items-center gap-2 text-xs font-mono text-zinc-400">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              <span className="text-white font-bold">PostgreSQL Core:</span>
+              <span>api.axionenterprise.cloud (v1.0)</span>
             </div>
-            <div className="text-2xl font-extrabold text-white">{s.value}</div>
-            <div className="font-mono text-[10px] text-zinc-500 uppercase tracking-wider mt-1">{s.label}</div>
-          </motion.div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function TenantsSection() {
-  const [tenants, setTenants] = useState<Array<any>>([]);
-  const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({ name: "", document: "", email: "" });
-  const [creating, setCreating] = useState(false);
-
-  useEffect(() => {
-    apiFetch("/api/pay/tenants").then(data => {
-      if (!data?.error) {
-        const list = Array.isArray(data) ? data : (Array.isArray(data?.tenants) ? data.tenants : []);
-        setTenants(list);
-      }
-    });
-  }, []);
-
-  const createTenant = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.name) return;
-    setCreating(true);
-    const data = await apiFetch("/api/pay/tenants", { method: "POST", body: JSON.stringify(formData) });
-    if (!data?.error && data?.id) {
-      const list = Array.isArray(tenants) ? tenants : [];
-      setTenants([data, ...list]);
-      setFormData({ name: "", document: "", email: "" });
-      setShowForm(false);
-    }
-    setCreating(false);
-  };
-
-  const toggleTenant = async (id: string) => {
-    const data = await apiFetch(`/api/pay/tenants/${id}/toggle`, { method: "PATCH" });
-    if (!data?.error) {
-      const list = Array.isArray(tenants) ? tenants : [];
-      setTenants(list.map(t => t.id === id ? { ...t, status: data.status || (t.status === "active" ? "inactive" : "active") } : t));
-    }
-  };
-
-  const deleteTenant = async (id: string) => {
-    const data = await apiFetch(`/api/pay/tenants/${id}`, { method: "DELETE" });
-    if (!data?.error) {
-      const list = Array.isArray(tenants) ? tenants : [];
-      setTenants(list.filter(t => t.id !== id));
-    }
-  };
-
-  const tenantList = Array.isArray(tenants) ? tenants : [];
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-extrabold tracking-tight text-white">Tenants</h2>
-          <p className="text-xs text-zinc-500 mt-1">Gerencie suas contas empresariais e sub-organizações</p>
-        </div>
-        <button onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-[#e8b923] text-black font-bold text-xs uppercase tracking-widest rounded-xl hover:opacity-90 transition-all shadow-lg shadow-yellow-500/10">
-          <Plus className="w-4 h-4" /> {showForm ? "Cancelar" : "Novo Tenant"}
-        </button>
-      </div>
-
-      <AnimatePresence>
-        {showForm && (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-            <div className="bg-[#09090d] border border-zinc-800 rounded-xl p-6">
-              <form onSubmit={createTenant} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Nome da Empresa *</label>
-                    <input type="text" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })}
-                      placeholder="Minha Empresa LTDA" required
-                      className="w-full px-4 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-sm text-white placeholder-zinc-600 focus:border-[#e8b923] focus:outline-none" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5">CNPJ/CPF</label>
-                    <input type="text" value={formData.document} onChange={e => setFormData({ ...formData, document: e.target.value })}
-                      placeholder="00.000.000/0001-00"
-                      className="w-full px-4 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-sm text-white placeholder-zinc-600 focus:border-[#e8b923] focus:outline-none" />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5">E-mail de Cobrança</label>
-                  <input type="email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })}
-                    placeholder="financeiro@empresa.com"
-                    className="w-full px-4 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-sm text-white placeholder-zinc-600 focus:border-[#e8b923] focus:outline-none" />
-                </div>
-                <div className="flex justify-end gap-3 pt-2">
-                  <button type="button" onClick={() => setShowForm(false)} className="px-5 py-2.5 rounded-xl border border-zinc-800 text-zinc-400 text-xs font-bold hover:bg-zinc-900">Cancelar</button>
-                  <button type="submit" disabled={creating || !formData.name} className="px-5 py-2.5 rounded-xl bg-[#e8b923] text-black text-xs font-bold hover:opacity-90 disabled:opacity-50 flex items-center gap-2">
-                    {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Criar Tenant
-                  </button>
-                </div>
-              </form>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <div className="grid gap-4">
-        {tenantList.length === 0 ? (
-          <div className="bg-[#09090d] border border-zinc-800 rounded-xl p-8 text-center">
-            <Building2 className="w-8 h-8 text-zinc-600 mx-auto mb-2" />
-            <p className="text-xs text-zinc-400 font-bold">Nenhum Tenant cadastrado</p>
-            <p className="text-[10px] text-zinc-500 mt-1">Clique em "Novo Tenant" para cadastrar sua primeira organização</p>
           </div>
-        ) : (
-          tenantList.map((t) => (
-            <div key={t.id || Math.random()} className="bg-[#09090d] border border-zinc-800 rounded-xl p-5 hover:border-[#e8b923]/25 transition-all">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-[#e8b923]/10 border border-[#e8b923]/20 flex items-center justify-center">
-                    <Building2 className="w-5 h-5 text-[#e8b923]" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-sm text-white">{t.name || "Tenant sem nome"}</h4>
-                    <p className="font-mono text-[10px] text-zinc-500">{t.document || "CNPJ não informado"} • {t.email || "Sem e-mail"}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <StatusBadge status={t.status || "active"} />
-                  <button onClick={() => toggleTenant(t.id)} className="px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs font-bold text-zinc-300 hover:bg-zinc-800">
-                    {t.status === "active" ? "Pausar" : "Ativar"}
-                  </button>
-                  <button onClick={() => deleteTenant(t.id)} className="p-1.5 text-red-400 hover:bg-red-400/10 rounded-lg">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-    </div>
-  );
-}
 
-function ApiKeysSection() {
-  const [keys, setKeys] = useState<Array<any>>([]);
-  const [showForm, setShowForm] = useState(false);
-  const [newKeyName, setNewKeyName] = useState("");
-  const [newKeyResult, setNewKeyResult] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
-  const [showKey, setShowKey] = useState<Record<string, boolean>>({});
-
-  useEffect(() => {
-    apiFetch("/api/pay/api-keys").then(data => {
-      if (!data?.error) {
-        const list = Array.isArray(data) ? data : (Array.isArray(data?.keys) ? data.keys : []);
-        setKeys(list);
-      }
-    });
-  }, []);
-
-  const generateKey = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newKeyName) return;
-    setCreating(true);
-    const data = await apiFetch("/api/pay/api-keys", { method: "POST", body: JSON.stringify({ name: newKeyName }) });
-    if (!data?.error && data?.api_key) {
-      const list = Array.isArray(keys) ? keys : [];
-      setKeys([data, ...list]);
-      setNewKeyResult(data.api_key);
-      setNewKeyName("");
-    }
-    setCreating(false);
-  };
-
-  const revokeKey = async (id: string) => {
-    const data = await apiFetch(`/api/pay/api-keys/${id}/revoke`, { method: "POST" });
-    if (!data?.error) {
-      const list = Array.isArray(keys) ? keys : [];
-      setKeys(list.map(k => k.id === id ? { ...k, status: "revoked" } : k));
-    }
-  };
-
-  const keyList = Array.isArray(keys) ? keys : [];
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-extrabold tracking-tight text-white">API Keys</h2>
-          <p className="text-xs text-zinc-500 mt-1">Gerencie chaves de API Live e Test para integração</p>
-        </div>
-        <button onClick={() => { setShowForm(!showForm); setNewKeyResult(null); }}
-          className="flex items-center gap-2 px-4 py-2.5 bg-[#e8b923] text-black font-bold text-xs uppercase tracking-widest rounded-xl hover:opacity-90 transition-all shadow-lg shadow-yellow-500/10">
-          <Plus className="w-4 h-4" /> {showForm ? "Cancelar" : "Nova Key"}
-        </button>
-      </div>
-
-      <AnimatePresence>
-        {showForm && !newKeyResult && (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-            <div className="bg-[#09090d] border border-zinc-800 rounded-xl p-6">
-              <form onSubmit={generateKey} className="space-y-4">
-                <div>
-                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Nome da Key</label>
-                  <input type="text" value={newKeyName} onChange={e => setNewKeyName(e.target.value)}
-                    placeholder="Produção - Minha Empresa" required
-                    className="w-full px-4 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-sm text-white placeholder-zinc-600 focus:border-[#e8b923] focus:outline-none" />
-                </div>
-                <div className="flex justify-end gap-3 pt-2">
-                  <button type="button" onClick={() => setShowForm(false)} className="px-5 py-2.5 rounded-xl border border-zinc-800 text-zinc-400 text-xs font-bold hover:bg-zinc-900">Cancelar</button>
-                  <button type="submit" disabled={creating || !newKeyName} className="px-5 py-2.5 rounded-xl bg-[#e8b923] text-black text-xs font-bold hover:opacity-90 disabled:opacity-50 flex items-center gap-2">
-                    {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Key className="w-4 h-4" />} Gerar Key
-                  </button>
-                </div>
-              </form>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {newKeyResult && (
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="bg-amber-500/5 border border-amber-400/30 rounded-xl p-6">
-            <div className="flex items-start gap-3 mb-4">
-              <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-              <div>
-                <h4 className="text-sm font-bold text-amber-400">Key Live Gerada com Sucesso!</h4>
-                <p className="text-xs text-zinc-400 mt-1">Copie esta chave agora. Ela é secreta e autoriza pagamentos em sua conta.</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 bg-black rounded-xl p-3 border border-zinc-800">
-              <code className="flex-1 text-xs font-mono text-amber-300 break-all">{newKeyResult}</code>
-              <CopyBtn text={newKeyResult} />
-            </div>
-            <button onClick={() => setNewKeyResult(null)} className="mt-4 text-xs text-zinc-500 hover:text-white font-bold">Fechar</button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <div className="grid gap-4">
-        {keyList.length === 0 ? (
-          <div className="bg-[#09090d] border border-zinc-800 rounded-xl p-8 text-center">
-            <Key className="w-8 h-8 text-zinc-600 mx-auto mb-2" />
-            <p className="text-xs text-zinc-400 font-bold">Nenhuma API Key encontrada</p>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={loadAllData}
+              disabled={loadingData}
+              className="px-3 py-1.5 rounded-lg border border-zinc-800 bg-zinc-900 hover:bg-zinc-800 text-xs text-zinc-300 flex items-center gap-1.5 transition-all cursor-pointer"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loadingData ? "animate-spin" : ""}`} />
+              <span className="hidden sm:inline">Sincronizar</span>
+            </button>
+            <a
+              href="/checkout"
+              className="px-3.5 py-1.5 rounded-lg bg-[#e8b923]/10 border border-[#e8b923]/30 text-[#e8b923] hover:bg-[#e8b923]/20 text-xs font-bold flex items-center gap-1.5 transition-all"
+            >
+              <CreditCard className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Portal Checkout</span>
+            </a>
           </div>
-        ) : (
-          keyList.map((k) => (
-            <div key={k.id || Math.random()} className="bg-[#09090d] border border-zinc-800 rounded-xl p-5 hover:border-[#e8b923]/25 transition-all">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <Key className="w-5 h-5 text-[#e8b923]" />
-                  <div>
-                    <h4 className="font-bold text-sm text-white">{k.name || k.key_name || "API Key Live"}</h4>
-                    <p className="font-mono text-[10px] text-zinc-500">Criada em {k.created_at ? new Date(k.created_at).toLocaleDateString("pt-BR") : "-"}</p>
-                  </div>
+        </header>
+
+        {/* MAIN BODY */}
+        <main className="p-6 sm:p-8 max-w-6xl w-full mx-auto space-y-8 flex-1">
+          {/* TAB 1: VISÃO GERAL (OVERVIEW) */}
+          {activeSection === "overview" && (
+            <div className="space-y-8 animate-fadeIn">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h1 className="text-2xl font-black text-white tracking-tight">Visão Geral do Gateway</h1>
+                  <p className="text-xs text-zinc-400 mt-1">Métricas em tempo real confirmadas no banco PostgreSQL</p>
                 </div>
-                <StatusBadge status={k.status || "active"} />
-              </div>
-              <div className="flex items-center gap-2 bg-black rounded-xl p-3 border border-zinc-800">
-                <code className="flex-1 text-xs font-mono text-zinc-400">
-                  {showKey[k.id] ? (k.api_key || k.key || "") : `${(k.api_key || k.key || "sec_key_live_xxx").slice(0, 12)}...${(k.api_key || k.key || "xxx").slice(-4)}`}
-                </code>
-                <button onClick={() => setShowKey({ ...showKey, [k.id]: !showKey[k.id] })} className="text-zinc-500 hover:text-white p-1">
-                  {showKey[k.id] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                <button
+                  onClick={() => setMerchantModal(true)}
+                  className="px-4 py-2 bg-[#e8b923] hover:bg-amber-400 text-black font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-yellow-500/10 flex items-center gap-2 cursor-pointer w-fit"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Novo Merchant</span>
                 </button>
-                <CopyBtn text={k.api_key || k.key || ""} />
-                {k.status !== "revoked" && (
-                  <button onClick={() => revokeKey(k.id)} className="p-1.5 text-red-400 hover:bg-red-400/10 rounded-lg">
-                    <Trash2 className="w-4 h-4" />
+              </div>
+
+              {/* Grid de Métricas */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="p-5 rounded-2xl bg-[#09090d] border border-zinc-800/80 space-y-2">
+                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-zinc-500">Operações (Merchants)</span>
+                  <div className="text-3xl font-extrabold text-white">{overview.merchants}</div>
+                  <p className="text-[11px] text-zinc-400">Contas ativas vinculadas</p>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-[#09090d] border border-zinc-800/80 space-y-2">
+                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-zinc-500">Chaves de API Ativas</span>
+                  <div className="text-3xl font-extrabold text-[#e8b923]">{overview.activeKeys}</div>
+                  <p className="text-[11px] text-zinc-400">Credenciais com hash SHA-256</p>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-[#09090d] border border-zinc-800/80 space-y-2">
+                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-zinc-500">Transações Hoje</span>
+                  <div className="text-3xl font-extrabold text-white">{overview.transactionsToday}</div>
+                  <p className="text-[11px] text-zinc-400">Cobranças emitidas hoje</p>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-[#09090d] border border-zinc-800/80 space-y-2">
+                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-zinc-500">Volume no Mês</span>
+                  <div className="text-3xl font-extrabold text-emerald-400 font-mono">
+                    R$ {(overview.volumeMonthCents / 100).toFixed(2)}
+                  </div>
+                  <p className="text-[11px] text-zinc-400">Liquidação comprovada</p>
+                </div>
+              </div>
+
+              {/* Tabela de Transações Recentes */}
+              <div className="rounded-3xl bg-[#09090d] border border-zinc-800/80 p-6 space-y-4 shadow-xl">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-sm font-bold text-white tracking-tight">Transações Recentes</h3>
+                  <button
+                    onClick={() => setActiveSection("transactions")}
+                    className="text-xs text-[#e8b923] hover:underline"
+                  >
+                    Ver todas →
                   </button>
+                </div>
+
+                {transactions.length === 0 ? (
+                  <div className="py-12 text-center text-zinc-500 text-xs font-mono">
+                    Nenhuma transação registrada no banco até o momento.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-zinc-800 text-zinc-500 font-mono text-[10px] uppercase">
+                          <th className="pb-3">ID / Correlation</th>
+                          <th className="pb-3">Merchant</th>
+                          <th className="pb-3">Valor</th>
+                          <th className="pb-3">Status</th>
+                          <th className="pb-3">Data</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-800/50">
+                        {transactions.slice(0, 5).map((tx) => (
+                          <tr key={tx.id} className="hover:bg-zinc-900/50 transition">
+                            <td className="py-3 font-mono text-zinc-300 select-all">{tx.correlationId}</td>
+                            <td className="py-3 font-semibold text-white">{tx.merchantName}</td>
+                            <td className="py-3 font-mono font-bold text-white">
+                              R$ {(tx.amountCents / 100).toFixed(2)}
+                            </td>
+                            <td className="py-3">
+                              <StatusBadge status={tx.status} />
+                            </td>
+                            <td className="py-3 text-zinc-400 font-mono">
+                              {new Date(tx.createdAt).toLocaleString("pt-BR")}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
             </div>
-          ))
-        )}
-      </div>
-    </div>
-  );
-}
+          )}
 
-function TransactionsSection() {
-  const [transactions, setTransactions] = useState<Array<any>>([]);
-
-  useEffect(() => {
-    apiFetch("/api/pay/transactions").then(data => {
-      if (!data?.error) {
-        const list = Array.isArray(data) ? data : (Array.isArray(data?.transactions) ? data.transactions : []);
-        setTransactions(list);
-      }
-    });
-  }, []);
-
-  const txList = Array.isArray(transactions) ? transactions : [];
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-extrabold tracking-tight text-white">Transações</h2>
-        <p className="text-xs text-zinc-500 mt-1">Histórico em tempo real de pagamentos e cobranças</p>
-      </div>
-      <DashboardCard icon={Wallet} title="Últimas Transações">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-zinc-800">
-                <th className="text-left py-3 text-[10px] font-bold text-zinc-500 uppercase">ID</th>
-                <th className="text-left py-3 text-[10px] font-bold text-zinc-500 uppercase">Valor</th>
-                <th className="text-left py-3 text-[10px] font-bold text-zinc-500 uppercase">Status</th>
-                <th className="text-left py-3 text-[10px] font-bold text-zinc-500 uppercase">Método</th>
-                <th className="text-left py-3 text-[10px] font-bold text-zinc-500 uppercase">Data</th>
-              </tr>
-            </thead>
-            <tbody>
-              {txList.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="py-6 text-center text-xs text-zinc-500 font-mono">Nenhuma transação registrada até o momento.</td>
-                </tr>
-              ) : (
-                txList.map((t, i) => (
-                  <tr key={t.id || i} className="border-b border-zinc-800/50">
-                    <td className="py-3 text-xs text-white font-mono">{t.id}</td>
-                    <td className="py-3 text-xs text-white font-bold">R$ {(t.amount || 0).toFixed(2)}</td>
-                    <td className="py-3"><StatusBadge status={t.status || "pending"} /></td>
-                    <td className="py-3 text-xs text-zinc-400">{t.payment_method || "-"}</td>
-                    <td className="py-3 text-xs text-zinc-400">{t.created_at ? new Date(t.created_at).toLocaleString("pt-BR") : "-"}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </DashboardCard>
-    </div>
-  );
-}
-
-function IntegrationsSection() {
-  const [webhookUrl, setWebhookUrl] = useState("https://minhaempresa.com/api/webhooks/axionpay");
-  const [webhookSecret, setWebhookSecret] = useState("whsec_axion_2026_super_secret_hash");
-  const [activeModal, setActiveModal] = useState<string | null>(null);
-  const [testStatus, setTestStatus] = useState<string | null>(null);
-  const [gateways, setGateways] = useState({
-    stripe: true,
-    mercadopago: true,
-    asaas: false
-  });
-  const [saved, setSaved] = useState(false);
-
-  useEffect(() => {
-    apiFetch("/api/pay/integrations").then(data => {
-      if (!data?.error && data?.webhookUrl) {
-        setWebhookUrl(data.webhookUrl);
-        if (data.webhookSecret) setWebhookSecret(data.webhookSecret);
-        if (data.gateways) setGateways(data.gateways);
-      }
-    });
-  }, []);
-
-  const saveIntegrations = async () => {
-    await apiFetch("/api/pay/integrations", {
-      method: "POST",
-      body: JSON.stringify({ webhookUrl, webhookSecret, gateways })
-    });
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
-  };
-
-  const testWebhookPing = async () => {
-    if (!webhookUrl || !webhookUrl.startsWith("https://")) {
-      setTestStatus("URL inválida. Use HTTPS.");
-      return;
-    }
-    setTestStatus("Enviando evento ping...");
-    try {
-      const res = await fetch(webhookUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Axion-Ping": "true" },
-        body: JSON.stringify({ event: "ping", timestamp: new Date().toISOString() })
-      });
-      setTestStatus(`HTTP ${res.status} — ${res.ok ? "Callback recebido com sucesso!" : "Falha no callback."}`);
-    } catch {
-      setTestStatus("Erro de conexão ao testar callback. Verifique a URL.");
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-extrabold tracking-tight text-white">Integrações</h2>
-        <p className="text-xs text-zinc-500 mt-1">Conecte AxionPay ao seu ecossistema</p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-[#09090d] border border-zinc-800 rounded-xl p-6 flex flex-col justify-between hover:border-[#e8b923]/30 transition-all">
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <Terminal className="w-6 h-6 text-[#e8b923]" />
-              <StatusBadge status="active" />
-            </div>
-            <h3 className="text-base font-bold text-white">API REST</h3>
-            <p className="text-xs text-zinc-500 mt-1">Integração direta via HTTP com endpoints de cobrança e PIX.</p>
-          </div>
-          <button onClick={() => setActiveModal("api_rest")} className="mt-6 w-full py-2 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-xs font-bold text-white rounded-lg transition-all">
-            Configurar
-          </button>
-        </div>
-
-        <div className="bg-[#09090d] border border-zinc-800 rounded-xl p-6 flex flex-col justify-between hover:border-[#e8b923]/30 transition-all">
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <Globe className="w-6 h-6 text-[#e8b923]" />
-              <StatusBadge status={webhookUrl ? "active" : "inactive"} />
-            </div>
-            <h3 className="text-base font-bold text-white">Webhooks</h3>
-            <p className="text-xs text-zinc-500 mt-1">Notificações em tempo real assinadas via HMAC Secret.</p>
-          </div>
-          <button onClick={() => setActiveModal("webhooks")} className="mt-6 w-full py-2 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-xs font-bold text-white rounded-lg transition-all">
-            Configurar
-          </button>
-        </div>
-
-        <div className="bg-[#09090d] border border-zinc-800 rounded-xl p-6 flex flex-col justify-between hover:border-[#e8b923]/30 transition-all">
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <FileText className="w-6 h-6 text-[#e8b923]" />
-              <StatusBadge status="active" />
-            </div>
-            <h3 className="text-base font-bold text-white">Checkout Pro</h3>
-            <p className="text-xs text-zinc-500 mt-1">Página de checkout pronta, responsiva e white-label.</p>
-          </div>
-          <button onClick={() => setActiveModal("checkout_pro")} className="mt-6 w-full py-2 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-xs font-bold text-white rounded-lg transition-all">
-            Configurar
-          </button>
-        </div>
-      </div>
-
-      <DashboardCard icon={Terminal} title="Gateways de Pagamento Ativos">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[
-            { id: "mercadopago", name: "Mercado Pago", desc: "PIX & Cartão Nacional" },
-            { id: "stripe", name: "Stripe International", desc: "USD, EUR, BRL Global" },
-            { id: "asaas", name: "Asaas Payments", desc: "Boleto & Recorrência" }
-          ].map(gw => (
-            <div key={gw.id} className="flex items-center justify-between p-4 bg-zinc-950 rounded-xl border border-zinc-800">
-              <div>
-                <p className="text-xs font-bold text-white">{gw.name}</p>
-                <p className="text-[10px] text-zinc-500 mt-0.5">{gw.desc}</p>
+          {/* TAB 2: MERCHANTS & OPERAÇÕES */}
+          {activeSection === "merchants" && (
+            <div className="space-y-6 animate-fadeIn">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h1 className="text-xl font-bold text-white tracking-tight">Merchants & Contas Operacionais</h1>
+                  <p className="text-xs text-zinc-400 mt-0.5">Segregação multi-tenant de cobranças e chaves de API</p>
+                </div>
+                <button
+                  onClick={() => setMerchantModal(true)}
+                  className="px-4 py-2 bg-[#e8b923] hover:bg-amber-400 text-black font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-yellow-500/10 flex items-center gap-2 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Cadastrar Merchant</span>
+                </button>
               </div>
-              <button onClick={() => setGateways({ ...gateways, [gw.id]: !gateways[gw.id as keyof typeof gateways] })}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
-                  gateways[gw.id as keyof typeof gateways]
-                    ? "bg-green-500/10 text-green-400 border-green-400/30"
-                    : "bg-zinc-900 text-zinc-500 border-zinc-800"
-                }`}>
-                {gateways[gw.id as keyof typeof gateways] ? "Ativo" : "Inativo"}
-              </button>
-            </div>
-          ))}
-        </div>
-      </DashboardCard>
 
-      {activeModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#09090d] border border-zinc-800 rounded-2xl max-w-lg w-full p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-              <h3 className="text-base font-bold text-white uppercase tracking-tight">
-                {activeModal === "api_rest" && "Configuração da API REST"}
-                {activeModal === "webhooks" && "Configuração de Webhooks"}
-                {activeModal === "checkout_pro" && "Configuração do Checkout Pro"}
-              </h3>
-              <button onClick={() => setActiveModal(null)} className="text-zinc-500 hover:text-white p-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {merchants.map((m) => (
+                  <div
+                    key={m.id}
+                    className="p-6 rounded-2xl bg-[#09090d] border border-zinc-800/80 space-y-4 relative"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center">
+                          <Building className="w-5 h-5 text-[#e8b923]" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-white">{m.name}</h4>
+                          <span className="text-[10px] font-mono text-zinc-500 select-all">{m.id}</span>
+                        </div>
+                      </div>
+                      <StatusBadge status={m.status} />
+                    </div>
+
+                    <div className="space-y-1 text-xs text-zinc-400 font-mono">
+                      {m.document && <p>Documento: {m.document}</p>}
+                      {m.billingEmail && <p>E-mail: {m.billingEmail}</p>}
+                    </div>
+
+                    <div className="pt-3 border-t border-zinc-800 flex justify-between items-center text-xs">
+                      <button
+                        onClick={() => {
+                          setKeyMerchantId(m.id);
+                          setApiKeyModal(true);
+                        }}
+                        className="text-[#e8b923] hover:underline font-bold flex items-center gap-1 cursor-pointer"
+                      >
+                        <Key className="w-3.5 h-3.5" />
+                        <span>Gerar Chave de API</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleToggleMerchantStatus(m.id, m.status)}
+                        className="text-xs text-zinc-400 hover:text-white cursor-pointer"
+                      >
+                        {m.status === "ACTIVE" ? "Desativar" : "Ativar"}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: API KEYS */}
+          {activeSection === "api-keys" && (
+            <div className="space-y-6 animate-fadeIn">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h1 className="text-xl font-bold text-white tracking-tight">Chaves de API (Server-to-Server)</h1>
+                  <p className="text-xs text-zinc-400 mt-0.5">Credenciais criptografadas para emissão de cobranças PIX</p>
+                </div>
+                <button
+                  onClick={() => {
+                    if (merchants.length > 0) setKeyMerchantId(merchants[0].id);
+                    setApiKeyModal(true);
+                  }}
+                  className="px-4 py-2 bg-[#e8b923] hover:bg-amber-400 text-black font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-yellow-500/10 flex items-center gap-2 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Nova Chave de API</span>
+                </button>
+              </div>
+
+              <div className="rounded-3xl bg-[#09090d] border border-zinc-800/80 p-6 space-y-4 shadow-xl">
+                {apiKeys.length === 0 ? (
+                  <div className="py-12 text-center text-zinc-500 text-xs font-mono">
+                    Nenhuma chave de API cadastrada.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-zinc-800 text-zinc-500 font-mono text-[10px] uppercase">
+                          <th className="pb-3">Nome da Chave</th>
+                          <th className="pb-3">Merchant</th>
+                          <th className="pb-3">Prefixo</th>
+                          <th className="pb-3">Escopos</th>
+                          <th className="pb-3">Status</th>
+                          <th className="pb-3 text-right">Ação</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-800/50">
+                        {apiKeys.map((k) => (
+                          <tr key={k.id} className="hover:bg-zinc-900/50 transition">
+                            <td className="py-3 font-bold text-white">{k.name}</td>
+                            <td className="py-3 text-zinc-400">{k.merchantName}</td>
+                            <td className="py-3 font-mono text-zinc-300">{k.keyPrefix}...</td>
+                            <td className="py-3 font-mono text-[11px] text-zinc-400">
+                              {(k.scopes || []).join(", ")}
+                            </td>
+                            <td className="py-3">
+                              <StatusBadge status={k.status} />
+                            </td>
+                            <td className="py-3 text-right">
+                              {k.status === "ACTIVE" && (
+                                <button
+                                  onClick={() => handleRevokeApiKey(k.id)}
+                                  className="text-red-400 hover:text-red-300 text-xs font-bold cursor-pointer"
+                                >
+                                  Revogar
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: TRANSAÇÕES */}
+          {activeSection === "transactions" && (
+            <div className="space-y-6 animate-fadeIn">
+              <div>
+                <h1 className="text-xl font-bold text-white tracking-tight">Histórico de Transações</h1>
+                <p className="text-xs text-zinc-400 mt-0.5">Todas as intenções de pagamento registradas no PostgreSQL</p>
+              </div>
+
+              <div className="rounded-3xl bg-[#09090d] border border-zinc-800/80 p-6 space-y-4 shadow-xl">
+                {transactions.length === 0 ? (
+                  <div className="py-12 text-center text-zinc-500 text-xs font-mono">
+                    Nenhuma transação registrada no banco até o momento.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-zinc-800 text-zinc-500 font-mono text-[10px] uppercase">
+                          <th className="pb-3">Correlation ID</th>
+                          <th className="pb-3">Merchant</th>
+                          <th className="pb-3">Valor</th>
+                          <th className="pb-3">Status</th>
+                          <th className="pb-3">Provedor</th>
+                          <th className="pb-3">Data</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-800/50">
+                        {transactions.map((tx) => (
+                          <tr key={tx.id} className="hover:bg-zinc-900/50 transition">
+                            <td className="py-3 font-mono text-zinc-300 select-all">{tx.correlationId}</td>
+                            <td className="py-3 font-semibold text-white">{tx.merchantName}</td>
+                            <td className="py-3 font-mono font-bold text-[#e8b923]">
+                              R$ {(tx.amountCents / 100).toFixed(2)}
+                            </td>
+                            <td className="py-3">
+                              <StatusBadge status={tx.status} />
+                            </td>
+                            <td className="py-3 font-mono text-zinc-400">{tx.provider}</td>
+                            <td className="py-3 text-zinc-400 font-mono">
+                              {new Date(tx.createdAt).toLocaleString("pt-BR")}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 5: INTEGRAÇÕES */}
+          {activeSection === "integrations" && (
+            <div className="space-y-6 animate-fadeIn">
+              <div>
+                <h1 className="text-xl font-bold text-white tracking-tight">Integrações & Endpoints</h1>
+                <p className="text-xs text-zinc-400 mt-0.5">Parâmetros de conexão do gateway industrial</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-6 rounded-2xl bg-[#09090d] border border-zinc-800/80 space-y-4">
+                  <div className="flex items-center gap-3">
+                    <Globe className="w-5 h-5 text-[#e8b923]" />
+                    <h3 className="text-sm font-bold text-white">Endpoint de Criação de Cobranças</h3>
+                  </div>
+                  <code className="block p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-mono text-[#e8b923] select-all">
+                    POST https://api.axionenterprise.cloud/v1/charges
+                  </code>
+                  <div className="space-y-2 text-xs text-zinc-400 font-mono">
+                    <p>Header: <span className="text-white">Idempotency-Key: &lt;uuid&gt;</span></p>
+                    <p>Header: <span className="text-white">Authorization: Bearer axp_live_...</span></p>
+                  </div>
+                </div>
+
+                <div className="p-6 rounded-2xl bg-[#09090d] border border-zinc-800/80 space-y-4">
+                  <div className="flex items-center gap-3">
+                    <Zap className="w-5 h-5 text-emerald-400" />
+                    <h3 className="text-sm font-bold text-white">Endpoint de Webhook (Woovi/OpenPix)</h3>
+                  </div>
+                  <code className="block p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-mono text-emerald-400 select-all">
+                    POST https://api.axionenterprise.cloud/webhooks/woovi
+                  </code>
+                  <div className="space-y-2 text-xs text-zinc-400 font-mono">
+                    <p>Header: <span className="text-white">x-webhook-signature: &lt;hmac-signature&gt;</span></p>
+                    <p>Trilho: <span className="text-white">Deduplicação atômica em PostgreSQL</span></p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 6: CONFIGURAÇÕES */}
+          {activeSection === "settings" && (
+            <div className="space-y-6 animate-fadeIn max-w-2xl">
+              <div>
+                <h1 className="text-xl font-bold text-white tracking-tight">Configurações da Conta</h1>
+                <p className="text-xs text-zinc-400 mt-0.5">Definições da organização</p>
+              </div>
+
+              <form onSubmit={handleSaveSettings} className="p-6 rounded-2xl bg-[#09090d] border border-zinc-800/80 space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-zinc-300 mb-1.5">Nome da Organização</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ex: AXION Enterprise LTDA"
+                    value={settings.organizationName || ""}
+                    onChange={(e) => setSettings({ ...settings, organizationName: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-sm text-white focus:border-[#e8b923] focus:outline-none"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 bg-[#e8b923] hover:bg-amber-400 text-black font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-yellow-500/10 cursor-pointer"
+                >
+                  Salvar Configurações
+                </button>
+              </form>
+            </div>
+          )}
+        </main>
+      </div>
+
+      {/* MODAL NOVO MERCHANT */}
+      {merchantModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-[#09090d] border border-zinc-800 rounded-3xl p-6 space-y-5">
+            <div className="flex justify-between items-center">
+              <h3 className="text-base font-bold text-white">Cadastrar Novo Merchant</h3>
+              <button onClick={() => setMerchantModal(false)} className="text-zinc-400 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {activeModal === "api_rest" && (
-              <div className="space-y-4">
-                <p className="text-xs text-zinc-400">Envie requisições HTTP autorizadas via Header `Authorization: Bearer sec_key_live_...`</p>
-                <div className="bg-black p-3 rounded-xl border border-zinc-800 space-y-2">
-                  <p className="text-[10px] text-zinc-500 uppercase font-mono">Endpoint de Cobrança PIX/Cartão:</p>
-                  <code className="text-xs font-mono text-amber-300 block break-all">POST https://pay.axionenterprise.cloud/payments/charge</code>
-                </div>
-                <div className="flex justify-end gap-2">
-                  <button onClick={() => setActiveModal(null)} className="px-4 py-2 bg-zinc-900 border border-zinc-800 text-xs font-bold text-white rounded-lg">Fechar</button>
-                </div>
+            <form onSubmit={handleCreateMerchant} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-zinc-300 mb-1.5">Nome da Operação / Loja</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex: AXION Cloud Services"
+                  value={newMerchantName}
+                  onChange={(e) => setNewMerchantName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-sm text-white focus:border-[#e8b923] focus:outline-none"
+                />
               </div>
-            )}
 
-            {activeModal === "webhooks" && (
+              <div>
+                <label className="block text-xs font-medium text-zinc-300 mb-1.5">CNPJ / CPF (Opcional)</label>
+                <input
+                  type="text"
+                  placeholder="00.000.000/0001-00"
+                  value={newMerchantDoc}
+                  onChange={(e) => setNewMerchantDoc(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-sm text-white focus:border-[#e8b923] focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-zinc-300 mb-1.5">E-mail Financeiro (Opcional)</label>
+                <input
+                  type="email"
+                  placeholder="financeiro@empresa.com"
+                  value={newMerchantEmail}
+                  onChange={(e) => setNewMerchantEmail(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-sm text-white focus:border-[#e8b923] focus:outline-none"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3 bg-[#e8b923] hover:bg-amber-400 text-black font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-yellow-500/10 cursor-pointer"
+              >
+                Confirmar Cadastro
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL NOVA CHAVE DE API */}
+      {apiKeyModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-[#09090d] border border-zinc-800 rounded-3xl p-6 space-y-5">
+            <div className="flex justify-between items-center">
+              <h3 className="text-base font-bold text-white">Gerar Chave de API</h3>
+              <button
+                onClick={() => {
+                  setApiKeyModal(false);
+                  setGeneratedKey(null);
+                }}
+                className="text-zinc-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {generatedKey ? (
               <div className="space-y-4">
-                <div>
-                  <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">URL de Callback (HTTP POST)</label>
-                  <input type="text" value={webhookUrl} onChange={e => setWebhookUrl(e.target.value)} className="w-full px-3 py-2 bg-black border border-zinc-800 rounded-lg text-xs font-mono text-white focus:border-[#e8b923] focus:outline-none" />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Webhook Secret HMAC</label>
-                  <div className="flex gap-2">
-                    <code className="flex-1 px-3 py-2 bg-black rounded-lg text-xs font-mono text-amber-300 border border-zinc-800 break-all">{webhookSecret}</code>
-                    <CopyBtn text={webhookSecret} />
+                <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400 space-y-2">
+                  <div className="font-bold flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Chave criada com sucesso!</span>
                   </div>
+                  <p className="text-[11px] leading-relaxed">
+                    Copie a chave agora. Por razões de segurança, ela não será exibida novamente.
+                  </p>
                 </div>
-                {testStatus && <p className="text-xs text-green-400 font-mono bg-green-500/10 p-2 rounded-lg border border-green-500/20">{testStatus}</p>}
-                <div className="flex gap-2">
-                  <button onClick={testWebhookPing} className="flex-1 py-2 bg-zinc-800 text-white text-xs font-bold rounded-lg hover:bg-zinc-700">Testar Webhook</button>
-                  <button onClick={() => { saveIntegrations(); setActiveModal(null); }} className="flex-1 py-2 bg-[#e8b923] text-black text-xs font-bold rounded-lg hover:opacity-90">Salvar e Fechar</button>
-                </div>
-              </div>
-            )}
 
-            {activeModal === "checkout_pro" && (
-              <div className="space-y-4">
-                <p className="text-xs text-zinc-400">Página de checkout integrada e otimizada para conversão instantânea.</p>
-                <div className="bg-black p-3 rounded-xl border border-zinc-800 space-y-2">
-                  <p className="text-[10px] text-zinc-500 uppercase font-mono">URL de Checkout:</p>
-                  <code className="text-xs font-mono text-amber-300 block break-all">https://pay.axionenterprise.cloud/checkout</code>
+                <div className="p-3 bg-zinc-950 border border-zinc-800 rounded-xl flex items-center justify-between gap-2">
+                  <code className="text-xs font-mono text-[#e8b923] select-all break-all">{generatedKey}</code>
+                  <CopyBtn text={generatedKey} />
                 </div>
-                <div className="flex justify-end gap-2">
-                  <a href="/checkout" target="_blank" rel="noreferrer" className="px-4 py-2 bg-[#e8b923] text-black text-xs font-bold rounded-lg hover:opacity-90 inline-flex items-center gap-1">
-                    Abrir Checkout <ExternalLink className="w-3 h-3" />
-                  </a>
-                  <button onClick={() => setActiveModal(null)} className="px-4 py-2 bg-zinc-900 border border-zinc-800 text-xs font-bold text-white rounded-lg">Fechar</button>
-                </div>
+
+                <button
+                  onClick={() => {
+                    setApiKeyModal(false);
+                    setGeneratedKey(null);
+                  }}
+                  className="w-full py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-xs rounded-xl"
+                >
+                  Concluir
+                </button>
               </div>
+            ) : (
+              <form onSubmit={handleCreateApiKey} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-zinc-300 mb-1.5">Merchant Vinculado</label>
+                  <select
+                    value={keyMerchantId}
+                    onChange={(e) => setKeyMerchantId(e.target.value)}
+                    required
+                    className="w-full px-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-xs font-mono text-white focus:border-[#e8b923] focus:outline-none"
+                  >
+                    {merchants.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name} ({m.id.slice(0, 8)}...)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-zinc-300 mb-1.5">Identificador da Chave</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ex: Produção Backend Flow"
+                    value={keyName}
+                    onChange={(e) => setKeyName(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-sm text-white focus:border-[#e8b923] focus:outline-none"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-3 bg-[#e8b923] hover:bg-amber-400 text-black font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-yellow-500/10 cursor-pointer"
+                >
+                  Gerar Chave Segura
+                </button>
+              </form>
             )}
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function SettingsSection({ user }: { user: any }) {
-  const [companyName, setCompanyName] = useState("Minha Empresa");
-  const [pixKey, setPixKey] = useState("financeiro@minhaempresa.com");
-  const [saved, setSaved] = useState(false);
-
-  const saveSettings = async () => {
-    await apiFetch("/api/pay/settings", {
-      method: "POST",
-      body: JSON.stringify({ companyName, pixKey })
-    });
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
-  };
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-extrabold tracking-tight text-white">Configurações da Conta</h2>
-        <p className="text-xs text-zinc-500 mt-1">Gerencie seu perfil, 2FA e preferências de transferência</p>
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <DashboardCard icon={User} title="Perfil Empresarial">
-          <div className="space-y-4">
-            {user && (
-              <div className="flex items-center gap-4 p-4 bg-white/5 rounded-xl">
-                <img src={user.picture || ""} alt="" className="w-12 h-12 rounded-full" />
-                <div>
-                  <p className="font-bold text-white">{user.name}</p>
-                  <p className="text-xs text-zinc-500">{user.email}</p>
-                </div>
-              </div>
-            )}
-            <div>
-              <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1.5">Nome Fantasia da Empresa</label>
-              <input type="text" value={companyName} onChange={e => setCompanyName(e.target.value)}
-                className="w-full px-4 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-sm text-white focus:border-[#e8b923] focus:outline-none" />
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1.5">Chave PIX para Saques Automáticos</label>
-              <input type="text" value={pixKey} onChange={e => setPixKey(e.target.value)}
-                className="w-full px-4 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-sm text-white focus:border-[#e8b923] focus:outline-none" />
-            </div>
-            {saved && <p className="text-xs text-[#e8b923] font-mono">Configurações salvas com sucesso!</p>}
-            <button onClick={saveSettings} className="w-full py-2.5 bg-[#e8b923] text-black font-bold text-xs rounded-xl hover:opacity-90">
-              Salvar Alterações
-            </button>
-          </div>
-        </DashboardCard>
-        <DashboardCard icon={Shield} title="Segurança & 2FA TOTP">
-          <TwoFactorSetup />
-        </DashboardCard>
-      </div>
-    </div>
-  );
-}
-
-export default function PayDashboard() {
-  const [user, setUser] = useState<any>(null);
-  const [authLoaded, setAuthLoaded] = useState(false);
-  const [activeSection, setActiveSection] = useState("overview");
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
-
-  useEffect(() => {
-    checkAuth().then(u => {
-      setUser(u || { name: "Iago Barreto", email: "iago@axionenterprise.cloud", picture: "" });
-      setAuthLoaded(true);
-    });
-  }, []);
-
-  if (!authLoaded) {
-    return (
-      <div className="min-h-screen bg-[#040407] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-8 h-8 border-2 border-[#e8b923] border-t-transparent rounded-full animate-spin" />
-          <p className="text-xs text-zinc-500 font-mono">Carregando AxionPay...</p>
-        </div>
-      </div>
-    );
-  }
-
-  const sections: Record<string, React.ReactNode> = {
-    overview: <OverviewSection />,
-    tenants: <TenantsSection />,
-    "api-keys": <ApiKeysSection />,
-    transactions: <TransactionsSection />,
-    integrations: <IntegrationsSection />,
-    settings: <SettingsSection user={user} />,
-  };
-
-  return (
-    <div className="min-h-screen bg-[#040407] text-[#f5f5fa] relative overflow-x-hidden">
-      <Sidebar activeSection={activeSection} setActiveSection={setActiveSection} user={user} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} collapsed={collapsed} />
-      <main className="ml-0 md:ml-64 min-h-screen relative z-10 transition-all duration-300">
-        <header className="sticky top-0 z-30 bg-[#040407]/90 backdrop-blur-xl border-b border-zinc-800">
-          <div className="flex items-center justify-between md:justify-end px-4 sm:px-6 md:px-8 h-16 gap-4">
-            <div className="flex items-center gap-3 md:hidden">
-              <button onClick={() => setMobileOpen(true)} className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white">
-                <Menu className="w-5 h-5" />
-              </button>
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-amber-400 to-yellow-600 flex items-center justify-center">
-                  <CreditCard className="w-4 h-4 text-black" />
-                </div>
-                <span className="text-sm font-extrabold tracking-tight text-white">Axion<span className="text-[#e8b923]">Pay</span></span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button onClick={() => setCollapsed(!collapsed)} className="hidden md:flex p-2 rounded-xl text-zinc-500 hover:text-white hover:bg-white/5 transition-all" title="Alternar sidebar">
-                <Menu className="w-4 h-4" />
-              </button>
-              <a href="/" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider text-zinc-400 hover:text-white hover:bg-white/5 transition-all border border-transparent hover:border-zinc-800">
-                <Home className="w-3.5 h-3.5" /> Landing
-              </a>
-              <div className="flex items-center gap-2.5 pl-3 border-l border-zinc-800">
-                <img src={user?.picture || ""} alt="" className="w-7 h-7 rounded-full" />
-                <span className="text-xs font-bold text-white hidden sm:block">{user?.name}</span>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        <div className="p-4 sm:p-6 md:p-8 lg:p-10 max-w-7xl mx-auto">
-          <motion.div key={activeSection} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
-            {sections[activeSection]}
-          </motion.div>
-        </div>
-      </main>
     </div>
   );
 }
