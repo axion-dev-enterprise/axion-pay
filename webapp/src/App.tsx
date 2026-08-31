@@ -197,12 +197,15 @@ export default function App() {
         headers: { "Content-Type": "application/json", "x-axion-mode": "black" },
         body: JSON.stringify({ amount: Math.round(v * 100), description: "Cobrança AxionPay" }),
       });
-      const d = await r.json();
-      setLink(d.paymentUrl || d.qrCode || JSON.stringify(d));
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !(d.paymentUrl || d.qrCode)) {
+        throw new Error(d.error || "Cobrança PIX indisponível.");
+      }
+      setLink(d.paymentUrl || d.qrCode);
       setQrCode(d.paymentUrl || d.qrCode);
-    } catch {
-      setLink(`em55b9e02c114389b706c9a38ef6722d5511924765169`);
-      setQrCode("https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=em55b9e02c114389b706c9a38ef6722d5511924765169");
+    } catch (error) {
+      setLink(error instanceof Error ? error.message : "Cobrança PIX indisponível.");
+      setQrCode(null);
     } finally {
       setLoading(false);
     }
@@ -245,9 +248,9 @@ export default function App() {
     }
   }
 
-  // Simulate payment confirmation
+  // Payment status must originate from the provider webhook, never from a browser action.
   const handleSimulatePayment = () => {
-    setPixPaid(true);
+    setLink("A confirmação será exibida somente após o webhook assinado do provedor.");
   };
 
   const copyToClipboard = (text: string) => {
