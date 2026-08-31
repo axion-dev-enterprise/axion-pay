@@ -53,7 +53,7 @@ export const StylishStripeCheckout: React.FC<StylishStripeCheckoutProps> = ({
   onSuccess,
   className = '',
 }) => {
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'pix' | 'b2b' | 'crypto'>('card');
+  const [paymentMethod] = useState<'card' | 'pix' | 'b2b' | 'crypto'>('pix');
   const [customerName, setCustomerName] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerCompany, setCustomerCompany] = useState('');
@@ -168,21 +168,8 @@ export const StylishStripeCheckout: React.FC<StylishStripeCheckoutProps> = ({
     }
   };
 
-  const handleSimulateSuccess = (methodName: string) => {
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      const receipt = {
-        txId: `AXN-PAY-${Date.now().toString(36).toUpperCase()}`,
-        amount: finalPrice,
-        currency: 'BRL',
-        method: methodName,
-        customer: { name: customerName || 'Cliente AXION', email: customerEmail || 'cliente@axionenterprise.cloud' },
-        timestamp: new Date().toISOString(),
-      };
-      setPaidReceipt(receipt);
-      if (onSuccess) onSuccess(receipt);
-    }, 1000);
+  const handleUnsupportedMethod = (methodName: string) => {
+    setErrorMessage(`${methodName} ainda não está disponível para pagamentos reais. Use apenas uma cobrança PIX criada pelo backend autorizado.`);
   };
 
   return (
@@ -374,62 +361,15 @@ export const StylishStripeCheckout: React.FC<StylishStripeCheckoutProps> = ({
                 <p className="text-xs text-zinc-400 mt-0.5">Selecione seu método preferido para concluir</p>
               </div>
 
-              {/* Seletor de Abas */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-zinc-950 p-1.5 rounded-2xl border border-zinc-800">
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('card')}
-                  className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    paymentMethod === 'card'
-                      ? 'bg-[#e8b923] text-black shadow-lg shadow-yellow-500/10'
-                      : 'text-zinc-400 hover:text-white'
-                  }`}
-                >
-                  <CreditCard className="w-4 h-4 shrink-0" />
-                  <span>Cartão</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('pix')}
-                  className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer relative ${
-                    paymentMethod === 'pix'
-                      ? 'bg-[#e8b923] text-black shadow-lg shadow-yellow-500/10'
-                      : 'text-zinc-400 hover:text-white'
-                  }`}
-                >
-                  <QrCode className="w-4 h-4 shrink-0" />
-                  <span>PIX</span>
-                  <span className="hidden sm:inline text-[9px] px-1 py-0.2 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                    -10%
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('b2b')}
-                  className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    paymentMethod === 'b2b'
-                      ? 'bg-[#e8b923] text-black shadow-lg shadow-yellow-500/10'
-                      : 'text-zinc-400 hover:text-white'
-                  }`}
-                >
-                  <Building2 className="w-4 h-4 shrink-0" />
-                  <span>Boleto B2B</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('crypto')}
-                  className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    paymentMethod === 'crypto'
-                      ? 'bg-[#e8b923] text-black shadow-lg shadow-yellow-500/10'
-                      : 'text-zinc-400 hover:text-white'
-                  }`}
-                >
-                  <Coins className="w-4 h-4 shrink-0" />
-                  <span>Crypto</span>
-                </button>
+              {/* Método liberado nesta distribuição */}
+              <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/15 flex items-center justify-center">
+                  <QrCode className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white">PIX</p>
+                  <p className="text-xs text-zinc-400">Disponibilização inicial em homologação controlada.</p>
+                </div>
               </div>
 
               {/* ABA 1: CARTÃO STRIPE ELEMENTS */}
@@ -509,21 +449,13 @@ export const StylishStripeCheckout: React.FC<StylishStripeCheckoutProps> = ({
 
               {/* ABA 2: PIX */}
               {paymentMethod === 'pix' && (
-                <div className="space-y-5 pt-1">
-                  <PixPaymentDisplay
-                    amount={finalPrice}
-                    copiaECola="00020126580014br.gov.bcb.pix0136e55b9e02c114389b706c9a38ef6722d55204000053039865406297.005802BR5921AXION ENTERPRISE LTDA6009SAO PAULO62070503***6304C9F1"
-                    expiresInSeconds={600}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleSimulateSuccess('PIX Instantâneo')}
-                    disabled={loading}
-                    className="w-full py-3.5 bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                    <span>Confirmar Pagamento PIX</span>
-                  </button>
+                <div className="rounded-2xl border border-zinc-800 bg-zinc-950/70 p-6 text-center space-y-3">
+                  <QrCode className="w-10 h-10 text-emerald-400 mx-auto" />
+                  <h4 className="text-sm font-bold text-white">PIX em ativação controlada</h4>
+                  <p className="text-xs text-zinc-400 leading-relaxed">
+                    O QR Code é criado exclusivamente por uma cobrança autorizada no backend.
+                    Nenhum pagamento deve ser transferido até a homologação Woovi concluir.
+                  </p>
                 </div>
               )}
 
@@ -533,7 +465,7 @@ export const StylishStripeCheckout: React.FC<StylishStripeCheckoutProps> = ({
                   <B2BInvoiceForm
                     amount={finalPrice}
                     loading={loading}
-                    onSubmit={() => handleSimulateSuccess('Faturamento B2B / Boleto')}
+                    onSubmit={() => handleUnsupportedMethod('Faturamento B2B / Boleto')}
                   />
                 </div>
               )}
@@ -551,7 +483,7 @@ export const StylishStripeCheckout: React.FC<StylishStripeCheckoutProps> = ({
                   </div>
                   <button
                     type="button"
-                    onClick={() => handleSimulateSuccess('Crypto (USDC / USDT)')}
+                    onClick={() => handleUnsupportedMethod('Crypto (USDC / USDT)')}
                     disabled={loading}
                     className="w-full py-3 bg-[#e8b923] hover:bg-amber-400 text-black font-bold uppercase rounded-xl transition-all"
                   >
