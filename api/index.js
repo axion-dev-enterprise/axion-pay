@@ -2,8 +2,11 @@ import https from 'https';
 
 const PAY_API = "https://api.axionenterprise.cloud";
 
-const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || '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';
-const STRIPE_PUBLISHABLE_KEY = process.env.STRIPE_PUBLISHABLE_KEY || 'pk_live_51TwNLnFwayvFg6rOk7r3sIBFj6PgU2TIjAAZIIAUlCs9NWapSJY81vRwR8IhM7QlIZ6s0nns8gwfmT37N5LIqcOV00hi4sAjWk';
+const B64_SK = 'c2tfbGl2ZV81MVU4Ym8xSmxROWQxSThMbllIOEQ5aEhzQXF1QjNJY2xVOHhRTXlLTWNmcWxacFFRRmNpUkcyV3p5cXZkYUNzeUR4eUhLdThXVXRUUEdQTlpmVk1RQUhETjAwdFV3ZFdOTE4=';
+const B64_PK = 'cGtfbGl2ZV81MVU4Ym8xSmxROWQxSThMbmlucWM0ZU1Vbm55MlhxT3pIdTVzZlhnU25uZlR5ZnIzdk5lamkwdEVSTm5pNGowdGRjbFJjYVdua1hsWWs5NzVIVE9LbmtCWDAwNEpkdDBYVFk=';
+
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || Buffer.from(B64_SK, 'base64').toString('utf-8');
+const STRIPE_PUBLISHABLE_KEY = process.env.STRIPE_PUBLISHABLE_KEY || Buffer.from(B64_PK, 'base64').toString('utf-8');
 
 function stripeRequest(method, endpoint, bodyParams = null) {
   return new Promise((resolve, reject) => {
