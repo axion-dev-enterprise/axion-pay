@@ -18,7 +18,7 @@
     "vercel-build": "vite build --config vite.config.js",
     "typecheck": "tsc --noEmit",
     "build": "npm run typecheck && npm run web:build",
-    "start:prod": "npm run build && node src/index.js",
+    "start:prod": "node -e \"console.error('O backend legado foi desativado. Publique a API em https://api.axionenterprise.cloud.'); process.exit(1)\"",
     "pretest": "npm install",
     "test": "cross-env NODE_ENV=test node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "test:web": "vitest run --passWithNoTests",
