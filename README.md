@@ -2,19 +2,19 @@
 
 ## Overview
 
-axion-pay is maintained as a production-ready release copy generated from the SANDBOX workspace.
+Public portal and dashboard frontend for AXION Pay. The payment API is maintained separately in [`axion-pay-core`](https://github.com/axion-dev-enterprise/axion-pay-core) and runs at `https://api.axionenterprise.cloud`.
 
 ## Repository role
 
 - Bucket: `apps`
-- Project kind: `node-react-app`
+- Project kind: `react-portal`
 - Release strategy: `github-release-build-artifact`
 - Owner target: `axion-dev-enterprise`
 - Notes: Axion Dev Enterprise release repository.
 
 ## Technology stack
 
-React, Node.js, npm
+React, Vite, TypeScript, npm
 
 ## Quality gates
 
@@ -32,16 +32,21 @@ npm install
 
 ```bash
 npm run build --if-present
-npm test --if-present
+npm run test:web --if-present
 ```
 
 ## Release process
 
 1. Develop and validate in `D:\WORKSPACE\SANDBOX`.
-2. Sync the clean release copy into `D:\WORKSPACE\PRODUCTION\apps\axion-pay`.
-3. Run CI and local validation.
-4. Create or update the GitHub repository for this project.
-5. Publish tagged releases through GitHub Actions.
+2. Run the frontend build and typecheck.
+3. Publish the portal through Vercel.
+4. Validate `/`, `/dashboard`, and `https://api.axionenterprise.cloud/health`.
+
+## Runtime boundaries
+
+- This repository does not create charges or expose a payment backend.
+- All merchants, API keys, transactions, and payment-provider calls are handled by `axion-pay-core`.
+- The former Express checkout/backend was removed to prevent mocked or duplicate payment paths from being executed.
 
 ## Source of truth
 

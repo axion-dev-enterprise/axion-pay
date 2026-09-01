@@ -3,7 +3,7 @@
   "version": "1.0.1",
   "description": "Payment Service API",
   "type": "module",
-  "main": "src/index.js",
+  "private": true,
   "scripts": {
     "start:frontend": "vite --config vite.config.js",
     "start:backend": "node -e \"console.error('O backend legado foi desativado. Use https://api.axionenterprise.cloud.'); process.exit(1)\"",
@@ -19,11 +19,10 @@
     "typecheck": "tsc --noEmit",
     "build": "npm run typecheck && npm run web:build",
     "start:prod": "node -e \"console.error('O backend legado foi desativado. Publique a API em https://api.axionenterprise.cloud.'); process.exit(1)\"",
-    "pretest": "npm install",
-    "test": "cross-env NODE_ENV=test node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test": "node -e \"console.error('Os testes do backend legado foram removidos. Use a suíte do axion-pay-core.'); process.exit(1)\"",
     "test:web": "vitest run --passWithNoTests",
-    "test:payments": "cross-env NODE_ENV=test node --experimental-vm-modules node_modules/jest/bin/jest.js src/controllers/paymentController.test.js",
-    "smoke-test": "node scripts/smoke-test.js"
+    "test:payments": "node -e \"console.error('Os testes de pagamentos legados foram removidos. Use o axion-pay-core.'); process.exit(1)\"",
+    "smoke-test": "node -e \"console.error('O smoke test legado foi removido. Consulte https://api.axionenterprise.cloud/health.'); process.exit(1)\""
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
