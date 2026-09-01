@@ -39,13 +39,11 @@ const AUTH_API = "https://auth.axionenterprise.cloud";
 const API_BASE = "https://api.axionenterprise.cloud";
 
 function getToken(): string | null {
-  const stored = sessionStorage.getItem("axion_token") || localStorage.getItem("axion_token");
-  if (stored) return stored;
   const params = new URLSearchParams(window.location.search);
   const urlToken = params.get("token");
   if (urlToken) {
     sessionStorage.setItem("axion_token", urlToken);
-    localStorage.setItem("axion_token", urlToken);
+    localStorage.removeItem("axion_token");
     params.delete("token");
     const newUrl =
       window.location.pathname +
@@ -53,6 +51,17 @@ function getToken(): string | null {
       window.location.hash;
     window.history.replaceState({}, "", newUrl);
     return urlToken;
+  }
+
+  const stored = sessionStorage.getItem("axion_token");
+  if (stored) return stored;
+
+  // Migra uma sessão antiga sem prolongá-la além da aba atual.
+  const legacyToken = localStorage.getItem("axion_token");
+  if (legacyToken) {
+    sessionStorage.setItem("axion_token", legacyToken);
+    localStorage.removeItem("axion_token");
+    return legacyToken;
   }
   return null;
 }
