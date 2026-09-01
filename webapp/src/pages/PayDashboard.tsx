@@ -104,6 +104,19 @@ async function checkAuth() {
   const token = getToken();
   const headers: Record<string, string> = { Accept: "application/json" };
   if (token) headers.Authorization = `Bearer ${token}`;
+
+  // The Core is the authorization boundary for this dashboard. Validating the
+  // shared HttpOnly session here proves that the cookie reached the API and
+  // that the API could validate it against Auth before any dashboard request.
+  try {
+    const res = await fetch(`${API_BASE}/v1/dashboard/me`, { headers, credentials: "include" });
+    const data = await res.json().catch(() => null);
+    if (res.ok && data?.user) return data.user;
+  } catch {
+    // A direct Auth check below keeps the login screen usable during a
+    // transient Core restart, without storing or exposing a bearer token.
+  }
+
   try {
     const res = await fetch(`${AUTH_API}/api/auth/me`, { headers, credentials: "include" });
     const data = await res.json().catch(() => null);
