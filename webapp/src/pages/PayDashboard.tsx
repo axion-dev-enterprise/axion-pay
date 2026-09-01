@@ -237,6 +237,11 @@ export default function PayDashboard() {
   const [integrations, setIntegrations] = useState<any>(null);
   const [onboarding, setOnboarding] = useState<any>(null);
   const [onboardingForm, setOnboardingForm] = useState<OnboardingForm>(emptyOnboardingForm);
+  const [canReviewKyc, setCanReviewKyc] = useState(false);
+  const [kycApplications, setKycApplications] = useState<Array<any>>([]);
+  const [kycReviewModal, setKycReviewModal] = useState<any>(null);
+  const [kycReviewStatus, setKycReviewStatus] = useState<"IN_REVIEW" | "ACTION_REQUIRED" | "APPROVED" | "REJECTED">("IN_REVIEW");
+  const [kycReviewReason, setKycReviewReason] = useState("");
   const [settings, setSettings] = useState<{ organizationName: string | null }>({
     organizationName: null,
   });
@@ -321,7 +326,15 @@ export default function PayDashboard() {
       if (txRes?.transactions) setTransactions(txRes.transactions);
       if (intRes && !intRes.error) setIntegrations(intRes);
       if (stRes?.settings) setSettings(stRes.settings);
-      if (onboardingRes && !onboardingRes.error) applyOnboardingProfile(onboardingRes.onboarding);
+      if (onboardingRes && !onboardingRes.error) {
+        applyOnboardingProfile(onboardingRes.onboarding);
+        const reviewer = Boolean(onboardingRes.canReviewKyc);
+        setCanReviewKyc(reviewer);
+        if (reviewer) {
+          const reviewRes = await apiFetch("/v1/internal/kyc/applications?status=SUBMITTED");
+          if (reviewRes?.applications) setKycApplications(reviewRes.applications);
+        }
+      }
     } catch (err: any) {
       setErrorMessage("Erro ao carregar dados do dashboard.");
     } finally {
@@ -479,6 +492,31 @@ export default function PayDashboard() {
     }
   };
 
+  const handleReviewKyc = async () => {
+    if (!kycReviewModal) return;
+    if (["ACTION_REQUIRED", "REJECTED"].includes(kycReviewStatus) && kycReviewReason.trim().length < 3) {
+      notify("error", "Informe o motivo para solicitar ajustes ou rejeitar o KYC.");
+      return;
+    }
+    setSubmittingAction("kyc-review");
+    try {
+      const res = await apiFetch(`/v1/internal/kyc/applications/${encodeURIComponent(kycReviewModal.authUserId)}/review`, {
+        method: "POST",
+        body: JSON.stringify({ status: kycReviewStatus, reason: kycReviewReason.trim() || undefined }),
+      });
+      if (res?.onboarding) {
+        setKycApplications((current) => current.filter((item) => item.authUserId !== kycReviewModal.authUserId));
+        setKycReviewModal(null);
+        setKycReviewReason("");
+        notify("success", "Decisão KYC registrada com trilha de auditoria.");
+      } else {
+        notify("error", res?.error || "Não foi possível registrar a decisão KYC.");
+      }
+    } finally {
+      setSubmittingAction(null);
+    }
+  };
+
   // Se carregando autenticação
   if (authLoading) {
     return (
@@ -524,6 +562,7 @@ export default function PayDashboard() {
     { id: "api-keys", label: "Chaves de API", icon: Key },
     { id: "transactions", label: "Transações", icon: Wallet },
     { id: "onboarding", label: "Cadastro & KYC", icon: FileCheck2 },
+    ...(canReviewKyc ? [{ id: "kyc-review", label: "Análise KYC", icon: Shield }] : []),
     { id: "integrations", label: "Integrações", icon: Globe },
     { id: "settings", label: "Configurações", icon: Settings },
   ];
@@ -1052,6 +1091,38 @@ export default function PayDashboard() {
             </div>
           )}
 
+          {activeSection === "kyc-review" && canReviewKyc && (
+            <div className="space-y-6 animate-fadeIn">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h1 className="text-xl font-bold text-white tracking-tight">Fila de análise KYC</h1>
+                  <p className="mt-0.5 text-xs text-zinc-400">Somente dados minimizados são exibidos. Cada decisão gera trilha de auditoria.</p>
+                </div>
+                <button type="button" onClick={loadAllData} disabled={loadingData} className="inline-flex items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-200 transition hover:bg-zinc-800 disabled:opacity-60"><RefreshCw className={`h-4 w-4 ${loadingData ? "animate-spin" : ""}`} aria-hidden="true" />Atualizar</button>
+              </div>
+              <div className="overflow-x-auto rounded-3xl border border-zinc-800/80 bg-[#09090d] p-2 shadow-xl">
+                {kycApplications.length === 0 ? (
+                  <div className="py-14 text-center text-xs font-mono text-zinc-500">Não há solicitações KYC pendentes.</div>
+                ) : (
+                  <table className="w-full text-left text-xs">
+                    <thead><tr className="border-b border-zinc-800 text-[10px] font-mono uppercase tracking-wider text-zinc-500"><th className="px-4 py-3">Titular</th><th className="px-4 py-3">Organização</th><th className="px-4 py-3">Documento</th><th className="px-4 py-3">Enviado</th><th className="px-4 py-3 text-right">Ação</th></tr></thead>
+                    <tbody className="divide-y divide-zinc-800/70">
+                      {kycApplications.map((application) => (
+                        <tr key={application.authUserId} className="transition hover:bg-zinc-900/60">
+                          <td className="px-4 py-3"><p className="font-bold text-white">{application.userDisplayName || "Titular AXION"}</p><p className="mt-0.5 text-zinc-500">{application.userEmail}</p></td>
+                          <td className="px-4 py-3 text-zinc-200">{application.legalName}</td>
+                          <td className="px-4 py-3 font-mono text-zinc-400">•••• {application.documentLastFour}</td>
+                          <td className="px-4 py-3 text-zinc-400">{application.submittedAt ? new Date(application.submittedAt).toLocaleString("pt-BR") : "—"}</td>
+                          <td className="px-4 py-3 text-right"><button type="button" onClick={() => { setKycReviewModal(application); setKycReviewStatus("IN_REVIEW"); setKycReviewReason(""); }} className="rounded-lg border border-[#e8b923]/40 px-3 py-1.5 text-xs font-bold text-[#e8b923] transition hover:bg-[#e8b923]/10">Analisar</button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* TAB 6: INTEGRAÇÕES */}
           {activeSection === "integrations" && (
             <div className="space-y-6 animate-fadeIn">
@@ -1163,6 +1234,24 @@ export default function PayDashboard() {
               <button type="button" onClick={() => setPendingRevoke(null)} disabled={Boolean(submittingAction)} className="rounded-xl border border-zinc-700 px-4 py-2.5 text-xs font-bold text-zinc-200 transition hover:bg-zinc-800 disabled:opacity-50">Cancelar</button>
               <button type="button" onClick={() => handleRevokeApiKey(pendingRevoke.id)} disabled={submittingAction === `revoke-${pendingRevoke.id}`} className="rounded-xl bg-red-500 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-red-400 disabled:cursor-wait disabled:opacity-60">{submittingAction === `revoke-${pendingRevoke.id}` ? "Revogando…" : "Revogar chave"}</button>
             </div>
+          </section>
+        </div>
+      )}
+
+      {kycReviewModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !submittingAction) setKycReviewModal(null); }}>
+          <section role="dialog" aria-modal="true" aria-labelledby="kyc-review-title" className="w-full max-w-lg rounded-3xl border border-zinc-700 bg-[#09090d] p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div><h2 id="kyc-review-title" className="text-base font-bold text-white">Analisar solicitação KYC</h2><p className="mt-1 text-xs text-zinc-400">{kycReviewModal.legalName} · documento final {kycReviewModal.documentLastFour}</p></div>
+              <button type="button" onClick={() => setKycReviewModal(null)} disabled={Boolean(submittingAction)} aria-label="Fechar análise KYC" className="text-zinc-500 transition hover:text-white"><X className="h-5 w-5" aria-hidden="true" /></button>
+            </div>
+            <div className="mt-5 space-y-4">
+              <div className="grid grid-cols-2 gap-3 text-xs"><div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3"><p className="text-zinc-500">E-mail</p><p className="mt-1 break-all text-zinc-200">{kycReviewModal.billingEmail}</p></div><div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3"><p className="text-zinc-500">Telefone</p><p className="mt-1 text-zinc-200">{kycReviewModal.phoneE164}</p></div></div>
+              <div><label className="mb-1.5 block text-xs font-medium text-zinc-300">Decisão</label><select value={kycReviewStatus} onChange={(e) => setKycReviewStatus(e.target.value as typeof kycReviewStatus)} className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3.5 py-2.5 text-sm text-white focus:border-[#e8b923] focus:outline-none"><option value="IN_REVIEW">Manter em revisão</option><option value="ACTION_REQUIRED">Solicitar ajustes</option><option value="APPROVED">Aprovar organização</option><option value="REJECTED">Rejeitar solicitação</option></select></div>
+              <div><label className="mb-1.5 block text-xs font-medium text-zinc-300">Motivo {(["ACTION_REQUIRED", "REJECTED"].includes(kycReviewStatus) ? "(obrigatório)" : "(opcional)"}</label><textarea value={kycReviewReason} onChange={(e) => setKycReviewReason(e.target.value)} maxLength={1000} className="min-h-24 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3.5 py-2.5 text-sm text-white focus:border-[#e8b923] focus:outline-none" /></div>
+              <p className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-xs leading-5 text-amber-100/80">A decisão é registrada com seu usuário AXION e pode liberar ou bloquear imediatamente novas chaves de API do solicitante.</p>
+            </div>
+            <div className="mt-6 flex justify-end gap-3"><button type="button" onClick={() => setKycReviewModal(null)} disabled={Boolean(submittingAction)} className="rounded-xl border border-zinc-700 px-4 py-2.5 text-xs font-bold text-zinc-200 transition hover:bg-zinc-800 disabled:opacity-50">Cancelar</button><button type="button" onClick={handleReviewKyc} disabled={submittingAction === "kyc-review"} className="rounded-xl bg-[#e8b923] px-4 py-2.5 text-xs font-extrabold text-black transition hover:bg-amber-400 disabled:cursor-wait disabled:opacity-60">{submittingAction === "kyc-review" ? "Registrando…" : "Registrar decisão"}</button></div>
           </section>
         </div>
       )}
