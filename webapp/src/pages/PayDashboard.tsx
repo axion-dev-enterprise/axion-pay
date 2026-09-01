@@ -777,6 +777,20 @@ export default function PayDashboard() {
                 <p className="text-xs text-zinc-400 mt-0.5">Parâmetros de conexão do gateway industrial</p>
               </div>
 
+              <div className={`rounded-2xl border p-5 ${integrations?.paymentsEnabled ? "border-emerald-500/30 bg-emerald-500/10" : "border-amber-500/30 bg-amber-500/10"}`}>
+                <div className="flex items-start gap-3">
+                  {integrations?.paymentsEnabled ? <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" /> : <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />}
+                  <div>
+                    <p className="text-sm font-bold text-white">{integrations?.paymentsEnabled ? "PIX operacional" : "PIX aguardando ativação"}</p>
+                    <p className="mt-1 text-xs leading-5 text-zinc-300">
+                      {integrations?.paymentsEnabled
+                        ? `Provedor ${String(integrations.provider || "Woovi")} ativo. As cobranças podem ser criadas pela API autenticada.`
+                        : "As rotas estão documentadas, mas a criação de cobranças retorna 503 até a configuração segura da credencial Woovi."}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="p-6 rounded-2xl bg-[#09090d] border border-zinc-800/80 space-y-4">
                   <div className="flex items-center gap-3">
