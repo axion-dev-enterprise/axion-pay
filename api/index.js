@@ -41,10 +41,16 @@ function stripeRequest(method, endpoint, bodyParams = null) {
 }
 
 async function parseBody(req) {
-  if (req.body && typeof req.body === 'object') return req.body;
-  if (req.body && typeof req.body === 'string') {
-    try { return JSON.parse(req.body); } catch(e) { return {}; }
+  if (req.body) {
+    if (typeof req.body === 'object' && !Buffer.isBuffer(req.body)) return req.body;
+    if (typeof req.body === 'string') {
+      try { return JSON.parse(req.body); } catch(e) { return {}; }
+    }
+    if (Buffer.isBuffer(req.body)) {
+      try { return JSON.parse(req.body.toString('utf-8')); } catch(e) { return {}; }
+    }
   }
+
   return new Promise((resolve) => {
     let raw = '';
     req.on('data', chunk => raw += chunk);
@@ -55,6 +61,14 @@ async function parseBody(req) {
         resolve({});
       }
     });
+    // Fallback timeout se o stream já tiver sido encerrado pela Vercel
+    setTimeout(() => {
+      try {
+        resolve(raw ? JSON.parse(raw) : {});
+      } catch (e) {
+        resolve({});
+      }
+    }, 200);
   });
 }
 
