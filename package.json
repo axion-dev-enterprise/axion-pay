@@ -6,9 +6,9 @@
   "main": "src/index.js",
   "scripts": {
     "start:frontend": "vite --config vite.config.js",
-    "start:backend": "node src/index.js",
-    "start": "concurrently \"npm run start:frontend\" \"npm run start:backend\"",
-    "dev": "npm run start",
+    "start:backend": "node -e \"console.error('O backend legado foi desativado. Use https://api.axionenterprise.cloud.'); process.exit(1)\"",
+    "start": "npm run start:frontend",
+    "dev": "npm run start:frontend",
     "dev:frontend": "npm run start:frontend",
     "dev:backend": "npm run start:backend",
     "gen:assets": "node scripts/generate-webapp-public-assets.cjs",
