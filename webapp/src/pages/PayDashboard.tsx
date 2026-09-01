@@ -66,9 +66,14 @@ function getToken(): string | null {
   return null;
 }
 
-function clearAuth() {
+async function clearAuth() {
   sessionStorage.removeItem("axion_token");
   localStorage.removeItem("axion_token");
+  try {
+    await fetch(`${AUTH_API}/api/auth/logout`, { method: "POST", credentials: "include" });
+  } catch {
+    // A remoção local evita reutilizar token legado mesmo se o Auth estiver indisponível.
+  }
 }
 
 async function apiFetch(path: string, options: RequestInit = {}) {
@@ -83,6 +88,7 @@ async function apiFetch(path: string, options: RequestInit = {}) {
     const res = await fetch(`${API_BASE}${path}`, {
       ...options,
       headers: { ...headers, ...((options.headers as Record<string, string>) || {}) },
+      credentials: "include",
     });
     const data = await res.json().catch(() => null);
     if (!res.ok) {
@@ -96,13 +102,10 @@ async function apiFetch(path: string, options: RequestInit = {}) {
 
 async function checkAuth() {
   const token = getToken();
-  if (!token) return null;
-  const headers: Record<string, string> = {
-    Authorization: `Bearer ${token}`,
-    Accept: "application/json",
-  };
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
   try {
-    const res = await fetch(`${AUTH_API}/api/auth/me`, { headers });
+    const res = await fetch(`${AUTH_API}/api/auth/me`, { headers, credentials: "include" });
     const data = await res.json().catch(() => null);
     return res.ok && data?.authenticated ? data.user : null;
   } catch {
@@ -429,8 +432,8 @@ export default function PayDashboard() {
               </div>
             )}
             <button
-              onClick={() => {
-                clearAuth();
+              onClick={async () => {
+                await clearAuth();
                 window.location.reload();
               }}
               title="Sair"
