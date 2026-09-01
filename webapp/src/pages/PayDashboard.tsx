@@ -32,58 +32,24 @@ import {
   X,
   Building,
   FileCheck2,
-  Sparkles,
   QrCode,
+  CreditCard,
 } from "lucide-react";
 
 const AUTH_API = "https://auth.axionenterprise.cloud";
 const API_BASE = "https://api.axionenterprise.cloud";
 
-function getToken(): string | null {
-  const params = new URLSearchParams(window.location.search);
-  const urlToken = params.get("token");
-  if (urlToken) {
-    sessionStorage.setItem("axion_token", urlToken);
-    localStorage.removeItem("axion_token");
-    params.delete("token");
-    const newUrl =
-      window.location.pathname +
-      (params.toString() ? "?" + params.toString() : "") +
-      window.location.hash;
-    window.history.replaceState({}, "", newUrl);
-    return urlToken;
-  }
-
-  const stored = sessionStorage.getItem("axion_token");
-  if (stored) return stored;
-
-  // Migra uma sessão antiga sem prolongá-la além da aba atual.
-  const legacyToken = localStorage.getItem("axion_token");
-  if (legacyToken) {
-    sessionStorage.setItem("axion_token", legacyToken);
-    localStorage.removeItem("axion_token");
-    return legacyToken;
-  }
-  return null;
-}
-
 async function clearAuth() {
-  sessionStorage.removeItem("axion_token");
-  localStorage.removeItem("axion_token");
   try {
     await fetch(`${AUTH_API}/api/auth/logout`, { method: "POST", credentials: "include" });
-  } catch {
-    // A remoção local evita reutilizar token legado mesmo se o Auth estiver indisponível.
-  }
+  } catch { /* A sessão é HttpOnly; nenhuma cópia local é mantida pelo portal. */ }
 }
 
 async function apiFetch(path: string, options: RequestInit = {}) {
-  const token = getToken();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     Accept: "application/json",
   };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
 
   try {
     const res = await fetch(`${API_BASE}${path}`, {
@@ -102,29 +68,17 @@ async function apiFetch(path: string, options: RequestInit = {}) {
 }
 
 async function checkAuth() {
-  const token = getToken();
-  const headers: Record<string, string> = { Accept: "application/json" };
-  if (token) headers.Authorization = `Bearer ${token}`;
-
   // The Core is the authorization boundary for this dashboard. Validating the
   // shared HttpOnly session here proves that the cookie reached the API and
   // that the API could validate it against Auth before any dashboard request.
   try {
-    const res = await fetch(`${API_BASE}/v1/dashboard/me`, { headers, credentials: "include" });
+    const res = await fetch(`${API_BASE}/v1/dashboard/me`, { headers: { Accept: "application/json" }, credentials: "include" });
     const data = await res.json().catch(() => null);
     if (res.ok && data?.user) return data.user;
   } catch {
-    // A direct Auth check below keeps the login screen usable during a
-    // transient Core restart, without storing or exposing a bearer token.
+    // Falha fechada: sem confirmação pela Core, o painel não é liberado.
   }
-
-  try {
-    const res = await fetch(`${AUTH_API}/api/auth/me`, { headers, credentials: "include" });
-    const data = await res.json().catch(() => null);
-    return res.ok && data?.authenticated ? data.user : null;
-  } catch {
-    return null;
-  }
+  return null;
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -235,6 +189,7 @@ export default function PayDashboard() {
   const [apiKeys, setApiKeys] = useState<Array<any>>([]);
   const [transactions, setTransactions] = useState<Array<any>>([]);
   const [integrations, setIntegrations] = useState<any>(null);
+  const [billing, setBilling] = useState<any>(null);
   const [onboarding, setOnboarding] = useState<any>(null);
   const [onboardingForm, setOnboardingForm] = useState<OnboardingForm>(emptyOnboardingForm);
   const [canReviewKyc, setCanReviewKyc] = useState(false);
@@ -310,7 +265,7 @@ export default function PayDashboard() {
     setLoadingData(true);
     setErrorMessage(null);
     try {
-      const [ovRes, mRes, kRes, txRes, intRes, stRes, onboardingRes] = await Promise.all([
+      const [ovRes, mRes, kRes, txRes, intRes, stRes, onboardingRes, billingRes] = await Promise.all([
         apiFetch("/v1/dashboard/overview"),
         apiFetch("/v1/dashboard/merchants"),
         apiFetch("/v1/dashboard/api-keys"),
@@ -318,6 +273,7 @@ export default function PayDashboard() {
         apiFetch("/v1/dashboard/integrations"),
         apiFetch("/v1/dashboard/settings"),
         apiFetch("/v1/dashboard/onboarding"),
+        apiFetch("/v1/dashboard/billing"),
       ]);
 
       if (ovRes && !ovRes.error) setOverview(ovRes);
@@ -335,6 +291,7 @@ export default function PayDashboard() {
           if (reviewRes?.applications) setKycApplications(reviewRes.applications);
         }
       }
+      if (billingRes && !billingRes.error) setBilling(billingRes.billing);
     } catch (err: any) {
       setErrorMessage("Erro ao carregar dados do dashboard.");
     } finally {
@@ -517,6 +474,34 @@ export default function PayDashboard() {
     }
   };
 
+  const handleBillingCheckout = async () => {
+    setSubmittingAction("billing-checkout");
+    try {
+      const res = await apiFetch("/v1/dashboard/billing/checkout", { method: "POST" });
+      if (res?.checkoutUrl) {
+        window.location.assign(res.checkoutUrl);
+        return;
+      }
+      notify("error", res?.error || "Não foi possível iniciar o checkout seguro.");
+    } finally {
+      setSubmittingAction(null);
+    }
+  };
+
+  const handleBillingPortal = async () => {
+    setSubmittingAction("billing-portal");
+    try {
+      const res = await apiFetch("/v1/dashboard/billing/portal", { method: "POST" });
+      if (res?.portalUrl) {
+        window.location.assign(res.portalUrl);
+        return;
+      }
+      notify("error", res?.error || "Não foi possível abrir a gestão da assinatura.");
+    } finally {
+      setSubmittingAction(null);
+    }
+  };
+
   // Se carregando autenticação
   if (authLoading) {
     return (
@@ -563,6 +548,7 @@ export default function PayDashboard() {
     { id: "transactions", label: "Transações", icon: Wallet },
     { id: "onboarding", label: "Cadastro & KYC", icon: FileCheck2 },
     ...(canReviewKyc ? [{ id: "kyc-review", label: "Análise KYC", icon: Shield }] : []),
+    { id: "billing", label: "Plano & Cobrança", icon: CreditCard },
     { id: "integrations", label: "Integrações", icon: Globe },
     { id: "settings", label: "Configurações", icon: Settings },
   ];
@@ -1123,7 +1109,37 @@ export default function PayDashboard() {
             </div>
           )}
 
-          {/* TAB 6: INTEGRAÇÕES */}
+          {/* TAB 6: PLANO E COBRANÇA */}
+          {activeSection === "billing" && (
+            <div className="space-y-6 animate-fadeIn">
+              <div>
+                <h1 className="text-xl font-bold text-white tracking-tight">Plano & cobrança</h1>
+                <p className="mt-0.5 text-xs text-zinc-400">A assinatura é concluída na página hospedada pela Stripe. O portal não recebe dados do cartão.</p>
+              </div>
+              <div className="rounded-3xl border border-zinc-800/80 bg-[#09090d] p-6 shadow-xl">
+                <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex items-start gap-3">
+                    <div className="rounded-xl border border-[#e8b923]/30 bg-[#e8b923]/10 p-2.5"><CreditCard className="h-5 w-5 text-[#e8b923]" aria-hidden="true" /></div>
+                    <div>
+                      <p className="text-sm font-bold text-white">Assinatura do gateway</p>
+                      <p className="mt-1 max-w-xl text-xs leading-5 text-zinc-400">Checkout, cobrança recorrente, cancelamento e atualização de pagamento são processados pela Stripe com confirmação por webhook assinado.</p>
+                    </div>
+                  </div>
+                  <StatusBadge status={billing?.subscription_status || "NOT_SUBSCRIBED"} />
+                </div>
+                <div className="mt-6 grid gap-3 border-t border-zinc-800 pt-5 sm:grid-cols-2">
+                  <div><p className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">Plano</p><p className="mt-1 text-sm text-zinc-200">{billing?.price_id || "Nenhum plano ativo"}</p></div>
+                  <div><p className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">Próximo ciclo</p><p className="mt-1 text-sm text-zinc-200">{billing?.current_period_end ? new Date(billing.current_period_end).toLocaleDateString("pt-BR") : "—"}</p></div>
+                </div>
+                <div className="mt-6 flex flex-wrap gap-3">
+                  <button type="button" onClick={handleBillingCheckout} disabled={submittingAction === "billing-checkout"} className="inline-flex min-w-44 items-center justify-center gap-2 rounded-xl bg-[#e8b923] px-4 py-2.5 text-xs font-extrabold uppercase tracking-wider text-black transition hover:bg-amber-400 disabled:cursor-wait disabled:opacity-60"><CreditCard className="h-4 w-4" aria-hidden="true" />{submittingAction === "billing-checkout" ? "Abrindo checkout…" : "Assinar plano"}</button>
+                  <button type="button" onClick={handleBillingPortal} disabled={submittingAction === "billing-portal"} className="inline-flex min-w-44 items-center justify-center gap-2 rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-2.5 text-xs font-bold text-zinc-200 transition hover:bg-zinc-800 disabled:cursor-wait disabled:opacity-60"><Settings className="h-4 w-4" aria-hidden="true" />{submittingAction === "billing-portal" ? "Abrindo portal…" : "Gerenciar assinatura"}</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 7: INTEGRAÇÕES */}
           {activeSection === "integrations" && (
             <div className="space-y-6 animate-fadeIn">
               <div>
