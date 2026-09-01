@@ -30,7 +30,6 @@ import {
   Globe,
   Lock,
   X,
-  CreditCard,
   Building,
   Sparkles,
   QrCode,
@@ -462,11 +461,11 @@ export default function PayDashboard() {
               <span className="hidden sm:inline">Sincronizar</span>
             </button>
             <a
-              href="/checkout"
+              href="/"
               className="px-3.5 py-1.5 rounded-lg bg-[#e8b923]/10 border border-[#e8b923]/30 text-[#e8b923] hover:bg-[#e8b923]/20 text-xs font-bold flex items-center gap-1.5 transition-all"
             >
-              <CreditCard className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Portal Checkout</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Portal da API</span>
             </a>
           </div>
         </header>
