@@ -59,7 +59,7 @@ async function apiFetch(path: string, options: RequestInit = {}) {
     });
     const data = await res.json().catch(() => null);
     if (!res.ok) {
-      return { error: data?.error || data?.message || `HTTP ${res.status}` };
+      return { error: data?.error?.message || data?.error || data?.message || `HTTP ${res.status}`, traceId: data?.error?.traceId };
     }
     return data || { error: "Resposta vazia do servidor" };
   } catch (err: any) {
