@@ -19,7 +19,7 @@
     "typecheck": "tsc --noEmit",
     "build": "npm run typecheck && npm run web:build",
     "start:prod": "node -e \"console.error('O backend legado foi desativado. Publique a API em https://api.axionenterprise.cloud.'); process.exit(1)\"",
-    "test": "node -e \"console.error('Os testes do backend legado foram removidos. Use a suíte do axion-pay-core.'); process.exit(1)\"",
+    "test": "npm run test:web",
     "test:web": "vitest run --passWithNoTests",
     "test:payments": "node -e \"console.error('Os testes de pagamentos legados foram removidos. Use o axion-pay-core.'); process.exit(1)\"",
     "smoke-test": "node -e \"console.error('O smoke test legado foi removido. Consulte https://api.axionenterprise.cloud/health.'); process.exit(1)\""
