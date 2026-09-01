@@ -1,16 +1,8 @@
-import { app } from "../src/app.js";
-import { ensureAdminUser } from "../src/services/adminUserService.js";
+const PAY_API = "https://api.axionenterprise.cloud";
 
-try {
-  ensureAdminUser();
-} catch (err) {
-  console.error("Failed to ensure admin user on Vercel initialization:", err);
-}
-
-export default async function handler(req, res) {
-  const originalUrl = req.headers["x-matched-path"] || req.headers["x-invoke-path"];
-  if (originalUrl) {
-    req.url = originalUrl;
-  }
-  return app(req, res);
+export default function handler(_req, res) {
+  res.status(410).json({
+    error: "A API legada do frontend foi desativada. Use a API AXION Pay autenticada.",
+    api: PAY_API,
+  });
 }
