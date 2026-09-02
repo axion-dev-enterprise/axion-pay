@@ -46,20 +46,26 @@ async function clearAuth() {
 }
 
 async function apiFetch(path: string, options: RequestInit = {}) {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    Accept: "application/json",
-  };
+  const headers = new Headers(options.headers);
+  if (!headers.has("Accept")) headers.set("Accept", "application/json");
+
+  // A request without a payload must not advertise a JSON body. Besides being
+  // semantically incorrect for GET and action-only POST endpoints, some API
+  // gateways reject this combination before the request reaches the handler.
+  const hasBody = options.body !== undefined && options.body !== null && options.body !== "";
+  if (hasBody && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
 
   try {
     const res = await fetch(`${API_BASE}${path}`, {
       ...options,
-      headers: { ...headers, ...((options.headers as Record<string, string>) || {}) },
+      headers,
       credentials: "include",
     });
     const data = await res.json().catch(() => null);
     if (!res.ok) {
-      return { error: data?.error || data?.message || `HTTP ${res.status}` };
+      return { error: data?.error?.message || data?.error || data?.message || `HTTP ${res.status}`, traceId: data?.error?.traceId };
     }
     return data || { error: "Resposta vazia do servidor" };
   } catch (err: any) {

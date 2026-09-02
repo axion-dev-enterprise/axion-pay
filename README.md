@@ -39,14 +39,14 @@ npm run test:web --if-present
 
 1. Develop and validate in `D:\WORKSPACE\SANDBOX`.
 2. Run the frontend build and typecheck.
-3. Publish the portal through Vercel.
+3. Publish the portal through the canonical Vercel project.
 4. Validate `/`, `/dashboard`, and `https://api.axionenterprise.cloud/health`.
 
 ## Runtime boundaries
 
 - This repository does not create charges or expose a payment backend.
 - All merchants, API keys, transactions, and payment-provider calls are handled by `axion-pay-core`.
-- The former Express checkout/backend was removed to prevent mocked or duplicate payment paths from being executed.
+- The former Express checkout/backend, its Vercel rewrites, and its static bundle were removed to prevent mocked, duplicate, or credential-bearing payment paths from being executed. The only payment API is `https://api.axionenterprise.cloud`.
 
 ## Source of truth
 

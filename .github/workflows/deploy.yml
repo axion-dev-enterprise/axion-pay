@@ -19,8 +19,8 @@ jobs:
         run: npm ci || npm install
       - name: Typecheck & Build
         run: |
-          npm run typecheck || true
-          npm run build || true
+          npm run typecheck
+          npm run build
 
   deploy-vercel:
     needs: build-and-test
