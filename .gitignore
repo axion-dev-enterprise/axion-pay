@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.env
+.nubank-profile/
+certs/*.pem
+certs/*.key
+*.log
