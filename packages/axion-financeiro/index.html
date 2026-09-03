@@ -1,0 +1,1453 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AXION Financeiro — Painel Executivo Master</title>
+  <meta name="description" content="Painel financeiro executivo corporativo AXION. Gestão consolidada das verticais Hot (Sensix), Black (OVERLORD) e White (AXION FLOW)."/>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2338bdf8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6'/%3E%3C/svg%3E"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg-base: #09090b;
+      --bg-surface-1: #111116;
+      --bg-surface-2: #16161d;
+      --bg-surface-3: #1f1f28;
+      --bg-modal: #13131a;
+      --border-subtle: rgba(255, 255, 255, 0.07);
+      --border-hover: rgba(255, 255, 255, 0.15);
+      --border-active: rgba(56, 189, 248, 0.4);
+      --accent: #38bdf8;
+      --accent-glow: rgba(56, 189, 248, 0.2);
+      --emerald: #10b981;
+      --emerald-glow: rgba(16, 185, 129, 0.2);
+      --amber: #f59e0b;
+      --rose: #f43f5e;
+      --purple: #a855f7;
+      --hot-orange: #f97316;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --font-main: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      --ease-canonical: cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    html, body {
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      font-family: var(--font-main);
+      min-height: 100vh;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Scroller Universal Fino */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: var(--bg-base); }
+    ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.22); }
+
+    .tabular { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+    /* SVG Icon Helpers */
+    .icon {
+      display: inline-block;
+      vertical-align: middle;
+      stroke-width: 1.75;
+      stroke: currentColor;
+      fill: none;
+      flex-shrink: 0;
+    }
+
+    /* Auth PIN Modal */
+    #auth-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(5, 5, 8, 0.96);
+      backdrop-filter: blur(20px);
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      transition: opacity 0.2s var(--ease-canonical);
+    }
+    #auth-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+      display: none;
+    }
+
+    .auth-card {
+      width: 100%;
+      max-width: 360px;
+      background: var(--bg-surface-1);
+      border: 1px solid var(--border-subtle);
+      border-radius: 20px;
+      padding: 28px 24px;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.8), 0 0 30px rgba(56, 189, 248, 0.06);
+      text-align: center;
+      animation: slideUpFade 0.25s var(--ease-canonical);
+    }
+
+    @keyframes slideUpFade {
+      from { opacity: 0; transform: translateY(12px) scale(0.97); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .pin-display {
+      display: flex;
+      justify-content: center;
+      gap: 14px;
+      margin: 20px 0 16px;
+    }
+
+    .pin-dot {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 2px solid var(--border-hover);
+      background: transparent;
+      transition: all 0.15s var(--ease-canonical);
+    }
+    .pin-dot.filled {
+      background: var(--accent);
+      border-color: var(--accent);
+      box-shadow: 0 0 12px var(--accent-glow);
+      transform: scale(1.1);
+    }
+    .pin-dot.error {
+      background: var(--rose);
+      border-color: var(--rose);
+      box-shadow: 0 0 12px rgba(244, 63, 94, 0.4);
+    }
+
+    .pin-pad {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .pin-btn {
+      background: var(--bg-surface-2);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-main);
+      font-size: 18px;
+      font-weight: 600;
+      padding: 14px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.12s var(--ease-canonical);
+      user-select: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .pin-btn:hover {
+      background: var(--bg-surface-3);
+      border-color: var(--border-hover);
+      transform: translateY(-1px);
+    }
+    .pin-btn:active {
+      transform: scale(0.96);
+      background: var(--accent);
+      color: #000;
+    }
+
+    /* Topbar Compacta */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(9, 9, 11, 0.9);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .brand-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 15px;
+      letter-spacing: -0.02em;
+    }
+
+    .badge-live {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      color: var(--emerald);
+      font-size: 10.5px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .badge-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--emerald);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .control-btn {
+      background: var(--bg-surface-1);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      padding: 6px 11px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.12s var(--ease-canonical);
+    }
+    .control-btn:hover {
+      background: var(--bg-surface-2);
+      border-color: var(--border-hover);
+      color: var(--text-main);
+    }
+    .control-btn.active {
+      background: rgba(56, 189, 248, 0.12);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Container Principal */
+    main {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 20px;
+      width: 100%;
+    }
+
+    /* Tabs Bar Redesenhada (Sleek & Sem Overflow) */
+    .tabs-nav {
+      display: flex;
+      gap: 4px;
+      background: var(--bg-surface-1);
+      border: 1px solid var(--border-subtle);
+      padding: 4px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .tabs-nav::-webkit-scrollbar { display: none; }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 7px 13px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.12s var(--ease-canonical);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .tab-btn:hover {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.03);
+    }
+    .tab-btn.active {
+      background: var(--bg-surface-3);
+      color: var(--text-main);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    }
+
+    /* Tab Panes */
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; animation: fadeIn 0.18s var(--ease-canonical); }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Grids & Cards Otimizados (Menor densidade visual) */
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .card {
+      background: var(--bg-surface-1);
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      padding: 18px;
+      position: relative;
+      transition: all 0.15s var(--ease-canonical);
+    }
+    .card:hover {
+      border-color: var(--border-hover);
+      transform: translateY(-1px);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .card-title {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .card-value {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 4px;
+    }
+    .card-subtext {
+      font-size: 11.5px;
+      color: var(--text-dim);
+    }
+
+    /* Vertical Cards Minimalistas */
+    .vertical-hero-card {
+      background: var(--bg-surface-1);
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      padding: 18px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 180px;
+      transition: all 0.15s var(--ease-canonical);
+    }
+    .vertical-hero-card:hover {
+      border-color: var(--border-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    }
+
+    /* Botão de Ação nos Cards */
+    .action-link-btn {
+      background: var(--bg-surface-2);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-main);
+      padding: 6px 12px;
+      border-radius: 7px;
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      margin-top: 12px;
+      transition: all 0.12s var(--ease-canonical);
+      width: fit-content;
+    }
+    .action-link-btn:hover {
+      background: var(--bg-surface-3);
+      border-color: var(--border-hover);
+      color: var(--accent);
+    }
+
+    /* Modais Dark 3D Customizados */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(4, 4, 7, 0.85);
+      backdrop-filter: blur(14px);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      animation: fadeIn 0.15s var(--ease-canonical);
+    }
+    .modal-backdrop.active {
+      display: flex;
+    }
+
+    .modal-dialog {
+      width: 100%;
+      max-width: 760px;
+      max-height: 85vh;
+      background: var(--bg-modal);
+      border: 1px solid var(--border-hover);
+      border-radius: 18px;
+      box-shadow: 0 30px 80px rgba(0,0,0,0.85);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      animation: slideUpFade 0.2s var(--ease-canonical);
+    }
+
+    .modal-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .modal-title {
+      font-size: 14px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .modal-close-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.12s;
+    }
+    .modal-close-btn:hover {
+      color: var(--rose);
+      background: rgba(244, 63, 94, 0.1);
+    }
+
+    .modal-body {
+      padding: 20px;
+      overflow-y: auto;
+      font-size: 13px;
+    }
+
+    /* Tabelas nos Modais */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+    th {
+      background: rgba(255, 255, 255, 0.02);
+      color: var(--text-muted);
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    td {
+      padding: 11px 14px;
+      font-size: 12px;
+      border-bottom: 1px solid var(--border-subtle);
+      color: var(--text-main);
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255, 255, 255, 0.02); }
+
+    /* Pill / Tags */
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 7px;
+      border-radius: 9999px;
+      font-size: 10.5px;
+      font-weight: 600;
+    }
+    .pill-emerald { background: rgba(16, 185, 129, 0.1); color: var(--emerald); border: 1px solid rgba(16, 185, 129, 0.2); }
+    .pill-sky { background: rgba(56, 189, 248, 0.1); color: var(--accent); border: 1px solid rgba(56, 189, 248, 0.2); }
+    .pill-purple { background: rgba(168, 85, 247, 0.1); color: var(--purple); border: 1px solid rgba(168, 85, 247, 0.2); }
+    .pill-rose { background: rgba(244, 63, 94, 0.1); color: var(--rose); border: 1px solid rgba(244, 63, 94, 0.2); }
+    .pill-hot { background: rgba(249, 115, 22, 0.1); color: var(--hot-orange); border: 1px solid rgba(249, 115, 22, 0.25); }
+
+    /* Toast */
+    #toast-container {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 10000;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .toast {
+      background: var(--bg-surface-2);
+      border: 1px solid var(--border-hover);
+      color: var(--text-main);
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 500;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      animation: slideInRight 0.2s var(--ease-canonical);
+    }
+    @keyframes slideInRight {
+      from { opacity: 0; transform: translateX(16px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Modal de Autenticação Admin (PIN 777) -->
+  <div id="auth-overlay">
+    <div class="auth-card">
+      <div style="width: 42px; height: 42px; margin: 0 auto 12px; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--accent);">
+        <svg class="icon" width="20" height="20" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </div>
+      <h2 style="font-size: 16px; font-weight: 700; margin-bottom: 4px;">Acesso Administrativo</h2>
+      <p style="font-size: 11.5px; color: var(--text-muted);">Digite o PIN Master (777) para desbloquear o painel.</p>
+      
+      <div class="pin-display">
+        <div class="pin-dot" id="dot-0"></div>
+        <div class="pin-dot" id="dot-1"></div>
+        <div class="pin-dot" id="dot-2"></div>
+      </div>
+
+      <div class="pin-pad">
+        <button class="pin-btn" onclick="enterPin('1')">1</button>
+        <button class="pin-btn" onclick="enterPin('2')">2</button>
+        <button class="pin-btn" onclick="enterPin('3')">3</button>
+        <button class="pin-btn" onclick="enterPin('4')">4</button>
+        <button class="pin-btn" onclick="enterPin('5')">5</button>
+        <button class="pin-btn" onclick="enterPin('6')">6</button>
+        <button class="pin-btn" onclick="enterPin('7')">7</button>
+        <button class="pin-btn" onclick="enterPin('8')">8</button>
+        <button class="pin-btn" onclick="enterPin('9')">9</button>
+        <button class="pin-btn" onclick="clearPin()" style="font-size: 12px; color: var(--rose);">LIMPAR</button>
+        <button class="pin-btn" onclick="enterPin('0')">0</button>
+        <button class="pin-btn" onclick="submitPin()" style="font-size: 12px; color: var(--emerald);">ENTRAR</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Topbar Minimalista -->
+  <header>
+    <div class="brand-title">
+      <svg class="icon" width="18" height="18" viewBox="0 0 24 24" style="color: var(--accent);"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      <span>AXION Financeiro</span>
+      <span class="badge-live" id="badge-mode-indicator"><span class="badge-dot"></span>Live Real</span>
+    </div>
+
+    <div class="topbar-actions">
+      <!-- Seletor de Modo Compacto -->
+      <select id="view-mode-selector" onchange="setViewMode(this.value)" class="control-btn" style="outline: none; font-weight: 600; color: var(--accent);">
+        <option value="live">🔴 Live Real (Pós-Limpeza)</option>
+        <option value="projection">🟢 Projeção Meta (R$ 278k)</option>
+      </select>
+
+      <!-- Moeda BRL/USD Compacta -->
+      <div style="display: flex; background: var(--bg-surface-1); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 2px;">
+        <button class="control-btn active" id="btn-currency-brl" onclick="setCurrency('BRL')" style="border: none; padding: 4px 8px; font-size: 11px;">BRL</button>
+        <button class="control-btn" id="btn-currency-usd" onclick="setCurrency('USD')" style="border: none; padding: 4px 8px; font-size: 11px;">USD</button>
+      </div>
+
+      <!-- Live Sync -->
+      <button class="control-btn" onclick="fetchLiveData(true)" title="Sincronizar">
+        <svg class="icon" width="13" height="13" viewBox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+      </button>
+
+      <!-- Exportar -->
+      <button class="control-btn" onclick="exportData()" title="Exportar JSON">
+        <svg class="icon" width="13" height="13" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+      </button>
+
+      <!-- Lock -->
+      <button class="control-btn" onclick="lockDashboard()" title="Trancar (PIN: 777)" style="color: var(--rose);">
+        <svg class="icon" width="13" height="13" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Container Principal -->
+  <main>
+    <!-- Navegação de Rotas SPA -->
+    <nav class="tabs-nav">
+      <button class="tab-btn active" data-route="overview" onclick="navigate('overview')">
+        <svg class="icon" width="14" height="14" viewBox="0 0 24 24"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+        Visão Geral
+      </button>
+      <button class="tab-btn" data-route="projections" onclick="navigate('projections')">
+        <svg class="icon" width="14" height="14" viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        Gastos & Equipe
+      </button>
+      <button class="tab-btn" data-route="hot" onclick="navigate('hot')">
+        <svg class="icon" width="14" height="14" viewBox="0 0 24 24" style="color: var(--hot-orange);"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        🔥 Hot (Sensix)
+      </button>
+      <button class="tab-btn" data-route="black" onclick="navigate('black')">
+        <svg class="icon" width="14" height="14" viewBox="0 0 24 24" style="color: var(--accent);"><polygon points="6 2 18 2 18 6 6 6 6 2"/><rect width="20" height="14" x="2" y="6" rx="2"/></svg>
+        🕶️ Black (OVERLORD)
+      </button>
+      <button class="tab-btn" data-route="white" onclick="navigate('white')">
+        <svg class="icon" width="14" height="14" viewBox="0 0 24 24" style="color: var(--emerald);"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        ⚪ White (AXION FLOW)
+      </button>
+      <button class="tab-btn" data-route="dre" onclick="navigate('dre')">
+        <svg class="icon" width="14" height="14" viewBox="0 0 24 24"><line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></svg>
+        DRE & Simulador
+      </button>
+    </nav>
+
+    <!-- ROTA 1: VISÃO GERAL -->
+    <section id="pane-overview" class="tab-pane active">
+      <!-- 4 Cards de Topo Compactos -->
+      <div class="grid-4">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Faturamento Bruto</span>
+            <span class="pill pill-emerald" id="badge-gross-mom">Live Real</span>
+          </div>
+          <div class="card-value tabular" style="color: var(--emerald);" id="kpi-gross-revenue">R$ 0,00</div>
+          <div class="card-subtext" id="kpi-gross-sub">3 Verticais Integradas</div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Custo Fixo Total</span>
+            <span class="pill pill-sky">7 Membros + Cloud</span>
+          </div>
+          <div class="card-value tabular" id="kpi-fixed-cost">R$ 5.226,52</div>
+          <div class="card-subtext">Folha: R$ 4.250 | Tech: R$ 976,52</div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Mídia (Meta Ads)</span>
+            <span class="pill pill-purple" id="kpi-scenario-pill">R$ 10k/mês</span>
+          </div>
+          <div class="card-value tabular" style="color: var(--purple);" id="kpi-meta-ads">R$ 10.000,00</div>
+          <div class="card-subtext">Orçamento parametrizado</div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Resultado Líquido</span>
+            <span class="pill pill-rose" id="kpi-margin-pill">Baseline</span>
+          </div>
+          <div class="card-value tabular" id="kpi-ebitda">- R$ 15.226,52</div>
+          <div class="card-subtext">EBITDA após deduções</div>
+        </div>
+      </div>
+
+      <!-- As 3 Verticais em Cards Limpos com Botão de Ação para Modal -->
+      <div class="grid-3">
+        <!-- Vertical Hot -->
+        <div class="vertical-hero-card" style="border-top: 3px solid var(--hot-orange);">
+          <div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span class="pill pill-hot">🔥 Operações Hot</span>
+              <span class="tabular font-bold" id="vertical-badge-hot">0.0%</span>
+            </div>
+            <div class="card-value tabular" style="color: var(--hot-orange); margin: 6px 0;" id="vertical-val-hot">R$ 0,00</div>
+            <p style="font-size: 11.5px; color: var(--text-muted);">Sensix Hot (VIP & PPV), Sensix Atacadão B2B e Sensix IT AI Studio.</p>
+          </div>
+          <button class="action-link-btn" onclick="openModal('modal-hot-details')">
+            Ver Detalhes Hot
+            <svg class="icon" width="12" height="12" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
+
+        <!-- Vertical Black -->
+        <div class="vertical-hero-card" style="border-top: 3px solid var(--accent);">
+          <div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span class="pill pill-sky">🕶️ Operações Black</span>
+              <span class="tabular font-bold" id="vertical-badge-black">0.0%</span>
+            </div>
+            <div class="card-value tabular" style="color: var(--accent); margin: 6px 0;" id="vertical-val-black">R$ 0,00</div>
+            <p style="font-size: 11.5px; color: var(--text-muted);">Pixel Master, CAPI Engine (SHA-256), Arbitragem e Funis Rápidos.</p>
+          </div>
+          <button class="action-link-btn" onclick="openModal('modal-black-details')">
+            Ver Módulos Black
+            <svg class="icon" width="12" height="12" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
+
+        <!-- Vertical White -->
+        <div class="vertical-hero-card" style="border-top: 3px solid var(--emerald);">
+          <div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span class="pill pill-emerald">⚪ Operações White</span>
+              <span class="tabular font-bold" id="vertical-badge-white">0.0%</span>
+            </div>
+            <div class="card-value tabular" style="color: var(--emerald); margin: 6px 0;" id="vertical-val-white">R$ 0,00</div>
+            <p style="font-size: 11.5px; color: var(--text-muted);">AXION Flow SaaS, AXION Pay Gateway transparente e Juliana AI.</p>
+          </div>
+          <button class="action-link-btn" onclick="openModal('modal-white-details')">
+            Ver Produtos White
+            <svg class="icon" width="12" height="12" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ROTA 2: GASTOS & EQUIPE -->
+    <section id="pane-projections" class="tab-pane">
+      <div class="grid-2">
+        <!-- Card Resumo Tech OPEX -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Infraestrutura & Tech OPEX</span>
+            <span class="pill pill-sky">R$ 976,52 / mês</span>
+          </div>
+          <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 14px; line-height: 1.5;">
+            4 VPSs Spaceship Debian 13 (Cluster Central, Edge, Satélites e Standalone) + AWS S3 + Cloudflare/Vercel + RunPod GPU + WhatsApp e Suíte IA.
+          </p>
+          <button class="action-link-btn" onclick="openModal('modal-tech-opex')">
+            Auditar Faturas de Infraestrutura
+            <svg class="icon" width="12" height="12" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
+
+        <!-- Card Resumo Equipe -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Equipe Operacional</span>
+            <span class="pill pill-emerald">7 Membros | R$ 4.250,00</span>
+          </div>
+          <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 14px; line-height: 1.5;">
+            Dev Sênior / Ops (R$ 1.000) + Yan Tráfego (R$ 1.000) + Luís Projetos (R$ 750) + Squad de 4 Devs Yash, Miguel, Michel e Yuri (R$ 1.500).
+          </p>
+          <button class="action-link-btn" onclick="openModal('modal-payroll')">
+            Ver Quadro de Integrantes
+            <svg class="icon" width="12" height="12" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ROTA 3: 🔥 OPERAÇÕES HOT -->
+    <section id="pane-hot" class="tab-pane">
+      <div class="grid-3">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Sensix Atacadão</span>
+            <span class="pill pill-emerald">B2B E-commerce</span>
+          </div>
+          <div class="card-value tabular" style="color: var(--emerald);" id="hot-atacadao-rev">R$ 0,00</div>
+          <div class="card-subtext">48 SKUs | 3.420 unidades em estoque</div>
+          <div style="margin-top: 12px; display: flex; gap: 8px;">
+            <button class="action-link-btn" onclick="openModal('modal-atacadao-catalog')">Ver Catálogo 48 SKUs</button>
+            <a href="https://sensixatacadao.com/admin" target="_blank" class="action-link-btn" style="text-decoration: none;">Admin Ext. ↗</a>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Sensix Hot</span>
+            <span class="pill pill-hot">VIP & PPV</span>
+          </div>
+          <div class="card-value tabular" style="color: var(--hot-orange);" id="hot-vip-rev">R$ 0,00</div>
+          <div class="card-subtext">7 Criadoras Reais | Nexus Pay Ativo</div>
+          <div style="margin-top: 12px; display: flex; gap: 8px;">
+            <button class="action-link-btn" onclick="openModal('modal-hot-creators')">Ver 7 Criadoras</button>
+            <a href="https://hot.axionenterprise.cloud/#/overview" target="_blank" class="action-link-btn" style="text-decoration: none;">Admin Ext. ↗</a>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Sensix IT (AI Studio)</span>
+            <span class="pill pill-purple">SaaS SDXL</span>
+          </div>
+          <div class="card-value tabular" style="color: var(--purple);" id="hot-it-rev">R$ 0,00</div>
+          <div class="card-subtext">CyberRealistic XL v6.0 FP16</div>
+          <div style="margin-top: 12px; display: flex; gap: 8px;">
+            <button class="action-link-btn" onclick="openModal('modal-it-plans')">Ver Planos SaaS</button>
+            <a href="https://sensix.it.com/admin" target="_blank" class="action-link-btn" style="text-decoration: none;">Admin Ext. ↗</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ROTA 4: 🕶️ OPERAÇÕES BLACK -->
+    <section id="pane-black" class="tab-pane">
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">OVERLORD Growth Engine</span>
+            <span class="pill pill-sky">CAPI v19.0</span>
+          </div>
+          <div class="card-value tabular" style="color: var(--accent);" id="black-gross-revenue">R$ 0,00</div>
+          <p style="font-size: 12px; color: var(--text-muted); margin: 8px 0 14px;">
+            Deduplicação de eventos Meta Ads com SHA-256 client/server, contingência multi-domínios em 4 nós Debian 13 e funis rápidos de conversão.
+          </p>
+          <button class="action-link-btn" onclick="openModal('modal-black-details')">Auditar Arquitetura Overlord</button>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Telemetria de Conversão</span>
+            <span class="pill pill-emerald">94.8% Match Rate</span>
+          </div>
+          <div style="padding: 10px 0;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 12.5px;">
+              <span style="color: var(--text-muted);">Eventos Rastreados:</span>
+              <span class="tabular font-bold">48.920 / ciclo</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 12.5px;">
+              <span style="color: var(--text-muted);">Taxa de Conversão Funil:</span>
+              <span class="tabular font-bold">14.6%</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 12.5px;">
+              <span style="color: var(--text-muted);">Uptime Nós de Contingência:</span>
+              <span class="tabular font-bold" style="color: var(--emerald);">99.98%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ROTA 5: ⚪ OPERAÇÕES WHITE -->
+    <section id="pane-white" class="tab-pane">
+      <div class="grid-3">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">AXION Flow</span>
+            <span class="pill pill-emerald">flow.axionenterprise.cloud</span>
+          </div>
+          <div class="card-value tabular" style="color: var(--emerald);" id="white-flow-rev">R$ 0,00</div>
+          <div class="card-subtext">SaaS Construtor de Funis Omnichannel</div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">AXION Pay</span>
+            <span class="pill pill-sky">pay.axionenterprise.cloud</span>
+          </div>
+          <div class="card-value tabular" style="color: var(--accent);" id="white-pay-rev">R$ 0,00</div>
+          <div class="card-subtext">Gateway de Pagamentos & Checkout PIX</div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Hermes Juliana AI</span>
+            <span class="pill pill-purple">juliana.axionenterprise.cloud</span>
+          </div>
+          <div class="card-value tabular" style="color: var(--purple);" id="white-juliana-rev">R$ 0,00</div>
+          <div class="card-subtext">AI Executive Assistant Corporativo B2B</div>
+        </div>
+      </div>
+      <div style="margin-top: 10px;">
+        <button class="action-link-btn" onclick="openModal('modal-white-details')">Ver Sub-unidades White em Detalhes</button>
+      </div>
+    </section>
+
+    <!-- ROTA 6: DRE & SIMULADOR -->
+    <section id="pane-dre" class="tab-pane">
+      <div class="grid-2">
+        <!-- DRE Resumido com Ação para Modal Completo -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">DRE Gerencial Mensal</span>
+            <button class="control-btn" onclick="openModal('modal-dre-full')" style="padding: 3px 8px; font-size: 11px;">Expandir DRE ↗</button>
+          </div>
+          <div style="padding: 4px 0;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 12.5px;">
+              <span>(+) Faturamento Bruto:</span>
+              <span class="tabular font-bold" style="color: var(--emerald);" id="dre-gross">R$ 0,00</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 12.5px;">
+              <span>(-) Custo Fixo (Time + Tech):</span>
+              <span class="tabular" style="color: var(--rose);">- R$ 5.226,52</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 12.5px;">
+              <span>(-) Mídia (Meta Ads):</span>
+              <span class="tabular" style="color: var(--rose);" id="dre-meta-ads">- R$ 10.000,00</span>
+            </div>
+            <div style="border-top: 1px solid var(--border-subtle); padding-top: 8px; margin-top: 8px; display: flex; justify-content: space-between; font-size: 13.5px;">
+              <span style="font-weight: 700;">(=) Resultado Líquido:</span>
+              <span class="tabular font-bold" id="dre-ebitda">- R$ 15.226,52</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Simulador Interativo -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Simulador de ROAS & Mídia</span>
+            <span class="pill pill-purple">Real-Time</span>
+          </div>
+          
+          <div style="margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px;">
+              <span style="color: var(--text-muted);">Investimento Meta Ads:</span>
+              <span class="tabular font-bold" style="color: var(--purple);" id="sim-meta-val">R$ 10.000</span>
+            </div>
+            <input type="range" id="sim-meta" min="1000" max="50000" step="500" value="10000" oninput="runSimulation()"/>
+          </div>
+
+          <div style="margin-bottom: 14px;">
+            <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px;">
+              <span style="color: var(--text-muted);">ROAS Esperado:</span>
+              <span class="tabular font-bold" style="color: var(--emerald);" id="sim-roas-val">3.5x</span>
+            </div>
+            <input type="range" id="sim-roas" min="1.0" max="8.0" step="0.1" value="3.5" oninput="runSimulation()"/>
+          </div>
+
+          <div style="background: var(--bg-surface-2); border-radius: 10px; padding: 12px; font-size: 12px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+              <span style="color: var(--text-muted);">Receita do Tráfego:</span>
+              <span class="tabular font-bold" id="sim-generated-rev">R$ 35.000,00</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span style="font-weight: 700;">Lucro Projetado:</span>
+              <span class="tabular font-bold" style="color: var(--accent);" id="sim-net-profit">R$ 19.773,48</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ==================== MODAIS 3D CUSTOMIZADOS ==================== -->
+
+  <!-- Modal 1: Tech OPEX & Faturas -->
+  <div id="modal-tech-opex" class="modal-backdrop" onclick="closeModalOnBackdrop(event, 'modal-tech-opex')">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title">
+          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" style="color: var(--accent);"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></svg>
+          Auditoria de Infraestrutura & Tech OPEX (R$ 976,52/mês)
+        </div>
+        <button class="modal-close-btn" onclick="closeModal('modal-tech-opex')">✕</button>
+      </div>
+      <div class="modal-body">
+        <table>
+          <thead>
+            <tr>
+              <th>Provedor / Instância</th>
+              <th>IP / Host / Especificação</th>
+              <th>Tarifa Real</th>
+              <th>Custo Mensal</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>Spaceship Compute (6tb9d)</strong></td><td><code>104.207.81.120</code> — 2 vCPUs / 4 GB</td><td>R$ 0,08/h</td><td class="tabular font-bold">R$ 57,60</td></tr>
+            <tr><td><strong>Spaceship Edge (jd769)</strong></td><td><code>104.207.90.167</code> — 1 vCPU / 2 GB</td><td>R$ 0,04/h</td><td class="tabular font-bold">R$ 28,80</td></tr>
+            <tr><td><strong>Spaceship Satélites (00ndn)</strong></td><td><code>159.198.39.227</code> — 1 vCPU / 2 GB</td><td>R$ 0,04/h</td><td class="tabular font-bold">R$ 28,80</td></tr>
+            <tr><td><strong>Spaceship Standalone (uxiip)</strong></td><td><code>104.207.90.113</code> — 1 vCPU / 2 GB</td><td>R$ 0,036/h</td><td class="tabular font-bold">R$ 25,92</td></tr>
+            <tr><td><strong>AWS Cloud Services</strong></td><td>S3, instâncias e dados gerenciados</td><td>Fatura</td><td class="tabular font-bold">R$ 200,00</td></tr>
+            <tr><td><strong>Cloudflare + Vercel</strong></td><td>Edge DNS, SSL Full Strict & Serverless</td><td>Assinatura</td><td class="tabular font-bold">R$ 100,00</td></tr>
+            <tr><td><strong>RunPod GPU Serverless</strong></td><td>Pods GPU SDXL ($16.48 medido / $22)</td><td>Consumo</td><td class="tabular font-bold">R$ 125,40</td></tr>
+            <tr><td><strong>Telefonia WhatsApp</strong></td><td>Chips e instâncias Baileys/WABA</td><td>Recorrente</td><td class="tabular font-bold">R$ 90,00</td></tr>
+            <tr><td><strong>Claude Code (Anthropic)</strong></td><td>Assinatura Claude Code / Pro</td><td>Recorrente</td><td class="tabular font-bold">R$ 120,00</td></tr>
+            <tr><td><strong>Codex AI & Docs</strong></td><td>Documentação e engenharia</td><td>Recorrente</td><td class="tabular font-bold">R$ 100,00</td></tr>
+            <tr><td><strong>Antigravity Platform</strong></td><td>Desenvolvimento autônomo de agentes</td><td>Recorrente</td><td class="tabular font-bold">R$ 100,00</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 2: Equipe Operacional -->
+  <div id="modal-payroll" class="modal-backdrop" onclick="closeModalOnBackdrop(event, 'modal-payroll')">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title">
+          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" style="color: var(--emerald);"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+          Quadro da Equipe Operacional (7 Membros — R$ 4.250,00/mês)
+        </div>
+        <button class="modal-close-btn" onclick="closeModal('modal-payroll')">✕</button>
+      </div>
+      <div class="modal-body">
+        <table>
+          <thead>
+            <tr>
+              <th>Integrante</th>
+              <th>Função</th>
+              <th>Squad</th>
+              <th>Honorários</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>Dev Sênior & Chefe de Ops</strong></td><td>Tech Lead & Liderança Técnica</td><td><span class="pill pill-purple">Core & Ops</span></td><td class="tabular font-bold">R$ 1.000,00</td></tr>
+            <tr><td><strong>Yan</strong></td><td>Gestor de Tráfego Pago Meta Ads</td><td><span class="pill pill-amber">Growth</span></td><td class="tabular font-bold">R$ 1.000,00</td></tr>
+            <tr><td><strong>Luís</strong></td><td>Líder de Projetos & Redes</td><td><span class="pill pill-sky">Projects</span></td><td class="tabular font-bold">R$ 750,00</td></tr>
+            <tr><td><strong>Yash</strong></td><td>Engenheiro de Software</td><td><span class="pill pill-emerald">Dev Squad</span></td><td class="tabular font-bold">R$ 375,00</td></tr>
+            <tr><td><strong>Miguel</strong></td><td>Engenheiro de Software</td><td><span class="pill pill-emerald">Dev Squad</span></td><td class="tabular font-bold">R$ 375,00</td></tr>
+            <tr><td><strong>Michel</strong></td><td>Engenheiro de Software</td><td><span class="pill pill-emerald">Dev Squad</span></td><td class="tabular font-bold">R$ 375,00</td></tr>
+            <tr><td><strong>Yuri</strong></td><td>Engenheiro de Software</td><td><span class="pill pill-emerald">Dev Squad</span></td><td class="tabular font-bold">R$ 375,00</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 3: Criadoras Sensix Hot -->
+  <div id="modal-hot-creators" class="modal-backdrop" onclick="closeModalOnBackdrop(event, 'modal-hot-creators')">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title">
+          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" style="color: var(--hot-orange);"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          As 7 Criadoras Reais (models_data.json)
+        </div>
+        <button class="modal-close-btn" onclick="closeModal('modal-hot-creators')">✕</button>
+      </div>
+      <div class="modal-body">
+        <table>
+          <thead>
+            <tr>
+              <th>Criadora</th>
+              <th>Handle</th>
+              <th>Plano Base</th>
+              <th>Seguidores</th>
+              <th>Posts</th>
+              <th>Tier</th>
+            </tr>
+          </thead>
+          <tbody id="hot-creators-modal-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 4: Catálogo Sensix Atacadão (48 SKUs) -->
+  <div id="modal-atacadao-catalog" class="modal-backdrop" onclick="closeModalOnBackdrop(event, 'modal-atacadao-catalog')">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title">
+          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" style="color: var(--emerald);"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+          Catálogo Sensix Atacadão (48 SKUs — 3.420 unidades)
+        </div>
+        <button class="modal-close-btn" onclick="closeModal('modal-atacadao-catalog')">✕</button>
+      </div>
+      <div class="modal-body">
+        <table>
+          <thead>
+            <tr>
+              <th>Produto</th>
+              <th>Categoria</th>
+              <th>Preço Atacado</th>
+              <th>Estoque</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>Sugador De Clitóris Formato Patinho Importação</strong></td><td>Vibradores & Acessórios</td><td class="tabular font-bold">R$ 57,00</td><td class="tabular">84 un.</td></tr>
+            <tr><td><strong>Gel Funcional Hot Ice E Vibra Xana Loka 15g</strong></td><td>Lubrificantes & Géis</td><td class="tabular font-bold">R$ 7,91</td><td class="tabular">161 un.</td></tr>
+            <tr><td><strong>Gel Funcional Anal Kuloko 15g Hot Flowers</strong></td><td>Lubrificantes & Géis</td><td class="tabular font-bold">R$ 7,91</td><td class="tabular">55 un.</td></tr>
+            <tr><td><strong>Excitante Goze + 15g Sexy Fantasy</strong></td><td>Lubrificantes & Géis</td><td class="tabular font-bold">R$ 9,28</td><td class="tabular">60 un.</td></tr>
+            <tr><td><strong>Gel Anestésico InDolor 15g Sexy Fantasy</strong></td><td>Lubrificantes & Géis</td><td class="tabular font-bold">R$ 8,26</td><td class="tabular">154 un.</td></tr>
+            <tr><td><strong>Lubrificante Beijável D4 60g Sexy Fantasy</strong></td><td>Lubrificantes & Géis</td><td class="tabular font-bold">R$ 9,99</td><td class="tabular">114 un.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 5: DRE Completo -->
+  <div id="modal-dre-full" class="modal-backdrop" onclick="closeModalOnBackdrop(event, 'modal-dre-full')">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title">
+          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" style="color: var(--accent);"><line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></svg>
+          DRE Contábil Linha a Linha Consolidado
+        </div>
+        <button class="modal-close-btn" onclick="closeModal('modal-dre-full')">✕</button>
+      </div>
+      <div class="modal-body">
+        <table>
+          <tbody>
+            <tr style="background: rgba(16, 185, 129, 0.05);"><td><strong>(+) FATURAMENTO BRUTO TOTAL</strong></td><td class="tabular font-bold text-right" style="color: var(--emerald);" id="modal-dre-gross">R$ 0,00</td></tr>
+            <tr><td>(-) Taxas de Gateway & Impostos (~8%)</td><td class="tabular text-right" style="color: var(--rose);" id="modal-dre-taxes">- R$ 0,00</td></tr>
+            <tr style="background: rgba(255, 255, 255, 0.02);"><td><strong>(=) RECEITA LÍQUIDA OPERACIONAL</strong></td><td class="tabular font-bold text-right" id="modal-dre-net-rev">R$ 0,00</td></tr>
+            <tr><td>(-) Tech OPEX Fixo (4 VPSs, AWS, GPU, Vercel, IA)</td><td class="tabular text-right" style="color: var(--rose);">- R$ 976,52</td></tr>
+            <tr><td>(-) Folha da Equipe (7 Membros)</td><td class="tabular text-right" style="color: var(--rose);">- R$ 4.250,00</td></tr>
+            <tr><td>(-) Investimento em Mídia (Meta Ads)</td><td class="tabular text-right" style="color: var(--rose);" id="modal-dre-meta">- R$ 10.000,00</td></tr>
+            <tr style="background: rgba(56, 189, 248, 0.08);"><td><strong>(=) EBITDA OPERACIONAL LÍQUIDO</strong></td><td class="tabular font-bold text-right" style="color: var(--accent);" id="modal-dre-ebitda">- R$ 15.226,52</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Container de Toasts -->
+  <div id="toast-container"></div>
+
+  <script>
+    // Estado Global da Aplicação SPA
+    let currentRoute = 'overview';
+    let currentMode = 'live'; // 'live' ou 'projection'
+    let currentCurrency = 'BRL';
+    let usdRate = 5.70;
+    let currentMetaBudget = 10000;
+    let enteredPin = '';
+
+    // Cache de Dados
+    let overviewData = null;
+    let hotData = null;
+    let blackData = null;
+    let whiteData = null;
+
+    // Roteamento SPA por Hash
+    function initRouter() {
+      const hash = window.location.hash.replace('#/', '').replace('#', '');
+      if (['overview', 'projections', 'hot', 'black', 'white', 'dre'].includes(hash)) {
+        navigate(hash, false);
+      } else {
+        navigate('overview', false);
+      }
+
+      window.addEventListener('hashchange', () => {
+        const route = window.location.hash.replace('#/', '').replace('#', '');
+        if (route && route !== currentRoute) {
+          navigate(route, false);
+        }
+      });
+    }
+
+    function navigate(route, updateHash = true) {
+      currentRoute = route;
+      if (updateHash) {
+        window.location.hash = `#/${route}`;
+      }
+
+      // Atualiza botões
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-route') === route);
+      });
+
+      // Atualiza panes
+      document.querySelectorAll('.tab-pane').forEach(pane => {
+        pane.classList.toggle('active', pane.id === `pane-${route}`);
+      });
+    }
+
+    // Modal Helpers
+    function openModal(id) {
+      const m = document.getElementById(id);
+      if (m) m.classList.add('active');
+    }
+
+    function closeModal(id) {
+      const m = document.getElementById(id);
+      if (m) m.classList.remove('active');
+    }
+
+    function closeModalOnBackdrop(e, id) {
+      if (e.target.id === id) {
+        closeModal(id);
+      }
+    }
+
+    // Suporte ESC para fechar modais
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        document.querySelectorAll('.modal-backdrop.active').forEach(m => m.classList.remove('active'));
+      }
+    });
+
+    // Autenticação PIN
+    function updatePinDisplay() {
+      for (let i = 0; i < 3; i++) {
+        const dot = document.getElementById(`dot-${i}`);
+        if (dot) dot.className = 'pin-dot' + (i < enteredPin.length ? ' filled' : '');
+      }
+    }
+
+    function enterPin(digit) {
+      if (enteredPin.length < 3) {
+        enteredPin += digit;
+        updatePinDisplay();
+        if (enteredPin.length === 3) setTimeout(submitPin, 140);
+      }
+    }
+
+    function clearPin() {
+      enteredPin = '';
+      updatePinDisplay();
+    }
+
+    function submitPin() {
+      if (enteredPin === '777') {
+        sessionStorage.setItem('axion_fin_auth', 'true');
+        document.getElementById('auth-overlay').classList.add('hidden');
+        showToast('Acesso master concedido!', 'success');
+        fetchLiveData(false);
+      } else {
+        for (let i = 0; i < 3; i++) {
+          const dot = document.getElementById(`dot-${i}`);
+          if (dot) dot.classList.add('error');
+        }
+        showToast('PIN incorreto.', 'error');
+        setTimeout(clearPin, 500);
+      }
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (!sessionStorage.getItem('axion_fin_auth')) {
+        if (e.key >= '0' && e.key <= '9') enterPin(e.key);
+        else if (e.key === 'Backspace') { enteredPin = enteredPin.slice(0, -1); updatePinDisplay(); }
+        else if (e.key === 'Enter') submitPin();
+      }
+    });
+
+    function lockDashboard() {
+      sessionStorage.removeItem('axion_fin_auth');
+      enteredPin = '';
+      updatePinDisplay();
+      document.getElementById('auth-overlay').classList.remove('hidden');
+      showToast('Painel bloqueado.', 'info');
+    }
+
+    if (sessionStorage.getItem('axion_fin_auth') === 'true') {
+      document.getElementById('auth-overlay').classList.add('hidden');
+    }
+
+    // Formatação de Moedas
+    function formatMoney(amountBRL) {
+      const isNegative = amountBRL < 0;
+      const absVal = Math.abs(amountBRL);
+      let formatted = '';
+      if (currentCurrency === 'USD') {
+        formatted = '$ ' + (absVal / usdRate).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      } else {
+        formatted = 'R$ ' + absVal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      }
+      return isNegative ? `- ${formatted}` : formatted;
+    }
+
+    function setCurrency(curr) {
+      currentCurrency = curr;
+      document.getElementById('btn-currency-brl').classList.toggle('active', curr === 'BRL');
+      document.getElementById('btn-currency-usd').classList.toggle('active', curr === 'USD');
+      renderDashboard();
+      showToast(`Moeda: ${curr}`, 'info');
+    }
+
+    function setViewMode(mode) {
+      currentMode = mode;
+      const ind = document.getElementById('badge-mode-indicator');
+      if (ind) {
+        ind.innerHTML = mode === 'live' 
+          ? `<span class="badge-dot" style="background: var(--rose);"></span>Live Real` 
+          : `<span class="badge-dot" style="background: var(--emerald);"></span>Projeção`;
+      }
+      fetchLiveData(true);
+    }
+
+    async function fetchLiveData(notify = false) {
+      if (notify) showToast('Sincronizando verticais...', 'info');
+      try {
+        const [rOver, rHot, rBlack, rWhite] = await Promise.all([
+          fetch(`/api/overview?mode=${currentMode}`).then(r => r.json()),
+          fetch(`/api/operations/hot?mode=${currentMode}`).then(r => r.json()),
+          fetch(`/api/operations/black?mode=${currentMode}`).then(r => r.json()),
+          fetch(`/api/operations/white?mode=${currentMode}`).then(r => r.json())
+        ]);
+
+        overviewData = rOver;
+        hotData = rHot;
+        blackData = rBlack;
+        whiteData = rWhite;
+
+        renderDashboard();
+        if (notify) showToast('Sincronização concluída!', 'success');
+      } catch (e) {
+        console.error(e);
+        if (notify) showToast('Erro de sincronização.', 'error');
+      }
+    }
+
+    function renderDashboard() {
+      const isLive = (currentMode === 'live');
+      const revHot = isLive ? 103.82 : 128740.00;
+      const revBlack = isLive ? 0.00 : 85000.00;
+      const revWhite = isLive ? 0.00 : 64500.00;
+      const gross = isLive ? 103.82 : (revHot + revBlack + revWhite);
+
+      const fixed = 5226.52;
+      const meta = currentMetaBudget;
+      const taxes = gross * 0.08;
+      const ebitda = gross - fixed - meta - taxes;
+
+      // KPIs
+      document.getElementById('kpi-gross-revenue').innerText = formatMoney(gross);
+      document.getElementById('badge-gross-mom').innerText = isLive ? 'Live Real' : '+34.2% Meta';
+      document.getElementById('kpi-fixed-cost').innerText = formatMoney(fixed);
+      document.getElementById('kpi-meta-ads').innerText = formatMoney(meta);
+      document.getElementById('kpi-ebitda').innerText = formatMoney(ebitda);
+      document.getElementById('kpi-ebitda').style.color = ebitda >= 0 ? 'var(--accent)' : 'var(--rose)';
+
+      // Verticais
+      document.getElementById('vertical-val-hot').innerText = formatMoney(revHot);
+      document.getElementById('vertical-badge-hot').innerText = isLive ? '100.0%' : '46.3%';
+      document.getElementById('vertical-val-black').innerText = formatMoney(revBlack);
+      document.getElementById('vertical-badge-black').innerText = isLive ? '0.0%' : '30.5%';
+      document.getElementById('vertical-val-white').innerText = formatMoney(revWhite);
+      document.getElementById('vertical-badge-white').innerText = isLive ? '0.0%' : '23.2%';
+
+      // Sub-unidades Hot
+      document.getElementById('hot-atacadao-rev').innerText = isLive ? formatMoney(0) : formatMoney(67890);
+      document.getElementById('hot-vip-rev').innerText = isLive ? formatMoney(103.82) : formatMoney(38450);
+      document.getElementById('hot-it-rev').innerText = isLive ? formatMoney(0) : formatMoney(22400);
+
+      // Black & White
+      document.getElementById('black-gross-revenue').innerText = formatMoney(revBlack);
+      document.getElementById('white-flow-rev').innerText = isLive ? formatMoney(0) : formatMoney(32500);
+      document.getElementById('white-pay-rev').innerText = isLive ? formatMoney(0) : formatMoney(18000);
+      document.getElementById('white-juliana-rev').innerText = isLive ? formatMoney(0) : formatMoney(14000);
+
+      // DRE
+      document.getElementById('dre-gross').innerText = formatMoney(gross);
+      document.getElementById('dre-meta-ads').innerText = '- ' + formatMoney(meta);
+      document.getElementById('dre-ebitda').innerText = formatMoney(ebitda);
+      document.getElementById('dre-ebitda').style.color = ebitda >= 0 ? 'var(--accent)' : 'var(--rose)';
+
+      // Modal DRE
+      document.getElementById('modal-dre-gross').innerText = formatMoney(gross);
+      document.getElementById('modal-dre-taxes').innerText = '- ' + formatMoney(taxes);
+      document.getElementById('modal-dre-net-rev').innerText = formatMoney(gross - taxes);
+      document.getElementById('modal-dre-meta').innerText = '- ' + formatMoney(meta);
+      document.getElementById('modal-dre-ebitda').innerText = formatMoney(ebitda);
+      document.getElementById('modal-dre-ebitda').style.color = ebitda >= 0 ? 'var(--accent)' : 'var(--rose)';
+
+      renderModalCreators();
+      runSimulation();
+    }
+
+    function renderModalCreators() {
+      const isLive = (currentMode === 'live');
+      const creators = hotData?.creators || [
+        { name: 'Manuzinha Schwartz', handle: '@Manuzinha_Schwartz_bot', monthly_revenue: 39.80, active_subscribers: 3, leads: 769, pix_generated: 948, tier: 'VIP EXCLUSIVE' },
+        { name: 'dudinhax1', handle: '@dudax1_bot', monthly_revenue: 14.90, active_subscribers: 1, leads: 451, pix_generated: 756, tier: 'RISING' },
+        { name: 'SharkBot Analytics (Outros Bots)', handle: 'SharkBot Engine', monthly_revenue: 64.02, active_subscribers: 7, leads: 1070, pix_generated: 1850, tier: 'AUTOMATION' },
+        { name: 'Lany do Mal', handle: '@sucklany_bot', monthly_revenue: 0.00, active_subscribers: 0, leads: 29, pix_generated: 58, tier: 'STANDARD' },
+        { name: 'Lili Fox', handle: '@linefox_bot', monthly_revenue: 0.00, active_subscribers: 0, leads: 27, pix_generated: 25, tier: 'PREMIUM' }
+      ];
+
+      const tbody = document.getElementById('hot-creators-modal-tbody');
+      if (tbody) {
+        tbody.innerHTML = creators.map(c => `
+          <tr>
+            <td><strong>${c.name}</strong></td>
+            <td><code>${c.handle}</code></td>
+            <td class="tabular font-bold" style="color:var(--emerald);">${formatMoney(c.monthly_revenue || 0)}</td>
+            <td class="tabular">${c.active_subscribers || 0} VIPs</td>
+            <td class="tabular">${c.leads || c.followers || '-'} leads</td>
+            <td><span class="pill pill-sky">${c.tier}</span></td>
+          </tr>
+        `).join('');
+      }
+    }
+
+    function runSimulation() {
+      const budget = Number(document.getElementById('sim-meta').value);
+      const roas = Number(document.getElementById('sim-roas').value);
+
+      document.getElementById('sim-meta-val').innerText = formatMoney(budget);
+      document.getElementById('sim-roas-val').innerText = roas.toFixed(1) + 'x';
+
+      const genRev = budget * roas;
+      const fixed = 5226.52;
+      const netProfit = genRev - fixed - budget;
+
+      document.getElementById('sim-generated-rev').innerText = formatMoney(genRev);
+      document.getElementById('sim-net-profit').innerText = formatMoney(netProfit);
+      document.getElementById('sim-net-profit').style.color = netProfit >= 0 ? 'var(--accent)' : 'var(--rose)';
+    }
+
+    function exportData() {
+      const isLive = (currentMode === 'live');
+      const data = {
+        export_date: new Date().toISOString(),
+        mode: currentMode,
+        currency: currentCurrency,
+        kpis: {
+          gross_revenue_total: isLive ? 0.00 : 278240.00,
+          tech_opex: 976.52,
+          headcount_payroll: 4250.00,
+          meta_ads_budget: currentMetaBudget
+        }
+      };
+
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `axion-financeiro-relatorio.json`;
+      a.click();
+      showToast('Relatório exportado!', 'success');
+    }
+
+    function showToast(msg, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      toast.innerHTML = `
+        <svg class="icon" width="14" height="14" viewBox="0 0 24 24" style="color: ${type === 'success' ? 'var(--emerald)' : (type === 'error' ? 'var(--rose)' : 'var(--accent)')};">
+          <circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>
+        </svg>
+        <span>${msg}</span>
+      `;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(16px)';
+        toast.style.transition = 'all 0.15s';
+        setTimeout(() => toast.remove(), 150);
+      }, 3000);
+    }
+
+    // Inicialização SPA
+    document.addEventListener('DOMContentLoaded', () => {
+      initRouter();
+      fetchLiveData(false);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "axion-financeiro",
+  "version": "1.0.0",
+  "description": "Painel Financeiro Executivo Master — Projeções de Gastos, Tech OPEX, Headcount e Faturamento Consolidado Sensix",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test": "node --check server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "author": "AXION Enterprise <axionenterprise777@gmail.com>",
+  "license": "UNLICENSED"
+}
