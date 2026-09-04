@@ -23,7 +23,7 @@ test('checkout não é oferecido quando Stripe não está configurado', async ()
   const billing = new FlowBillingService(database);
 
   await assert.rejects(
-    () => billing.createCheckout({ id: 'auth-user-1', email: 'user@example.com' }),
+    () => billing.createCheckout({ id: 'auth-user-1', email: 'user@example.com' }, 'starter'),
     /Cobrança do Flow ainda não foi configurada/,
   );
 });

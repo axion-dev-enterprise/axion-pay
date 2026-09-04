@@ -59,7 +59,9 @@ const envSchema = z.object({
   STRIPE_ENABLED: boolFromEnv,
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().regex(/^whsec_[A-Za-z0-9]+$/).optional(),
-  STRIPE_FLOW_PRICE_ID: z.string().optional(),
+  STRIPE_FLOW_STARTER_PRICE_ID: z.string().regex(/^price_[A-Za-z0-9]+$/).optional(),
+  STRIPE_FLOW_PROFESSIONAL_PRICE_ID: z.string().regex(/^price_[A-Za-z0-9]+$/).optional(),
+  STRIPE_FLOW_ENTERPRISE_PRICE_ID: z.string().regex(/^price_[A-Za-z0-9]+$/).optional(),
   STRIPE_FLOW_SUCCESS_URL: z.string().url().default('https://flow.axionenterprise.cloud/dashboard?billing=success'),
   STRIPE_FLOW_CANCEL_URL: z.string().url().default('https://flow.axionenterprise.cloud/dashboard?billing=cancelled'),
   STRIPE_BILLING_ENABLED: boolFromEnv,
@@ -100,8 +102,8 @@ if (env.NODE_ENV === 'production' && apiKeys.length === 0) {
 if (env.NODE_ENV === 'production' && env.PAYMENTS_ENABLED && !env.WOOVI_APP_ID) {
   throw new Error('WOOVI_APP_ID é obrigatório em produção.');
 }
-if (env.STRIPE_ENABLED && (!env.STRIPE_SECRET_KEY || !env.STRIPE_WEBHOOK_SECRET || !env.STRIPE_FLOW_PRICE_ID)) {
-  throw new Error('STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET e STRIPE_FLOW_PRICE_ID são obrigatórios quando STRIPE_ENABLED=true.');
+if (env.STRIPE_ENABLED && (!env.STRIPE_SECRET_KEY || !env.STRIPE_WEBHOOK_SECRET || !env.STRIPE_FLOW_STARTER_PRICE_ID || !env.STRIPE_FLOW_PROFESSIONAL_PRICE_ID || !env.STRIPE_FLOW_ENTERPRISE_PRICE_ID)) {
+  throw new Error('STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET e os três preços do AXION Flow são obrigatórios quando STRIPE_ENABLED=true.');
 }
 if (env.NODE_ENV === 'production' && env.STRIPE_BILLING_ENABLED) {
   if (!env.STRIPE_SECRET_KEY || !env.STRIPE_PRICE_ID || !env.STRIPE_WEBHOOK_SECRET) {

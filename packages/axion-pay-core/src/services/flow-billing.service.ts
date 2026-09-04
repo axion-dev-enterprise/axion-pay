@@ -13,6 +13,15 @@ export type FlowBillingStatus = {
   currentPeriodEndsAt: string | null;
   cancelAtPeriodEnd: boolean;
   trialDays: number;
+  plan: FlowPlan | null;
+};
+
+export type FlowPlan = 'starter' | 'professional' | 'enterprise';
+
+const flowPlans: Record<FlowPlan, { priceId: string | undefined; trialDays: number }> = {
+  starter: { priceId: config.STRIPE_FLOW_STARTER_PRICE_ID, trialDays: 7 },
+  professional: { priceId: config.STRIPE_FLOW_PROFESSIONAL_PRICE_ID, trialDays: 14 },
+  enterprise: { priceId: config.STRIPE_FLOW_ENTERPRISE_PRICE_ID, trialDays: 30 },
 };
 
 function iso(value: number | null | undefined): string | null {
@@ -28,7 +37,10 @@ function toStatus(row: Record<string, unknown> | undefined): FlowBillingStatus {
     trialEndsAt: row?.trial_ends_at ? new Date(String(row.trial_ends_at)).toISOString() : null,
     currentPeriodEndsAt: row?.current_period_ends_at ? new Date(String(row.current_period_ends_at)).toISOString() : null,
     cancelAtPeriodEnd: Boolean(row?.cancel_at_period_end),
-    trialDays: 7,
+    trialDays: Number(row?.trial_days ?? 0),
+    plan: row?.plan_code === 'starter' || row?.plan_code === 'professional' || row?.plan_code === 'enterprise'
+      ? row.plan_code
+      : null,
   };
 }
 
@@ -42,7 +54,7 @@ export class FlowBillingService {
   }
 
   private requireStripe(): Stripe {
-    if (!this.stripe || !config.STRIPE_FLOW_PRICE_ID) {
+    if (!this.stripe) {
       const error = new Error('Cobrança do Flow ainda não foi configurada.');
       (error as Error & { statusCode?: number }).statusCode = 503;
       throw error;
@@ -52,15 +64,21 @@ export class FlowBillingService {
 
   async getStatus(userId: string): Promise<FlowBillingStatus> {
     const result = await this.database.query(
-      `SELECT subscription_status, trial_ends_at, current_period_ends_at, cancel_at_period_end
+      `SELECT subscription_status, trial_ends_at, current_period_ends_at, cancel_at_period_end, plan_code, trial_days
          FROM flow_billing_accounts WHERE auth_user_id = $1`,
       [userId],
     );
     return toStatus(result.rows[0]);
   }
 
-  async createCheckout(user: DashboardUser): Promise<{ checkoutUrl: string; status: FlowBillingStatus }> {
+  async createCheckout(user: DashboardUser, plan: FlowPlan): Promise<{ checkoutUrl: string; status: FlowBillingStatus }> {
     const stripe = this.requireStripe();
+    const selectedPlan = flowPlans[plan];
+    if (!selectedPlan.priceId) {
+      const error = new Error('O plano selecionado ainda não foi configurado para cobrança.');
+      (error as Error & { statusCode?: number }).statusCode = 503;
+      throw error;
+    }
     const existing = await this.database.query<{ stripe_customer_id: string; subscription_status: string }>(
       `SELECT stripe_customer_id, subscription_status FROM flow_billing_accounts WHERE auth_user_id = $1`,
       [user.id],
@@ -79,22 +97,26 @@ export class FlowBillingService {
     })).id;
 
     await this.database.query(
-      `INSERT INTO flow_billing_accounts (auth_user_id, stripe_customer_id)
-       VALUES ($1, $2)
-       ON CONFLICT (auth_user_id) DO UPDATE SET stripe_customer_id = EXCLUDED.stripe_customer_id, updated_at = NOW()`,
-      [user.id, customerId],
+      `INSERT INTO flow_billing_accounts (auth_user_id, stripe_customer_id, plan_code, trial_days)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (auth_user_id) DO UPDATE
+         SET stripe_customer_id = EXCLUDED.stripe_customer_id,
+             plan_code = EXCLUDED.plan_code,
+             trial_days = EXCLUDED.trial_days,
+             updated_at = NOW()`,
+      [user.id, customerId, plan, selectedPlan.trialDays],
     );
 
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       customer: customerId,
       client_reference_id: user.id,
-      line_items: [{ price: config.STRIPE_FLOW_PRICE_ID, quantity: 1 }],
+      line_items: [{ price: selectedPlan.priceId!, quantity: 1 }],
       subscription_data: {
-        trial_period_days: 7,
-        metadata: { axion_auth_user_id: user.id, product: 'axion_flow' },
+        trial_period_days: selectedPlan.trialDays,
+        metadata: { axion_auth_user_id: user.id, product: 'axion_flow', plan },
       },
-      metadata: { axion_auth_user_id: user.id, product: 'axion_flow' },
+      metadata: { axion_auth_user_id: user.id, product: 'axion_flow', plan },
       success_url: config.STRIPE_FLOW_SUCCESS_URL,
       cancel_url: config.STRIPE_FLOW_CANCEL_URL,
       allow_promotion_codes: true,
@@ -159,6 +181,8 @@ export class FlowBillingService {
               trial_ends_at = to_timestamp($4),
               current_period_ends_at = to_timestamp($5),
               cancel_at_period_end = $6,
+              plan_code = COALESCE($7, plan_code),
+              trial_days = CASE $7 WHEN 'starter' THEN 7 WHEN 'professional' THEN 14 WHEN 'enterprise' THEN 30 ELSE trial_days END,
               updated_at = NOW()
         WHERE auth_user_id = $1`,
       [
@@ -168,6 +192,7 @@ export class FlowBillingService {
         subscription.trial_end ?? null,
         subscription.items.data[0]?.current_period_end ?? null,
         subscription.cancel_at_period_end,
+        subscription.metadata.plan ?? null,
       ],
     );
   }

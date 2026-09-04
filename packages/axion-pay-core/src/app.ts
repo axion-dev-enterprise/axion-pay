@@ -53,6 +53,7 @@ const dashboardApiKeySchema = z.object({
   name: z.string().trim().min(1).max(120),
 });
 const dashboardSettingsSchema = z.object({ organizationName: z.string().trim().min(1).max(120) });
+const flowCheckoutSchema = z.object({ plan: z.enum(['starter', 'professional', 'enterprise']).default('professional') });
 const onboardingProfileSchema = z.object({
   legalEntityType: z.enum(['INDIVIDUAL', 'BUSINESS']).default('BUSINESS'),
   legalName: z.string().trim().min(2).max(160).optional(),
@@ -356,7 +357,8 @@ export async function buildApp(dependencies: AppDependencies = {}) {
   app.post('/v1/flow/billing/checkout', async (request, reply) => {
     const user = await requireDashboardUser(request, reply, database);
     if (!user) return;
-    return reply.code(201).send(await flowBilling.createCheckout(user));
+    const { plan } = flowCheckoutSchema.parse(request.body ?? {});
+    return reply.code(201).send(await flowBilling.createCheckout(user, plan));
   });
 
   app.post('/v1/flow/billing/portal', async (request, reply) => {

@@ -11,9 +11,7 @@
     "typecheck": "tsc --noEmit",
     "test": "tsc && node --test tests/*.test.mjs",
     "migrate": "tsx src/migrate.ts",
-    "api-key:create": "tsx scripts/generate-api-key.ts",
-    "nubank:login": "tsx scripts/nubank-login.ts",
-    "nubank:snapshot": "tsx scripts/nubank-snapshot.ts"
+    "api-key:create": "tsx scripts/generate-api-key.ts"
   },
   "dependencies": {
     "@fastify/cors": "11.1.0",
