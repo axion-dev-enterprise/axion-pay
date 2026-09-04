@@ -86,8 +86,8 @@ export default function App() {
           </div>
           <aside className="rounded-2xl border border-amber-300/20 bg-amber-300/[0.06] p-6">
             <div className="flex items-center gap-2 text-amber-200"><CreditCard className="h-5 w-5" /><span className="text-sm font-bold">Cartões e planos mensais</span></div>
-            <p className="mt-4 text-sm leading-6 text-zinc-300">A experiência de cartão será hospedada pela Stripe, com Checkout e webhooks validados no servidor. Ela está em implantação e não aparece como uma cobrança disponível enquanto a configuração de produção não estiver concluída.</p>
-            <p className="mt-4 text-xs leading-5 text-zinc-500">Isso evita promessas comerciais, campos de cartão ou planos fictícios antes da ativação real do provedor.</p>
+            <p className="mt-4 text-sm leading-6 text-zinc-300">Planos habilitados usam Stripe Checkout com cartão e webhooks validados no servidor. O checkout é iniciado somente pelo console autenticado, após a criação da sessão pelo AXION Pay.</p>
+            <p className="mt-4 text-xs leading-5 text-zinc-500">Nenhum dado de cartão passa pelo navegador da AXION: a cobrança é hospedada pela Stripe e registrada pelo backend.</p>
           </aside>
         </section>
 
