@@ -1,0 +1,35 @@
+name: AXION Pay Core
+
+on:
+  pull_request:
+    paths:
+      - 'packages/axion-pay-core/**'
+      - '.github/workflows/axion-pay-core.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'packages/axion-pay-core/**'
+      - '.github/workflows/axion-pay-core.yml'
+
+jobs:
+  verify-core:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/axion-pay-core
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: packages/axion-pay-core/pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Tests
+        run: pnpm test

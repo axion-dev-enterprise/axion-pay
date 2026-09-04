@@ -1,8 +1,17 @@
 # axion-pay
 
+## Arquitetura de pagamentos
+
+O frontend é uma SPA pública. Operações autenticadas, Checkout Stripe, período
+de avaliação e webhooks são executados exclusivamente pelo serviço
+`packages/axion-pay-core` na VPS, em `https://api.axionenterprise.cloud`.
+Segredos Stripe nunca são configurados no deploy Vercel.
+
 ## Overview
 
-Public portal and dashboard frontend for AXION Pay. The payment API is maintained separately in [`axion-pay-core`](https://github.com/axion-dev-enterprise/axion-pay-core) and runs at `https://api.axionenterprise.cloud`.
+Public portal and dashboard frontend for AXION Pay. The payment API is the
+versioned package `packages/axion-pay-core` and runs at
+`https://api.axionenterprise.cloud`.
 
 ## Repository role
 
