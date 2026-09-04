@@ -14,7 +14,8 @@ test('billing do Flow começa sem entitlement e sem inventar assinatura', async 
     trialEndsAt: null,
     currentPeriodEndsAt: null,
     cancelAtPeriodEnd: false,
-    trialDays: 7,
+    trialDays: 0,
+    plan: null,
   });
 });
 
