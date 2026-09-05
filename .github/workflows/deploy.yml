@@ -32,8 +32,7 @@ jobs:
         run: npm install --global vercel@latest
       - name: Link Vercel Project Config
         run: |
-          mkdir -p webapp/.vercel
-          echo '{"orgId":"${{ secrets.VERCEL_ORG_ID }}","projectId":"${{ secrets.VERCEL_PROJECT_ID }}"}' > webapp/.vercel/project.json
+          mkdir -p .vercel
+          echo '{"orgId":"${{ secrets.VERCEL_ORG_ID }}","projectId":"${{ secrets.VERCEL_PROJECT_ID }}"}' > .vercel/project.json
       - name: Deploy to Vercel Production
-        working-directory: webapp
         run: vercel --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
