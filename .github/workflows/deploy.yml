@@ -35,4 +35,4 @@ jobs:
           mkdir -p .vercel
           echo '{"orgId":"${{ secrets.VERCEL_ORG_ID }}","projectId":"${{ secrets.VERCEL_PROJECT_ID }}"}' > .vercel/project.json
       - name: Deploy to Vercel Production
-        run: vercel --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
+        run: vercel --prod --public --yes --token=${{ secrets.VERCEL_TOKEN }}
