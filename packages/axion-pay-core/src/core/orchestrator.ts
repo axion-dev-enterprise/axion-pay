@@ -35,7 +35,10 @@ export class PaymentOrchestrator {
     }
 
     if (!intent) throw new Error('Não foi possível criar a intenção de pagamento.');
-    if (intent.amount_cents !== input.amountCents) {
+    // PostgreSQL BIGINT values are returned as strings by node-postgres.
+    // Normalize before comparing so a newly persisted intent is not mistaken
+    // for an idempotency-key reuse with a different amount.
+    if (Number(intent.amount_cents) !== input.amountCents) {
       throw Object.assign(new Error('Idempotency-Key já usada com outro valor.'), { statusCode: 409 });
     }
     if (intent.provider_charge_id) return intent;
