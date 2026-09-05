@@ -40,7 +40,7 @@ export default function App() {
             <p className="mt-5 max-w-xl text-base leading-7 text-zinc-400">Crie merchants, gere chaves de API e acompanhe cobranças pelo console. Nenhuma cobrança é criada pelo navegador e não há dados de demonstração nesta aplicação.</p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <a href="/dashboard" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#e8b923] px-5 py-3 text-sm font-bold text-black transition hover:bg-amber-300"><LayoutDashboard className="h-4 w-4" /> Abrir console <ArrowRight className="h-4 w-4" /></a>
-              <a href={`${PAY_API}/openapi.json`} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-xl border border-zinc-700 px-5 py-3 text-sm font-bold text-zinc-200 transition hover:border-zinc-500 hover:bg-zinc-900"><BookOpen className="h-4 w-4" /> Documentação da API</a>
+              <a href="/docs" className="inline-flex items-center justify-center gap-2 rounded-xl border border-zinc-700 px-5 py-3 text-sm font-bold text-zinc-200 transition hover:border-zinc-500 hover:bg-zinc-900"><BookOpen className="h-4 w-4" /> Documentação da API</a>
             </div>
           </div>
 
@@ -93,7 +93,7 @@ export default function App() {
 
         <section className="mt-16 flex flex-col items-start justify-between gap-5 border-t border-zinc-800 pt-8 sm:flex-row sm:items-center">
           <div><h2 className="text-lg font-bold text-white">Pronto para integrar?</h2><p className="mt-1 text-sm text-zinc-400">Use o console para criar sua operação ou consulte o contrato completo da API.</p></div>
-          <div className="flex flex-wrap gap-3"><a href="/dashboard" className="inline-flex items-center gap-2 rounded-xl bg-[#e8b923] px-4 py-2.5 text-sm font-bold text-black transition hover:bg-amber-300"><LayoutDashboard className="h-4 w-4" /> Abrir console</a><a href={`${PAY_API}/openapi.json`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl border border-zinc-700 px-4 py-2.5 text-sm font-bold text-zinc-200 transition hover:border-zinc-500"><Globe2 className="h-4 w-4" /> Ver API</a></div>
+          <div className="flex flex-wrap gap-3"><a href="/dashboard" className="inline-flex items-center gap-2 rounded-xl bg-[#e8b923] px-4 py-2.5 text-sm font-bold text-black transition hover:bg-amber-300"><LayoutDashboard className="h-4 w-4" /> Abrir console</a><a href="/docs" className="inline-flex items-center gap-2 rounded-xl border border-zinc-700 px-4 py-2.5 text-sm font-bold text-zinc-200 transition hover:border-zinc-500"><Globe2 className="h-4 w-4" /> Ver documentação</a></div>
         </section>
         <p className="mt-8 text-center text-xs text-zinc-600">AXION Enterprise · Operação sem simulações no frontend.</p>
       </div>

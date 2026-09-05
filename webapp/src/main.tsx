@@ -5,6 +5,7 @@ import App from "./App";
 import "./index.css";
 
 const PayDashboard = lazy(() => import("./pages/PayDashboard"));
+const ApiDocs = lazy(() => import("./pages/ApiDocs"));
 
 const LazyLoad = ({ children }: { children: React.ReactNode }) => (
   <Suspense fallback={
@@ -21,6 +22,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <Routes>
       <Route path="/" element={<App />} />
       <Route path="/dashboard/*" element={<LazyLoad><PayDashboard /></LazyLoad>} />
+      <Route path="/docs" element={<LazyLoad><ApiDocs /></LazyLoad>} />
       <Route path="/checkout/*" element={<App />} />
     </Routes>
   </BrowserRouter>
