@@ -8,6 +8,11 @@ const endpoints = [
   { method: "POST", path: "/v1/charges", title: "Criar cobrança PIX", auth: "API key · charges:write", description: "Cria uma cobrança idempotente para um merchant." },
   { method: "GET", path: "/v1/charges/{correlationId}", title: "Consultar cobrança", auth: "API key · charges:read", description: "Consulta uma cobrança pertencente ao merchant autenticado." },
   { method: "POST", path: "/webhooks/woovi", title: "Webhook Woovi", auth: "Assinatura Woovi", description: "Recebe eventos assinados e processa a conciliação." },
+  { method: "GET", path: "/v1/dashboard/billing", title: "Status da assinatura", auth: "Sessão AXION", description: "Consulta plano, status e período de trial do merchant." },
+  { method: "POST", path: "/v1/dashboard/billing/checkout", title: "Checkout de cartão", auth: "Sessão AXION", description: "Abre o Checkout Stripe hospedado para assinatura mensal por cartão." },
+  { method: "POST", path: "/v1/dashboard/billing/portal", title: "Portal da assinatura", auth: "Sessão AXION", description: "Abre o Customer Portal Stripe para atualizar cartão, fatura ou cancelar." },
+  { method: "POST", path: "/v1/flow/billing/checkout", title: "Plano AXION Flow + trial", auth: "Sessão AXION", description: "Inicia assinatura Stripe com trial de 7, 14 ou 30 dias conforme o plano." },
+  { method: "POST", path: "/webhooks/stripe", title: "Webhook Stripe", auth: "Assinatura Stripe", description: "Sincroniza pagamentos, trials e cancelamentos no backend." },
 ];
 
 export default function ApiDocs() {
@@ -21,6 +26,19 @@ export default function ApiDocs() {
       return language === "curl"
         ? `curl -sS ${API_BASE}/health`
         : `const response = await fetch("${API_BASE}/health");\nconsole.log(await response.json());`;
+    }
+    if (endpoint.path === "/v1/dashboard/billing/checkout" || endpoint.path === "/v1/dashboard/billing/portal") {
+      return language === "curl"
+        ? `curl -X POST ${API_BASE}${endpoint.path} \\\n+  -H "Authorization: Bearer $AXION_SESSION_TOKEN"`
+        : `const response = await fetch("${API_BASE}${endpoint.path}", {\n  method: "POST",\n  credentials: "include"\n});`;
+    }
+    if (endpoint.path === "/v1/flow/billing/checkout") {
+      return language === "curl"
+        ? `curl -X POST ${API_BASE}${endpoint.path} \\\n+  -H "Authorization: Bearer $AXION_SESSION_TOKEN" \\\n+  -H "Content-Type: application/json" \\\n+  -d '{"plan":"starter"}'`
+        : `const response = await fetch("${API_BASE}${endpoint.path}", {\n  method: "POST",\n  credentials: "include",\n  headers: { "Content-Type": "application/json" },\n  body: JSON.stringify({ plan: "starter" })\n});`;
+    }
+    if (endpoint.path === "/webhooks/stripe") {
+      return "Stripe envia este evento assinado ao backend; não chame pelo navegador.";
     }
     if (endpoint.method === "POST") {
       return language === "curl"
@@ -66,6 +84,10 @@ export default function ApiDocs() {
         <section className="grid gap-6 lg:grid-cols-[280px_1fr]">
           <nav className="rounded-2xl border border-zinc-800 bg-zinc-950/70 p-3" aria-label="Endpoints"><p className="px-3 py-2 text-xs font-bold uppercase tracking-[0.18em] text-zinc-500">Endpoints</p>{endpoints.map((item, index) => <button key={item.path} type="button" onClick={() => setSelected(index)} className={`flex w-full items-center justify-between rounded-xl px-3 py-3 text-left transition ${selected === index ? "bg-amber-300/10 text-amber-200" : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"}`}><span><span className={`mr-2 font-mono text-[10px] font-bold ${item.method === "POST" ? "text-cyan-300" : "text-emerald-300"}`}>{item.method}</span><span className="text-sm font-semibold">{item.title}</span></span><ChevronRight className="h-4 w-4" /></button>)}</nav>
           <article className="rounded-2xl border border-zinc-800 bg-zinc-950/70 p-6 sm:p-8"><div className="flex flex-wrap items-center gap-3"><span className={`rounded-md px-2 py-1 font-mono text-xs font-bold ${endpoint.method === "POST" ? "bg-cyan-400/10 text-cyan-300" : "bg-emerald-400/10 text-emerald-300"}`}>{endpoint.method}</span><code className="font-mono text-sm text-zinc-200">{endpoint.path}</code><span className="ml-auto inline-flex items-center gap-2 text-xs font-semibold text-zinc-500"><ShieldCheck className="h-4 w-4" /> {endpoint.auth}</span></div><h2 className="mt-6 text-2xl font-black text-white">{endpoint.title}</h2><p className="mt-2 text-sm leading-6 text-zinc-400">{endpoint.description}</p><div className="mt-8 overflow-hidden rounded-xl border border-zinc-800 bg-[#08080b]"><div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3"><div className="flex gap-1 rounded-lg bg-zinc-900 p-1"><button type="button" onClick={() => setLanguage("curl")} className={`rounded-md px-3 py-1 text-xs font-bold ${language === "curl" ? "bg-zinc-700 text-white" : "text-zinc-500"}`}>cURL</button><button type="button" onClick={() => setLanguage("node")} className={`rounded-md px-3 py-1 text-xs font-bold ${language === "node" ? "bg-zinc-700 text-white" : "text-zinc-500"}`}>Node.js</button></div><button type="button" onClick={copyCode} className="inline-flex items-center gap-2 text-xs font-bold text-zinc-400 hover:text-white" aria-label="Copiar exemplo">{copied ? <Check className="h-4 w-4 text-emerald-300" /> : <Clipboard className="h-4 w-4" />}{copied ? "Copiado" : "Copiar"}</button></div><pre className="overflow-x-auto p-5 text-xs leading-6 text-zinc-300"><code>{code}</code></pre></div><div className="mt-6 flex items-start gap-3 rounded-xl border border-amber-300/20 bg-amber-300/[0.06] p-4 text-sm leading-6 text-zinc-300"><Code2 className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" /><span>Use a chave somente no seu servidor. Para testar sem risco, solicite uma chave pública de sandbox com escopo de leitura; cobranças reais exigem uma chave privada de merchant.</span></div></article>
+        </section>
+        <section className="mt-8 grid gap-6 rounded-2xl border border-zinc-800 bg-zinc-950/70 p-6 sm:p-8 lg:grid-cols-[1.2fr_1fr]">
+          <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-300">Cartão e assinaturas</p><h2 className="mt-3 text-2xl font-black text-white">Cobrança mensal via Stripe</h2><p className="mt-3 text-sm leading-6 text-zinc-400">No console, abra <a className="text-amber-300 hover:underline" href="/dashboard">Plano & cobrança</a>. O botão “Assinar plano” redireciona para o Checkout Stripe; “Gerenciar assinatura” abre o Customer Portal. Os dados do cartão nunca passam pelo AXION.</p></div>
+          <div><p className="text-sm font-bold text-zinc-200">Trials do AXION Flow</p><div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs"><div className="rounded-lg border border-zinc-800 p-3"><b className="block text-white">Starter</b><span className="text-amber-300">7 dias</span></div><div className="rounded-lg border border-zinc-800 p-3"><b className="block text-white">Professional</b><span className="text-amber-300">14 dias</span></div><div className="rounded-lg border border-zinc-800 p-3"><b className="block text-white">Enterprise</b><span className="text-amber-300">30 dias</span></div></div></div>
         </section>
       </div>
     </main>
