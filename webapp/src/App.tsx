@@ -1,102 +1,42 @@
 import { useEffect, useState } from "react";
-import { ArrowRight, BookOpen, CheckCircle2, CircleAlert, CreditCard, Globe2, KeyRound, LayoutDashboard, ShieldCheck, Webhook } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Check, Code2, CreditCard, Globe2, KeyRound, Layers, LockKeyhole, ShieldCheck, UserRoundPlus, Zap } from "lucide-react";
 
-const PAY_API = "https://api.axionenterprise.cloud";
-type HealthState = "loading" | "ready" | "unavailable";
+const API = "https://api.axionenterprise.cloud";
+const capabilities = [
+  [Zap, "PIX para o Brasil", "Cobranças idempotentes, webhook assinado e acompanhamento no console."],
+  [CreditCard, "Cartão e assinatura", "Checkout Stripe hospedado: dados de cartão não passam pelo AXION Pay."],
+  [KeyRound, "Chaves por merchant", "Cada operação fica segregada com chaves próprias e revogáveis."],
+  [Globe2, "Pronto para escalar", "Uma API segura para pagamentos, identidade e operação."],
+] as const;
 
 export default function App() {
-  const [health, setHealth] = useState<HealthState>("loading");
-
-  useEffect(() => {
-    let active = true;
-    fetch(`${PAY_API}/health`)
-      .then((response) => { if (active) setHealth(response.ok ? "ready" : "unavailable"); })
-      .catch(() => { if (active) setHealth("unavailable"); });
-    return () => { active = false; };
-  }, []);
-
-  const status = health === "ready"
-    ? { icon: CheckCircle2, label: "API operacional", tone: "text-emerald-300 border-emerald-400/25 bg-emerald-400/10" }
-    : health === "unavailable"
-      ? { icon: CircleAlert, label: "API indisponível", tone: "text-red-300 border-red-400/25 bg-red-400/10" }
-      : { icon: ShieldCheck, label: "Verificando API", tone: "text-zinc-300 border-zinc-700 bg-zinc-800/60" };
-  const StatusIcon = status.icon;
-
-  return (
-    <main className="min-h-screen bg-[#040407] px-5 py-8 text-zinc-100 sm:px-8 lg:px-12">
-      <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-6xl flex-col justify-center">
-        <header className="mb-10 flex items-center justify-between border-b border-zinc-800 pb-6">
-          <a href="/" className="flex items-center gap-3 font-semibold tracking-tight text-white">
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#e8b923] text-base font-black text-black">A</span>
-            <span>AXION Pay</span>
-          </a>
-          <a href="/dashboard" className="text-sm font-semibold text-amber-300 hover:text-amber-200">Acessar console</a>
-        </header>
-
-        <section className="grid gap-6 lg:grid-cols-[1.3fr_.7fr]">
-          <div className="rounded-3xl border border-zinc-800 bg-zinc-950/70 p-8 shadow-2xl shadow-black/30 sm:p-10">
-            <p className="mb-4 text-xs font-bold uppercase tracking-[0.22em] text-amber-300">Gateway server-to-server</p>
-            <h1 className="max-w-2xl text-4xl font-black tracking-tight text-white sm:text-5xl">Cobranças PIX com autenticação central AXION.</h1>
-            <p className="mt-5 max-w-xl text-base leading-7 text-zinc-400">Crie merchants, gere chaves de API e acompanhe cobranças pelo console. Nenhuma cobrança é criada pelo navegador e não há dados de demonstração nesta aplicação.</p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <a href="/dashboard" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#e8b923] px-5 py-3 text-sm font-bold text-black transition hover:bg-amber-300"><LayoutDashboard className="h-4 w-4" /> Abrir console <ArrowRight className="h-4 w-4" /></a>
-              <a href="/docs" className="inline-flex items-center justify-center gap-2 rounded-xl border border-zinc-700 px-5 py-3 text-sm font-bold text-zinc-200 transition hover:border-zinc-500 hover:bg-zinc-900"><BookOpen className="h-4 w-4" /> Documentação da API</a>
-            </div>
-          </div>
-
-          <aside className="rounded-3xl border border-zinc-800 bg-[#09090d] p-7">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">Estado do serviço</p>
-            <div className={`mt-5 inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold ${status.tone}`}><StatusIcon className="h-4 w-4" /> {status.label}</div>
-            <dl className="mt-8 space-y-5 text-sm">
-              <div><dt className="text-zinc-500">Autenticação</dt><dd className="mt-1 font-semibold text-zinc-200">AXION Auth Central</dd></div>
-              <div><dt className="text-zinc-500">Integração</dt><dd className="mt-1 font-semibold text-zinc-200">Chaves de merchant no console</dd></div>
-              <div><dt className="text-zinc-500">Cobranças</dt><dd className="mt-1 font-semibold text-zinc-200">API autenticada e idempotente</dd></div>
-            </dl>
-          </aside>
-        </section>
-
-        <section className="mt-16 grid gap-4 md:grid-cols-3" aria-label="Capacidades da AXION Pay">
-          <article className="rounded-2xl border border-zinc-800 bg-zinc-950/60 p-6">
-            <KeyRound className="h-5 w-5 text-amber-300" />
-            <h2 className="mt-4 text-base font-bold text-white">Acesso por merchant</h2>
-            <p className="mt-2 text-sm leading-6 text-zinc-400">Crie operações segregadas, gere chaves uma única vez e revogue credenciais sem interromper outros merchants.</p>
-          </article>
-          <article className="rounded-2xl border border-zinc-800 bg-zinc-950/60 p-6">
-            <Webhook className="h-5 w-5 text-amber-300" />
-            <h2 className="mt-4 text-base font-bold text-white">API idempotente</h2>
-            <p className="mt-2 text-sm leading-6 text-zinc-400">O backend registra cobranças e eventos no PostgreSQL para que a integração do seu sistema seja auditável e recuperável.</p>
-          </article>
-          <article className="rounded-2xl border border-zinc-800 bg-zinc-950/60 p-6">
-            <ShieldCheck className="h-5 w-5 text-amber-300" />
-            <h2 className="mt-4 text-base font-bold text-white">SSO AXION</h2>
-            <p className="mt-2 text-sm leading-6 text-zinc-400">O console é protegido pelo Auth Central. Nenhum dado de teste é usado para representar uma operação real.</p>
-          </article>
-        </section>
-
-        <section className="mt-16 grid gap-6 rounded-3xl border border-zinc-800 bg-[#09090d] p-7 sm:p-10 lg:grid-cols-[1fr_.9fr]">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-300">Primeira integração</p>
-            <h2 className="mt-3 text-2xl font-black tracking-tight text-white">Do console à cobrança PIX em quatro passos.</h2>
-            <ol className="mt-6 grid gap-4 text-sm text-zinc-300">
-              <li className="flex gap-3"><span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-amber-300 font-bold text-black">1</span><span>Entre com sua identidade corporativa AXION.</span></li>
-              <li className="flex gap-3"><span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-amber-300 font-bold text-black">2</span><span>Cadastre o merchant que receberá as cobranças.</span></li>
-              <li className="flex gap-3"><span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-amber-300 font-bold text-black">3</span><span>Gere uma chave de API e armazene o segredo somente no seu servidor.</span></li>
-              <li className="flex gap-3"><span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-amber-300 font-bold text-black">4</span><span>Crie e acompanhe a cobrança pelo contrato público da API.</span></li>
-            </ol>
-          </div>
-          <aside className="rounded-2xl border border-amber-300/20 bg-amber-300/[0.06] p-6">
-            <div className="flex items-center gap-2 text-amber-200"><CreditCard className="h-5 w-5" /><span className="text-sm font-bold">Cartões e planos mensais</span></div>
-            <p className="mt-4 text-sm leading-6 text-zinc-300">Planos habilitados usam Stripe Checkout com cartão e webhooks validados no servidor. O checkout é iniciado somente pelo console autenticado, após a criação da sessão pelo AXION Pay.</p>
-            <p className="mt-4 text-xs leading-5 text-zinc-500">Nenhum dado de cartão passa pelo navegador da AXION: a cobrança é hospedada pela Stripe e registrada pelo backend.</p>
-          </aside>
-        </section>
-
-        <section className="mt-16 flex flex-col items-start justify-between gap-5 border-t border-zinc-800 pt-8 sm:flex-row sm:items-center">
-          <div><h2 className="text-lg font-bold text-white">Pronto para integrar?</h2><p className="mt-1 text-sm text-zinc-400">Use o console para criar sua operação ou consulte o contrato completo da API.</p></div>
-          <div className="flex flex-wrap gap-3"><a href="/dashboard" className="inline-flex items-center gap-2 rounded-xl bg-[#e8b923] px-4 py-2.5 text-sm font-bold text-black transition hover:bg-amber-300"><LayoutDashboard className="h-4 w-4" /> Abrir console</a><a href="/docs" className="inline-flex items-center gap-2 rounded-xl border border-zinc-700 px-4 py-2.5 text-sm font-bold text-zinc-200 transition hover:border-zinc-500"><Globe2 className="h-4 w-4" /> Ver documentação</a></div>
-        </section>
-        <p className="mt-8 text-center text-xs text-zinc-600">AXION Enterprise · Operação sem simulações no frontend.</p>
-      </div>
-    </main>
-  );
+  const [online, setOnline] = useState<boolean | null>(null);
+  useEffect(() => { let alive = true; fetch(`${API}/health`, { cache: "no-store" }).then(r => alive && setOnline(r.ok)).catch(() => alive && setOnline(false)); return () => { alive = false; }; }, []);
+  const state = online === true ? "API operacional" : online === false ? "API indisponível" : "Verificando API";
+  return <main className="min-h-screen overflow-x-hidden bg-[#040806] text-[#f3f7f4]">
+    <a href="#conteudo" className="skip-link">Pular para o conteúdo</a>
+    <section className="relative isolate overflow-hidden border-b border-emerald-100/10">
+      <img src="/money-hero.jpg" className="absolute inset-0 -z-20 h-full w-full object-cover opacity-35" alt="" />
+      <div className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(4,8,6,.78),rgba(4,8,6,.92)),radial-gradient(circle_at_50%_0%,rgba(0,230,107,.18),transparent_48%)]" />
+      <nav className="mx-auto flex h-24 w-[min(1160px,calc(100%-3rem))] items-center justify-between gap-4 border-b border-emerald-100/10">
+        <a href="/" className="flex items-center gap-2.5 font-semibold tracking-tight"><img src="/axion-logo.png" className="h-11 w-10 object-contain" alt="" /><span className="text-xl">AXION <span className="font-normal text-emerald-300">Pay</span></span></a>
+        <div className="hidden items-center gap-7 text-sm text-emerald-50/70 md:flex"><a href="#solucoes">Soluções</a><a href="#integracao">Integração</a><a href="#comecar">Como começar</a></div>
+        <a href="/dashboard" className="inline-flex items-center gap-2 rounded-lg border border-emerald-200/25 bg-emerald-950/35 px-3.5 py-2.5 text-sm font-semibold">Acessar conta <ArrowUpRight className="h-4 w-4" /></a>
+      </nav>
+      <header id="conteudo" className="mx-auto w-[min(1160px,calc(100%-3rem))] py-20 text-center sm:py-28">
+        <p className="inline-flex items-center gap-2 rounded-full border border-emerald-300/25 bg-emerald-950/55 px-3.5 py-2 text-xs font-semibold tracking-[.12em] text-emerald-200"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> PAGAMENTOS PARA OPERAÇÕES DIGITAIS</p>
+        <h1 className="mx-auto mt-7 max-w-4xl text-5xl font-semibold leading-[1.05] tracking-[-.06em] sm:text-7xl">Suas vendas.<br /><span className="text-emerald-300">Sem fronteiras.</span></h1>
+        <p className="mx-auto mt-6 max-w-2xl text-base leading-8 text-emerald-50/70 sm:text-lg">PIX, cartão e assinaturas com uma operação centralizada, API segura e uma experiência pensada para seu negócio crescer.</p>
+        <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row"><a href="/dashboard" className="inline-flex items-center justify-center gap-3 rounded-lg bg-emerald-400 px-6 py-3.5 font-bold text-emerald-950">Começar a vender <ArrowUpRight className="h-5 w-5" /></a><a href="#solucoes" className="inline-flex items-center justify-center gap-3 rounded-lg border border-emerald-100/20 bg-emerald-950/35 px-6 py-3.5 font-semibold">Conhecer a AXION <ArrowRight className="h-5 w-5" /></a></div>
+        <div className="mx-auto mt-10 grid max-w-5xl gap-4 text-left lg:grid-cols-[.8fr_1.2fr]">
+          <div className="rounded-2xl border border-emerald-200/15 bg-[#08110c]/85 p-6"><p className="text-xs font-semibold tracking-[.14em] text-emerald-200/65">UMA CONEXÃO. MAIS POSSIBILIDADES.</p><div className="mt-5 space-y-4">{[[Zap,"PIX","Seu negócio no Brasil"],[CreditCard,"Cartão","Assinaturas pela Stripe"],[Globe2,"BRL / USD","Mais de uma moeda"]].map(([Icon,title,copy]) => <div key={title as string} className="flex items-center gap-4 border-t border-emerald-100/10 pt-4"><Icon className="h-6 w-6 text-emerald-300" /><span><b className="block">{title as string}</b><small className="text-emerald-50/55">{copy as string}</small></span></div>)}</div></div>
+          <div className="rounded-2xl border border-emerald-200/15 bg-[#08110c]/85 p-6"><div className="flex items-center justify-between border-b border-emerald-100/10 pb-4 text-xs"><span className="tracking-[.14em] text-emerald-100/55">ESTADO DO SERVIÇO</span><span className={online === false ? "text-red-300" : "text-emerald-300"}>{state}</span></div><div className="mt-5 rounded-xl border border-emerald-400/25 bg-emerald-400/5 p-4 font-mono text-xs"><div className="flex justify-between text-emerald-100/75"><span>POST /v1/charges</span><span className="text-emerald-300">API AXION</span></div><code className="mt-3 block break-all text-emerald-100/55">{'{ "checkout": "PIX | cartão | assinatura", "auth": "AXION SSO" }'}</code></div><dl className="mt-5 grid gap-3 text-sm text-emerald-50/70"><div className="flex justify-between"><dt>Autenticação central</dt><dd className="text-emerald-300">ativa</dd></div><div className="flex justify-between"><dt>Chaves por merchant</dt><dd className="text-emerald-300">seguras</dd></div><div className="flex justify-between"><dt>API idempotente</dt><dd className="text-emerald-300">disponível</dd></div></dl></div>
+        </div>
+      </header>
+    </section>
+    <section id="solucoes" className="mx-auto w-[min(1160px,calc(100%-3rem))] py-20 sm:py-28"><div className="mx-auto max-w-2xl text-center"><p className="text-xs font-semibold tracking-[.16em] text-emerald-300">PAGAMENTOS QUE ACOMPANHAM SUA OPERAÇÃO</p><h2 className="mt-4 text-4xl font-semibold tracking-[-.04em] sm:text-5xl">Você foca em vender.<br /><span className="text-emerald-300">A estrutura é AXION.</span></h2></div><div className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-4">{capabilities.map(([Icon,title,copy]) => <article key={title} className="rounded-2xl border border-emerald-100/10 bg-[#09120d] p-6"><Icon className="h-7 w-7 text-emerald-300" /><h3 className="mt-6 text-lg font-semibold">{title}</h3><p className="mt-3 text-sm leading-6 text-emerald-50/65">{copy}</p></article>)}</div></section>
+    <section id="integracao" className="border-y border-emerald-100/10 bg-emerald-950/15"><div className="mx-auto grid w-[min(1160px,calc(100%-3rem))] gap-10 py-20 lg:grid-cols-2"><div><p className="text-xs font-semibold tracking-[.16em] text-emerald-300">UMA INTEGRAÇÃO. TODA A SUA OPERAÇÃO.</p><h2 className="mt-4 text-4xl font-semibold tracking-[-.04em]">Do console à primeira cobrança.</h2><p className="mt-5 max-w-xl leading-7 text-emerald-50/65">Crie merchants, gere uma chave e integre pelo contrato público. A cobrança sempre é criada no backend do seu sistema.</p><a href="/docs" className="mt-7 inline-flex items-center gap-2 font-semibold text-emerald-300">Conhecer a API <ArrowUpRight className="h-4 w-4" /></a></div><div className="rounded-2xl border border-emerald-200/15 bg-[#061009] p-6"><div className="flex items-center gap-2 text-sm text-emerald-100"><LockKeyhole className="h-4 w-4 text-emerald-300" /> AXION Auth Central</div><div className="my-5 h-px bg-emerald-100/10" /><div className="rounded-xl border border-emerald-300/25 bg-emerald-400/5 p-5"><div className="flex items-center justify-between"><span className="flex items-center gap-2"><Zap className="h-5 w-5 text-emerald-300" /> Cobrança PIX</span><Check className="h-5 w-5 text-emerald-300" /></div><p className="mt-5 font-mono text-xs text-emerald-100/55">POST /v1/charges <span className="float-right text-emerald-300">idempotente</span></p></div></div></div></section>
+    <section id="comecar" className="mx-auto w-[min(1160px,calc(100%-3rem))] py-20 sm:py-28"><div className="mx-auto max-w-2xl text-center"><p className="text-xs font-semibold tracking-[.16em] text-emerald-300">DO CADASTRO À PRIMEIRA VENDA</p><h2 className="mt-4 text-4xl font-semibold tracking-[-.04em] sm:text-5xl">Menos complicação.<br /><span className="text-emerald-300">Mais negócio acontecendo.</span></h2></div><ol className="mt-12 grid gap-6 md:grid-cols-3">{[[UserRoundPlus,"Cadastre sua operação","Entre com sua identidade AXION e informe os dados do negócio."],[Layers,"Configure seus pagamentos","Crie seu merchant e sua chave de integração no console."],[Code2,"Comece a receber","Integre a API e acompanhe cobranças, plano e assinatura."]].map(([Icon,title,copy],index) => <li key={title as string} className="relative rounded-2xl border border-emerald-100/10 bg-[#09120d] p-6"><span className="grid h-11 w-11 place-items-center rounded-xl bg-emerald-400/10 text-emerald-300"><Icon className="h-6 w-6" /></span><span className="absolute right-6 top-6 font-mono text-sm text-emerald-100/25">0{index+1}</span><h3 className="mt-6 text-lg font-semibold">{title as string}</h3><p className="mt-3 text-sm leading-6 text-emerald-50/65">{copy as string}</p></li>)}</ol><div className="mt-12 text-center"><a href="/dashboard" className="inline-flex items-center gap-3 rounded-lg bg-emerald-400 px-6 py-3.5 font-bold text-emerald-950">Quero começar <ArrowUpRight className="h-5 w-5" /></a></div></section>
+    <footer className="border-t border-emerald-100/10"><div className="mx-auto flex w-[min(1160px,calc(100%-3rem))] flex-col gap-5 py-8 text-sm text-emerald-50/55 sm:flex-row sm:items-center sm:justify-between"><span>© {new Date().getFullYear()} AXION Pay.</span><span>PIX · CARTÃO · ASSINATURAS</span><div className="flex gap-5"><a href="/docs">Documentação</a><a href="/dashboard">Acessar conta</a></div></div></footer>
+  </main>;
 }
