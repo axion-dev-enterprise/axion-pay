@@ -1,42 +1,101 @@
-import { useEffect, useState } from "react";
-import { ArrowRight, ArrowUpRight, Check, Code2, CreditCard, Globe2, KeyRound, Layers, LockKeyhole, ShieldCheck, UserRoundPlus, Zap } from "lucide-react";
+import './landing.css';
+import { ArrowUpRight, ArrowRight, ShieldCheck, CreditCard, Zap, Globe2, Flame, Gamepad2, Layers, KeyRound, Code2, UserRoundPlus, SlidersHorizontal, Check, LockKeyhole, CircleDollarSign } from 'lucide-react';
+import { Reveal, MobileNavigation } from './landing-motion';
 
-const API = "https://api.axionenterprise.cloud";
-const capabilities = [
-  [Zap, "PIX para o Brasil", "Cobranças idempotentes, webhook assinado e acompanhamento no console."],
-  [CreditCard, "Cartão e assinatura", "Checkout Stripe hospedado: dados de cartão não passam pelo AXION Pay."],
-  [KeyRound, "Chaves por merchant", "Cada operação fica segregada com chaves próprias e revogáveis."],
-  [Globe2, "Pronto para escalar", "Uma API segura para pagamentos, identidade e operação."],
-] as const;
+const CONSOLE = 'https://pay.axionenterprise.cloud/dashboard';
+const DOCS = 'https://pay.axionenterprise.cloud/docs';
 
-export default function App() {
-  const [online, setOnline] = useState<boolean | null>(null);
-  useEffect(() => { let alive = true; fetch(`${API}/health`, { cache: "no-store" }).then(r => alive && setOnline(r.ok)).catch(() => alive && setOnline(false)); return () => { alive = false; }; }, []);
-  const state = online === true ? "API operacional" : online === false ? "API indisponível" : "Verificando API";
-  return <main className="min-h-screen overflow-x-hidden bg-[#040806] text-[#f3f7f4]">
-    <a href="#conteudo" className="skip-link">Pular para o conteúdo</a>
-    <section className="relative isolate overflow-hidden border-b border-emerald-100/10">
-      <img src="/money-hero.jpg" className="absolute inset-0 -z-20 h-full w-full object-cover opacity-35" alt="" />
-      <div className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(4,8,6,.78),rgba(4,8,6,.92)),radial-gradient(circle_at_50%_0%,rgba(0,230,107,.18),transparent_48%)]" />
-      <nav className="mx-auto flex h-24 w-[min(1160px,calc(100%-3rem))] items-center justify-between gap-4 border-b border-emerald-100/10">
-        <a href="/" className="flex items-center gap-2.5 font-semibold tracking-tight"><img src="/axion-logo.png" className="h-11 w-10 object-contain" alt="" /><span className="text-xl">AXION <span className="font-normal text-emerald-300">Pay</span></span></a>
-        <div className="hidden items-center gap-7 text-sm text-emerald-50/70 md:flex"><a href="#solucoes">Soluções</a><a href="#integracao">Integração</a><a href="#comecar">Como começar</a></div>
-        <a href="/dashboard" className="inline-flex items-center gap-2 rounded-lg border border-emerald-200/25 bg-emerald-950/35 px-3.5 py-2.5 text-sm font-semibold">Acessar conta <ArrowUpRight className="h-4 w-4" /></a>
-      </nav>
-      <header id="conteudo" className="mx-auto w-[min(1160px,calc(100%-3rem))] py-20 text-center sm:py-28">
-        <p className="inline-flex items-center gap-2 rounded-full border border-emerald-300/25 bg-emerald-950/55 px-3.5 py-2 text-xs font-semibold tracking-[.12em] text-emerald-200"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> PAGAMENTOS PARA OPERAÇÕES DIGITAIS</p>
-        <h1 className="mx-auto mt-7 max-w-4xl text-5xl font-semibold leading-[1.05] tracking-[-.06em] sm:text-7xl">Suas vendas.<br /><span className="text-emerald-300">Sem fronteiras.</span></h1>
-        <p className="mx-auto mt-6 max-w-2xl text-base leading-8 text-emerald-50/70 sm:text-lg">PIX, cartão e assinaturas com uma operação centralizada, API segura e uma experiência pensada para seu negócio crescer.</p>
-        <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row"><a href="/dashboard" className="inline-flex items-center justify-center gap-3 rounded-lg bg-emerald-400 px-6 py-3.5 font-bold text-emerald-950">Começar a vender <ArrowUpRight className="h-5 w-5" /></a><a href="#solucoes" className="inline-flex items-center justify-center gap-3 rounded-lg border border-emerald-100/20 bg-emerald-950/35 px-6 py-3.5 font-semibold">Conhecer a AXION <ArrowRight className="h-5 w-5" /></a></div>
-        <div className="mx-auto mt-10 grid max-w-5xl gap-4 text-left lg:grid-cols-[.8fr_1.2fr]">
-          <div className="rounded-2xl border border-emerald-200/15 bg-[#08110c]/85 p-6"><p className="text-xs font-semibold tracking-[.14em] text-emerald-200/65">UMA CONEXÃO. MAIS POSSIBILIDADES.</p><div className="mt-5 space-y-4">{[[Zap,"PIX","Seu negócio no Brasil"],[CreditCard,"Cartão","Assinaturas pela Stripe"],[Globe2,"BRL / USD","Mais de uma moeda"]].map(([Icon,title,copy]) => <div key={title as string} className="flex items-center gap-4 border-t border-emerald-100/10 pt-4"><Icon className="h-6 w-6 text-emerald-300" /><span><b className="block">{title as string}</b><small className="text-emerald-50/55">{copy as string}</small></span></div>)}</div></div>
-          <div className="rounded-2xl border border-emerald-200/15 bg-[#08110c]/85 p-6"><div className="flex items-center justify-between border-b border-emerald-100/10 pb-4 text-xs"><span className="tracking-[.14em] text-emerald-100/55">ESTADO DO SERVIÇO</span><span className={online === false ? "text-red-300" : "text-emerald-300"}>{state}</span></div><div className="mt-5 rounded-xl border border-emerald-400/25 bg-emerald-400/5 p-4 font-mono text-xs"><div className="flex justify-between text-emerald-100/75"><span>POST /v1/charges</span><span className="text-emerald-300">API AXION</span></div><code className="mt-3 block break-all text-emerald-100/55">{'{ "checkout": "PIX | cartão | assinatura", "auth": "AXION SSO" }'}</code></div><dl className="mt-5 grid gap-3 text-sm text-emerald-50/70"><div className="flex justify-between"><dt>Autenticação central</dt><dd className="text-emerald-300">ativa</dd></div><div className="flex justify-between"><dt>Chaves por merchant</dt><dd className="text-emerald-300">seguras</dd></div><div className="flex justify-between"><dt>API idempotente</dt><dd className="text-emerald-300">disponível</dd></div></dl></div>
-        </div>
-      </header>
-    </section>
-    <section id="solucoes" className="mx-auto w-[min(1160px,calc(100%-3rem))] py-20 sm:py-28"><div className="mx-auto max-w-2xl text-center"><p className="text-xs font-semibold tracking-[.16em] text-emerald-300">PAGAMENTOS QUE ACOMPANHAM SUA OPERAÇÃO</p><h2 className="mt-4 text-4xl font-semibold tracking-[-.04em] sm:text-5xl">Você foca em vender.<br /><span className="text-emerald-300">A estrutura é AXION.</span></h2></div><div className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-4">{capabilities.map(([Icon,title,copy]) => <article key={title} className="rounded-2xl border border-emerald-100/10 bg-[#09120d] p-6"><Icon className="h-7 w-7 text-emerald-300" /><h3 className="mt-6 text-lg font-semibold">{title}</h3><p className="mt-3 text-sm leading-6 text-emerald-50/65">{copy}</p></article>)}</div></section>
-    <section id="integracao" className="border-y border-emerald-100/10 bg-emerald-950/15"><div className="mx-auto grid w-[min(1160px,calc(100%-3rem))] gap-10 py-20 lg:grid-cols-2"><div><p className="text-xs font-semibold tracking-[.16em] text-emerald-300">UMA INTEGRAÇÃO. TODA A SUA OPERAÇÃO.</p><h2 className="mt-4 text-4xl font-semibold tracking-[-.04em]">Do console à primeira cobrança.</h2><p className="mt-5 max-w-xl leading-7 text-emerald-50/65">Crie merchants, gere uma chave e integre pelo contrato público. A cobrança sempre é criada no backend do seu sistema.</p><a href="/docs" className="mt-7 inline-flex items-center gap-2 font-semibold text-emerald-300">Conhecer a API <ArrowUpRight className="h-4 w-4" /></a></div><div className="rounded-2xl border border-emerald-200/15 bg-[#061009] p-6"><div className="flex items-center gap-2 text-sm text-emerald-100"><LockKeyhole className="h-4 w-4 text-emerald-300" /> AXION Auth Central</div><div className="my-5 h-px bg-emerald-100/10" /><div className="rounded-xl border border-emerald-300/25 bg-emerald-400/5 p-5"><div className="flex items-center justify-between"><span className="flex items-center gap-2"><Zap className="h-5 w-5 text-emerald-300" /> Cobrança PIX</span><Check className="h-5 w-5 text-emerald-300" /></div><p className="mt-5 font-mono text-xs text-emerald-100/55">POST /v1/charges <span className="float-right text-emerald-300">idempotente</span></p></div></div></div></section>
-    <section id="comecar" className="mx-auto w-[min(1160px,calc(100%-3rem))] py-20 sm:py-28"><div className="mx-auto max-w-2xl text-center"><p className="text-xs font-semibold tracking-[.16em] text-emerald-300">DO CADASTRO À PRIMEIRA VENDA</p><h2 className="mt-4 text-4xl font-semibold tracking-[-.04em] sm:text-5xl">Menos complicação.<br /><span className="text-emerald-300">Mais negócio acontecendo.</span></h2></div><ol className="mt-12 grid gap-6 md:grid-cols-3">{[[UserRoundPlus,"Cadastre sua operação","Entre com sua identidade AXION e informe os dados do negócio."],[Layers,"Configure seus pagamentos","Crie seu merchant e sua chave de integração no console."],[Code2,"Comece a receber","Integre a API e acompanhe cobranças, plano e assinatura."]].map(([Icon,title,copy],index) => <li key={title as string} className="relative rounded-2xl border border-emerald-100/10 bg-[#09120d] p-6"><span className="grid h-11 w-11 place-items-center rounded-xl bg-emerald-400/10 text-emerald-300"><Icon className="h-6 w-6" /></span><span className="absolute right-6 top-6 font-mono text-sm text-emerald-100/25">0{index+1}</span><h3 className="mt-6 text-lg font-semibold">{title as string}</h3><p className="mt-3 text-sm leading-6 text-emerald-50/65">{copy as string}</p></li>)}</ol><div className="mt-12 text-center"><a href="/dashboard" className="inline-flex items-center gap-3 rounded-lg bg-emerald-400 px-6 py-3.5 font-bold text-emerald-950">Quero começar <ArrowUpRight className="h-5 w-5" /></a></div></section>
-    <footer className="border-t border-emerald-100/10"><div className="mx-auto flex w-[min(1160px,calc(100%-3rem))] flex-col gap-5 py-8 text-sm text-emerald-50/55 sm:flex-row sm:items-center sm:justify-between"><span>© {new Date().getFullYear()} AXION Pay.</span><span>PIX · CARTÃO · ASSINATURAS</span><div className="flex gap-5"><a href="/docs">Documentação</a><a href="/dashboard">Acessar conta</a></div></div></footer>
-  </main>;
+function Brand() {
+  return <a className="brand" href="#inicio" aria-label="AXION Pay — início"><img src="/axion-logo.png" width="830" height="887" alt="" /><span>AXION<span className="brand-pay">pay</span></span></a>;
+}
+
+export default function Home() {
+  return (
+    <main id="inicio" className="pay-landing">
+      <a href="#conteudo" className="skip-link">Pular para o conteúdo</a>
+      <section className="hero">
+        <img className="hero-background" src="/money-hero.jpg" width="1920" height="1080" alt="" fetchPriority="high" />
+        <div className="hero-shade" />
+        <nav className="navigation container" aria-label="Navegação principal">
+          <Brand />
+          <div className="nav-links"><a href="#solucoes">Soluções</a><a href="#para-quem">Para quem é</a><a href="#como-comecar">Como começar</a></div>
+          <div className="nav-actions"><a className="nav-login" href={CONSOLE}>Acessar conta <ArrowUpRight size={16}/></a><MobileNavigation/></div>
+        </nav>
+        <header id="conteudo" className="hero-content container">
+          <div className="eyebrow animate-rise"><span className="status-dot"/> O PRÓXIMO NÍVEL DA SUA OPERAÇÃO</div>
+          <h1 className="animate-rise">Suas vendas.<br/>Sem <span className="gradient-text">fronteiras.</span></h1>
+          <p className="hero-description animate-rise">Do PIX ao cartão internacional. Receba em BRL e USD com a estrutura que acompanha o ritmo do seu negócio.</p>
+          <div className="hero-actions animate-rise"><a className="button button-primary" href={CONSOLE}>Começar a vender <ArrowUpRight size={20}/></a><a className="button button-secondary" href="#solucoes">Conhecer a AXION <ArrowRight size={18}/></a></div>
+          <div className="hero-trust animate-rise"><span><ShieldCheck size={15}/> Autenticação central AXION</span><span><Globe2 size={15}/> Brasil e mundo</span></div>
+          <div className="hero-panels">
+          <div className="payment-panel animate-rise">
+            <div className="panel-top"><span className="panel-label">UMA CONEXÃO. MAIS POSSIBILIDADES.</span><span className="panel-tag"><span className="status-dot"/> AXION PAY</span></div>
+            <div className="payment-options"><div><span className="payment-icon"><Zap/></span><div><strong>PIX</strong><span>Seu negócio no Brasil</span></div></div><div><span className="payment-icon"><CreditCard/></span><div><strong>Cartão internacional</strong><span>Seu negócio no mundo</span></div></div><div><span className="payment-icon currency-icon">$</span><div><strong>BRL / USD</strong><span>Mais de uma moeda</span></div></div></div>
+            <div className="scan-track" aria-hidden="true"><span/></div>
+          </div>
+          <figure className="service-figure animate-rise" aria-label="Exemplo ilustrativo do painel de estado do serviço AXION">
+            <div className="service-panel">
+              <div className="service-heading"><span>ESTADO DO SERVIÇO</span><span className="service-operational"><span className="status-dot"/> OPERACIONAL</span></div>
+              <div className="service-content">
+                <div className="service-scan" aria-hidden="true"/>
+                <div className="service-response">
+                  <div className="service-response-heading"><span>POST /v1/charges</span><span>201 CREATED</span></div>
+                  <code>{'{ "txid":"0x5f2a","status":"APROVADO","latency_ms":42 }'}</code>
+                </div>
+                <dl className="service-metrics">
+                  <div><dt>API operacional</dt><dd><span/>99,98%</dd></div>
+                  <div><dt>AXION Auth Central</dt><dd><span/>ativo</dd></div>
+                  <div><dt>Chaves de merchant no console</dt><dd><span/>seguras</dd></div>
+                  <div><dt>API autenticada e idempotente</dt><dd><span/>ok</dd></div>
+                </dl>
+              </div>
+            </div>
+            <figcaption>Visualização ilustrativa da integração AXION.</figcaption>
+          </figure>
+          </div>
+        </header>
+      </section>
+      <div className="section-body">
+        <section className="section container" id="para-quem" aria-labelledby="audience-title">
+          <Reveal className="section-heading"><span className="section-kicker">DIFERENTES NEGÓCIOS. A MESMA AMBIÇÃO.</span><h2 id="audience-title">Para quem a <span className="gradient-text">AXION Pay serve?</span></h2><p>Seu mercado muda. Sua forma de receber acompanha.</p></Reveal>
+          <div className="audience-grid">
+            {[
+              {icon:Flame,title:'Nicho hot',text:'Conteúdo exclusivo, creators e negócios digitais. Conecte seu público a uma forma simples de pagar.',tag:'CONTEÚDO & CREATORS'},
+              {icon:Gamepad2,title:'iGaming',text:'Sua operação não para. Integre os pagamentos à experiência de quem joga e acompanhe cada cobrança.',tag:'JOGOS & ENTRETENIMENTO'},
+              {icon:Layers,title:'Operações black e white',text:'Diferentes estratégias de venda, com uma estrutura de pagamentos para acompanhar o seu negócio.',tag:'PERFORMANCE & VENDAS'},
+              {icon:Globe2,title:'Brasil e mundo',text:'Operações nacionais e internacionais. PIX no Brasil, cartão de crédito internacional e moedas BRL e USD.',tag:'NACIONAL & INTERNACIONAL'},
+            ].map((item,i) => <Reveal delay={i*75} className="audience-card" key={item.title}><span className="card-icon"><item.icon size={25}/></span><h3>{item.title}</h3><p>{item.text}</p><span className="card-tag">{item.tag}</span></Reveal>)}
+          </div>
+        </section>
+        <section className="section solutions container" id="solucoes" aria-labelledby="solutions-title">
+          <Reveal className="section-heading"><span className="section-kicker">POR TRÁS DE CADA PAGAMENTO</span><h2 id="solutions-title">Você foca em vender.<br/><span className="gradient-text">A estrutura é AXION.</span></h2><p>Pagamentos conectados, acessos organizados e sua operação no controle.</p></Reveal>
+          <div className="solution-grid">
+            <Reveal className="solution-main">
+              <div className="solution-copy"><span className="card-icon"><Code2 size={25}/></span><h3>Uma integração.<br/>Toda a sua operação.</h3><p>Crie e acompanhe cobranças pela API, com autenticação central e proteção contra duplicidade.</p><a href={DOCS} className="text-link">Conhecer a API <ArrowUpRight size={17}/></a></div>
+              <div className="flow-visual" role="img" aria-label="Fluxo ilustrativo: autenticação AXION, processamento de cobrança e confirmação de pagamento.">
+                <div className="flow-caption"><span>FLUXO DE PAGAMENTO</span><span>Ilustrativo</span></div>
+                <div className="flow-auth"><span><LockKeyhole size={16}/> AXION Auth Central</span><ShieldCheck size={18}/></div>
+                <div className="flow-connector" aria-hidden="true"><span/></div>
+                <div className="transaction"><div className="transaction-scan" aria-hidden="true"/><div className="transaction-top"><span><Zap size={19}/> Cobrança PIX</span><span className="status-dot"/></div><div className="transaction-state"><span className="processing-state"><span className="loader"/> Processando pagamento</span><span className="approved-state"><span className="approved-icon"><Check size={13}/></span> Pagamento confirmado</span></div><div className="transaction-code">POST /v1/charges <span>API AXION</span></div></div>
+                <div className="flow-caption flow-bottom"><span>DA CONEXÃO À CONFIRMAÇÃO</span><span><ShieldCheck size={13}/> Autenticado</span></div>
+              </div>
+            </Reveal>
+            <div className="solution-side">
+              <Reveal className="feature-card" delay={80}><span className="card-icon"><ShieldCheck size={24}/></span><div><h3>Um acesso. Controle central.</h3><p>Entre com a identidade AXION e gerencie sua operação em um só console.</p><span className="feature-label"><span className="status-dot"/> SSO AXION</span></div></Reveal>
+              <Reveal className="feature-card" delay={160}><span className="card-icon"><KeyRound size={24}/></span><div><h3>Cada operação no seu lugar.</h3><p>Organize seus negócios por merchant, com chaves de acesso próprias e gestão individual.</p><span className="feature-label"><Layers size={13}/> GESTÃO POR MERCHANT</span></div></Reveal>
+            </div>
+          </div>
+        </section>
+        <section className="section start-section container" id="como-comecar" aria-labelledby="start-title">
+          <Reveal className="section-heading"><span className="section-kicker">DO CADASTRO À PRIMEIRA VENDA</span><h2 id="start-title">Menos complicação.<br/><span className="gradient-text">Mais negócio acontecendo.</span></h2><p>Começar é simples. Sua próxima etapa já está aqui.</p></Reveal>
+          <div className="start-grid">
+            {[{icon:UserRoundPlus,title:'Cadastre sua operação',text:'Acesse sua conta AXION e preencha os dados do negócio que vai receber.'},{icon:SlidersHorizontal,title:'Conecte seus pagamentos',text:'Configure sua operação e faça a conexão dos pagamentos com seu site ou sistema.'},{icon:CircleDollarSign,title:'Comece a receber',text:'Com a operação habilitada, crie suas cobranças e acompanhe tudo pelo console.'}].map((item,i)=><Reveal className="start-card" delay={i*90} key={item.title}><span className="start-icon"><item.icon size={27}/></span>{i<2&&<span className="step-connection" aria-hidden="true"><ArrowRight size={18}/></span>}<h3>{item.title}</h3><p>{item.text}</p></Reveal>)}
+          </div>
+          <Reveal className="start-action"><a href={CONSOLE} className="button button-primary">Quero começar <ArrowUpRight size={20}/></a><span>Já tem uma conta? <a href={CONSOLE}>Acesse o console</a></span></Reveal>
+        </section>
+        <section className="container closing-section" aria-labelledby="closing-title"><Reveal className="closing-card"><div className="closing-glow" aria-hidden="true"/><span className="eyebrow"><span className="status-dot"/> SEU PRÓXIMO MOVIMENTO</span><h2 id="closing-title">Seu negócio vai além.<br/><span className="gradient-text">Seu pagamento também.</span></h2><p>PIX, cartão internacional, BRL e USD.<br/>Uma nova fase para a sua operação começa com AXION Pay.</p><div className="hero-actions"><a href={CONSOLE} className="button button-primary">Começar com a AXION <ArrowUpRight size={20}/></a><a href={DOCS} className="button button-secondary">Ver documentação <Code2 size={18}/></a></div><div className="scan-track" aria-hidden="true"><span/></div></Reveal></section>
+        <footer className="footer container"><div className="footer-top"><Brand/><p>Conectando negócios.<br/>Movimentando possibilidades.</p><div className="footer-links"><a href="#para-quem">Para quem é</a><a href={DOCS}>Documentação <ArrowUpRight size={14}/></a><a href={CONSOLE}>Acessar conta <ArrowUpRight size={14}/></a></div></div><div className="footer-bottom"><span>© {new Date().getFullYear()} AXION Pay.</span><span>PIX · CARTÃO INTERNACIONAL · BRL / USD</span><a href="#inicio">Voltar ao topo ↑</a></div></footer>
+      </div>
+    </main>
+  );
 }
