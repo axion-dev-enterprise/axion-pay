@@ -656,11 +656,6 @@ export default function PayDashboard() {
             >
               <Menu className="w-5 h-5" />
             </button>
-            <div className="flex items-center gap-2 text-xs font-mono text-[#a1b0a6]">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-              <span className="text-white font-bold">PostgreSQL Core:</span>
-              <span>api.axionenterprise.cloud (v1.0)</span>
-            </div>
           </div>
 
           <div className="flex items-center gap-3">
