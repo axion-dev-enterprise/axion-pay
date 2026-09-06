@@ -190,6 +190,25 @@ export async function ingestStripeWebhook(database: BillingDatabase, config: Str
   );
   if (!inserted.rowCount) return { received: true, duplicate: true };
 
+  if (event.type.startsWith('payment_intent.') && typeof object.id === 'string') {
+    const paymentStatus = typeof object.status === 'string' ? object.status.toUpperCase() : 'PROCESSING';
+    const paymentIntent = await database.query<{ id: string; amount_cents: string }>(
+      `UPDATE payment_intents SET status = $2, updated_at = NOW()
+        WHERE provider = 'stripe' AND provider_charge_id = $1
+        RETURNING id, amount_cents`,
+      [object.id, paymentStatus],
+    );
+    if (event.type === 'payment_intent.succeeded' && paymentIntent.rowCount) {
+      await database.query(
+        `INSERT INTO financial_transactions
+          (payment_intent_id, provider, provider_transaction_id, amount_cents, direction, status, occurred_at)
+         VALUES ($1, 'stripe', $2, $3, 'CREDIT', 'CONFIRMED', to_timestamp($4))
+         ON CONFLICT (provider, provider_transaction_id) DO NOTHING`,
+        [paymentIntent.rows[0].id, object.id, paymentIntent.rows[0].amount_cents, event.created],
+      );
+    }
+  }
+
   if (customerId && (event.type === 'checkout.session.completed' || event.type.startsWith('customer.subscription.'))) {
     const status = typeof object.status === 'string' ? object.status : (event.type === 'checkout.session.completed' ? 'checkout_completed' : null);
     const periodEnd = typeof object.current_period_end === 'number' ? object.current_period_end : null;
