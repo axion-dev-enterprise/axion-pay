@@ -1,3 +1,4 @@
+import "../workspace-theme.css";
 import React, { useState, useEffect } from "react";
 import {
   Building2,
@@ -102,7 +103,7 @@ function StatusBadge({ status }: { status: string }) {
           ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
           : isBad
           ? "bg-red-500/10 text-red-400 border-red-500/20"
-          : "bg-zinc-800 text-zinc-400 border-zinc-700"
+          : "bg-[#182b20] text-[#a1b0a6] border-[#30513d]"
       }`}
     >
       <span
@@ -124,7 +125,7 @@ function CopyBtn({ text }: { text: string }) {
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       }}
-      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-mono text-zinc-300 transition-all border border-zinc-700 cursor-pointer"
+      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#182b20] hover:bg-[#294333] text-xs font-mono text-[#b5c6bb] transition-all border border-[#30513d] cursor-pointer"
     >
       {copied ? (
         <>
@@ -511,10 +512,10 @@ export default function PayDashboard() {
   // Se carregando autenticação
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-[#040407] flex items-center justify-center">
+      <div className="pay-workspace min-h-screen bg-[#040806] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-8 h-8 text-[#e8b923] animate-spin" />
-          <span className="text-xs font-mono text-zinc-400">Verificando sessão segura AXION...</span>
+          <Loader2 className="w-8 h-8 text-[#00e66b] animate-spin" />
+          <span className="text-xs font-mono text-[#a1b0a6]">Verificando sessão segura AXION...</span>
         </div>
       </div>
     );
@@ -524,20 +525,20 @@ export default function PayDashboard() {
   if (!user) {
     const returnUrl = encodeURIComponent(window.location.href);
     return (
-      <div className="min-h-screen bg-[#040407] flex items-center justify-center p-4">
-        <div className="w-full max-w-md p-8 rounded-3xl bg-[#09090d]/90 border border-zinc-800 shadow-2xl text-center space-y-6">
-          <div className="w-14 h-14 rounded-2xl bg-[#e8b923]/10 border border-[#e8b923]/20 flex items-center justify-center mx-auto">
-            <Lock className="w-7 h-7 text-[#e8b923]" />
+      <div className="pay-workspace min-h-screen bg-[#040806] flex items-center justify-center p-4">
+        <div className="w-full max-w-md p-8 rounded-3xl bg-[#09120d]/90 border border-[#213428] shadow-2xl text-center space-y-6">
+          <div className="w-14 h-14 rounded-2xl bg-[#00e66b]/10 border border-[#00e66b]/20 flex items-center justify-center mx-auto">
+            <Lock className="w-7 h-7 text-[#00e66b]" />
           </div>
           <div className="space-y-1.5">
             <h2 className="text-xl font-bold text-white tracking-tight">Painel de Controle AxionPay</h2>
-            <p className="text-xs text-zinc-400 leading-relaxed">
+            <p className="text-xs text-[#a1b0a6] leading-relaxed">
               Autenticação obrigatória. Faça login com sua conta corporativa AXION para acessar o gateway industrial.
             </p>
           </div>
           <a
             href={`${AUTH_API}/login?return_to=${returnUrl}`}
-            className="w-full py-3.5 bg-[#e8b923] hover:bg-amber-400 text-black font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-yellow-500/10 flex items-center justify-center gap-2"
+            className="w-full py-3.5 bg-[#00e66b] hover:bg-[#69f0ae] text-black font-semibold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-emerald-500/10 flex items-center justify-center gap-2"
           >
             <LogIn className="w-4 h-4" />
             <span>Entrar com AXION Single Sign-On</span>
@@ -561,28 +562,28 @@ export default function PayDashboard() {
   const canGenerateApiKeys = onboarding?.status === "APPROVED";
 
   return (
-    <div className="min-h-screen bg-[#040407] text-[#f5f5fa] font-sans antialiased flex flex-col md:flex-row">
+    <div className="pay-workspace min-h-screen bg-[#040806] text-[#f3f7f4] font-sans antialiased flex flex-col md:flex-row">
       {/* SIDEBAR */}
       <aside
-        className={`fixed md:sticky top-0 h-screen bg-[#09090d] border-r border-zinc-800/80 z-40 flex flex-col justify-between transition-all duration-300 ${
+        className={`fixed md:sticky top-0 h-screen bg-[#09120d] border-r border-[#213428]/80 z-40 flex flex-col justify-between transition-all duration-300 ${
           mobileOpen ? "left-0 w-64" : "-left-64 md:left-0"
         } ${collapsed ? "md:w-16" : "md:w-64"}`}
       >
         <div>
-          <div className="flex items-center justify-between px-5 h-16 border-b border-zinc-800/80">
+          <div className="flex items-center justify-between px-5 h-16 border-b border-[#213428]/80">
             {(!collapsed || mobileOpen) && (
               <a href="/" className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-[#e8b923]/10 border border-[#e8b923]/30 flex items-center justify-center">
-                  <Zap className="w-4 h-4 text-[#e8b923]" />
+                <div className="w-8 h-8 rounded-xl bg-[#00e66b]/10 border border-[#00e66b]/30 flex items-center justify-center">
+                  <img src="/axion-logo.png" className="h-8 w-8 object-contain" alt="" />
                 </div>
-                <span className="text-base font-extrabold tracking-tight text-white">
-                  Axion<span className="text-[#e8b923]">Pay</span>
+                <span className="text-base font-semibold tracking-tight text-white">
+                  AXION <span className="text-[#00e66b]">Pay</span>
                 </span>
               </a>
             )}
             <button
               onClick={() => setMobileOpen(false)}
-              className="md:hidden p-1 text-zinc-400 hover:text-white"
+              className="md:hidden p-1 text-[#a1b0a6] hover:text-white"
             >
               <X className="w-5 h-5" />
             </button>
@@ -598,8 +599,8 @@ export default function PayDashboard() {
                 }}
                 className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   activeSection === item.id
-                    ? "bg-[#e8b923] text-black shadow-lg shadow-yellow-500/10"
-                    : "text-zinc-400 hover:text-white hover:bg-zinc-900"
+                    ? "bg-[#00e66b] text-black shadow-lg shadow-emerald-500/10"
+                    : "text-[#a1b0a6] hover:text-white hover:bg-[#101d14]"
                 }`}
               >
                 <item.icon className="w-4 h-4 shrink-0" />
@@ -610,15 +611,15 @@ export default function PayDashboard() {
         </div>
 
         {/* User Card no rodapé da Sidebar */}
-        <div className="p-4 border-t border-zinc-800/80">
+        <div className="p-4 border-t border-[#213428]/80">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-white font-bold text-xs">
+            <div className="w-8 h-8 rounded-full bg-[#182b20] flex items-center justify-center text-white font-bold text-xs">
               {user.name ? user.name.slice(0, 2).toUpperCase() : "AX"}
             </div>
             {(!collapsed || mobileOpen) && (
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-bold text-white truncate">{user.name || "Usuário AXION"}</p>
-                <p className="text-[10px] font-mono text-zinc-500 truncate">{user.email}</p>
+                <p className="text-[10px] font-mono text-[#8b9f93] truncate">{user.email}</p>
               </div>
             )}
             <button
@@ -627,7 +628,7 @@ export default function PayDashboard() {
                 window.location.reload();
               }}
               title="Sair"
-              className="p-1.5 text-zinc-500 hover:text-red-400 transition-colors"
+              className="p-1.5 text-[#8b9f93] hover:text-red-400 transition-colors"
             >
               <LogOut className="w-4 h-4" />
             </button>
@@ -638,15 +639,15 @@ export default function PayDashboard() {
       {/* CONTEÚDO PRINCIPAL */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* TOPBAR */}
-        <header className="h-16 px-6 border-b border-zinc-800/80 flex items-center justify-between bg-[#040407]/80 backdrop-blur-md sticky top-0 z-30">
+        <header className="h-16 px-6 border-b border-[#213428]/80 flex items-center justify-between bg-[#040806]/80 backdrop-blur-md sticky top-0 z-30">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileOpen(true)}
-              className="md:hidden p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-900"
+              className="md:hidden p-2 rounded-lg text-[#a1b0a6] hover:text-white hover:bg-[#101d14]"
             >
               <Menu className="w-5 h-5" />
             </button>
-            <div className="flex items-center gap-2 text-xs font-mono text-zinc-400">
+            <div className="flex items-center gap-2 text-xs font-mono text-[#a1b0a6]">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
               <span className="text-white font-bold">PostgreSQL Core:</span>
               <span>api.axionenterprise.cloud (v1.0)</span>
@@ -657,14 +658,14 @@ export default function PayDashboard() {
             <button
               onClick={loadAllData}
               disabled={loadingData}
-              className="px-3 py-1.5 rounded-lg border border-zinc-800 bg-zinc-900 hover:bg-zinc-800 text-xs text-zinc-300 flex items-center gap-1.5 transition-all cursor-pointer"
+              className="px-3 py-1.5 rounded-lg border border-[#213428] bg-[#101d14] hover:bg-[#182b20] text-xs text-[#b5c6bb] flex items-center gap-1.5 transition-all cursor-pointer"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loadingData ? "animate-spin" : ""}`} />
               <span className="hidden sm:inline">Sincronizar</span>
             </button>
             <a
               href="/"
-              className="px-3.5 py-1.5 rounded-lg bg-[#e8b923]/10 border border-[#e8b923]/30 text-[#e8b923] hover:bg-[#e8b923]/20 text-xs font-bold flex items-center gap-1.5 transition-all"
+              className="px-3.5 py-1.5 rounded-lg bg-[#00e66b]/10 border border-[#00e66b]/30 text-[#00e66b] hover:bg-[#00e66b]/20 text-xs font-bold flex items-center gap-1.5 transition-all"
             >
               <ExternalLink className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Portal da API</span>
@@ -695,12 +696,12 @@ export default function PayDashboard() {
             <div className="space-y-8 animate-fadeIn">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <h1 className="text-2xl font-black text-white tracking-tight">Visão Geral do Gateway</h1>
-                  <p className="text-xs text-zinc-400 mt-1">Métricas em tempo real confirmadas no banco PostgreSQL</p>
+                  <h1 className="text-2xl font-semibold text-white tracking-tight">Visão Geral do Gateway</h1>
+                  <p className="text-xs text-[#a1b0a6] mt-1">Métricas em tempo real confirmadas no banco PostgreSQL</p>
                 </div>
                 <button
                   onClick={() => setMerchantModal(true)}
-                  className="px-4 py-2 bg-[#e8b923] hover:bg-amber-400 text-black font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-yellow-500/10 flex items-center gap-2 cursor-pointer w-fit"
+                  className="px-4 py-2 bg-[#00e66b] hover:bg-[#69f0ae] text-black font-semibold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-emerald-500/10 flex items-center gap-2 cursor-pointer w-fit"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Novo Merchant</span>
@@ -709,54 +710,54 @@ export default function PayDashboard() {
 
               {/* Grid de Métricas */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="p-5 rounded-2xl bg-[#09090d] border border-zinc-800/80 space-y-2">
-                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-zinc-500">Operações (Merchants)</span>
-                  <div className="text-3xl font-extrabold text-white">{overview.merchants}</div>
-                  <p className="text-[11px] text-zinc-400">Contas ativas vinculadas</p>
+                <div className="p-5 rounded-2xl bg-[#09120d] border border-[#213428]/80 space-y-2">
+                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#8b9f93]">Operações (Merchants)</span>
+                  <div className="text-3xl font-semibold text-white">{overview.merchants}</div>
+                  <p className="text-[11px] text-[#a1b0a6]">Contas ativas vinculadas</p>
                 </div>
 
-                <div className="p-5 rounded-2xl bg-[#09090d] border border-zinc-800/80 space-y-2">
-                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-zinc-500">Chaves de API Ativas</span>
-                  <div className="text-3xl font-extrabold text-[#e8b923]">{overview.activeKeys}</div>
-                  <p className="text-[11px] text-zinc-400">Credenciais com hash SHA-256</p>
+                <div className="p-5 rounded-2xl bg-[#09120d] border border-[#213428]/80 space-y-2">
+                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#8b9f93]">Chaves de API Ativas</span>
+                  <div className="text-3xl font-semibold text-[#00e66b]">{overview.activeKeys}</div>
+                  <p className="text-[11px] text-[#a1b0a6]">Credenciais com hash SHA-256</p>
                 </div>
 
-                <div className="p-5 rounded-2xl bg-[#09090d] border border-zinc-800/80 space-y-2">
-                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-zinc-500">Transações Hoje</span>
-                  <div className="text-3xl font-extrabold text-white">{overview.transactionsToday}</div>
-                  <p className="text-[11px] text-zinc-400">Cobranças emitidas hoje</p>
+                <div className="p-5 rounded-2xl bg-[#09120d] border border-[#213428]/80 space-y-2">
+                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#8b9f93]">Transações Hoje</span>
+                  <div className="text-3xl font-semibold text-white">{overview.transactionsToday}</div>
+                  <p className="text-[11px] text-[#a1b0a6]">Cobranças emitidas hoje</p>
                 </div>
 
-                <div className="p-5 rounded-2xl bg-[#09090d] border border-zinc-800/80 space-y-2">
-                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-zinc-500">Volume no Mês</span>
-                  <div className="text-3xl font-extrabold text-emerald-400 font-mono">
+                <div className="p-5 rounded-2xl bg-[#09120d] border border-[#213428]/80 space-y-2">
+                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#8b9f93]">Volume no Mês</span>
+                  <div className="text-3xl font-semibold text-emerald-400 font-mono">
                     R$ {(overview.volumeMonthCents / 100).toFixed(2)}
                   </div>
-                  <p className="text-[11px] text-zinc-400">Liquidação comprovada</p>
+                  <p className="text-[11px] text-[#a1b0a6]">Liquidação comprovada</p>
                 </div>
               </div>
 
               {/* Tabela de Transações Recentes */}
-              <div className="rounded-3xl bg-[#09090d] border border-zinc-800/80 p-6 space-y-4 shadow-xl">
+              <div className="rounded-3xl bg-[#09120d] border border-[#213428]/80 p-6 space-y-4 shadow-xl">
                 <div className="flex justify-between items-center">
                   <h3 className="text-sm font-bold text-white tracking-tight">Transações Recentes</h3>
                   <button
                     onClick={() => setActiveSection("transactions")}
-                    className="text-xs text-[#e8b923] hover:underline"
+                    className="text-xs text-[#00e66b] hover:underline"
                   >
                     Ver todas →
                   </button>
                 </div>
 
                 {transactions.length === 0 ? (
-                  <div className="py-12 text-center text-zinc-500 text-xs font-mono">
+                  <div className="py-12 text-center text-[#8b9f93] text-xs font-mono">
                     Nenhuma transação registrada no banco até o momento.
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs">
                       <thead>
-                        <tr className="border-b border-zinc-800 text-zinc-500 font-mono text-[10px] uppercase">
+                        <tr className="border-b border-[#213428] text-[#8b9f93] font-mono text-[10px] uppercase">
                           <th className="pb-3">ID / Correlation</th>
                           <th className="pb-3">Merchant</th>
                           <th className="pb-3">Valor</th>
@@ -766,8 +767,8 @@ export default function PayDashboard() {
                       </thead>
                       <tbody className="divide-y divide-zinc-800/50">
                         {transactions.slice(0, 5).map((tx) => (
-                          <tr key={tx.id} className="hover:bg-zinc-900/50 transition">
-                            <td className="py-3 font-mono text-zinc-300 select-all">{tx.correlationId}</td>
+                          <tr key={tx.id} className="hover:bg-[#101d14]/50 transition">
+                            <td className="py-3 font-mono text-[#b5c6bb] select-all">{tx.correlationId}</td>
                             <td className="py-3 font-semibold text-white">{tx.merchantName}</td>
                             <td className="py-3 font-mono font-bold text-white">
                               R$ {(tx.amountCents / 100).toFixed(2)}
@@ -775,7 +776,7 @@ export default function PayDashboard() {
                             <td className="py-3">
                               <StatusBadge status={tx.status} />
                             </td>
-                            <td className="py-3 text-zinc-400 font-mono">
+                            <td className="py-3 text-[#a1b0a6] font-mono">
                               {new Date(tx.createdAt).toLocaleString("pt-BR")}
                             </td>
                           </tr>
@@ -794,11 +795,11 @@ export default function PayDashboard() {
               <div className="flex justify-between items-center">
                 <div>
                   <h1 className="text-xl font-bold text-white tracking-tight">Merchants & Contas Operacionais</h1>
-                  <p className="text-xs text-zinc-400 mt-0.5">Segregação multi-tenant de cobranças e chaves de API</p>
+                  <p className="text-xs text-[#a1b0a6] mt-0.5">Segregação multi-tenant de cobranças e chaves de API</p>
                 </div>
                 <button
                   onClick={() => setMerchantModal(true)}
-                  className="px-4 py-2 bg-[#e8b923] hover:bg-amber-400 text-black font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-yellow-500/10 flex items-center gap-2 cursor-pointer"
+                  className="px-4 py-2 bg-[#00e66b] hover:bg-[#69f0ae] text-black font-semibold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-emerald-500/10 flex items-center gap-2 cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Cadastrar Merchant</span>
@@ -809,27 +810,27 @@ export default function PayDashboard() {
                 {merchants.map((m) => (
                   <div
                     key={m.id}
-                    className="p-6 rounded-2xl bg-[#09090d] border border-zinc-800/80 space-y-4 relative"
+                    className="p-6 rounded-2xl bg-[#09120d] border border-[#213428]/80 space-y-4 relative"
                   >
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center">
-                          <Building className="w-5 h-5 text-[#e8b923]" />
+                        <div className="w-10 h-10 rounded-xl bg-[#101d14] border border-[#213428] flex items-center justify-center">
+                          <Building className="w-5 h-5 text-[#00e66b]" />
                         </div>
                         <div>
                           <h4 className="text-sm font-bold text-white">{m.name}</h4>
-                          <span className="text-[10px] font-mono text-zinc-500 select-all">{m.id}</span>
+                          <span className="text-[10px] font-mono text-[#8b9f93] select-all">{m.id}</span>
                         </div>
                       </div>
                       <StatusBadge status={m.status} />
                     </div>
 
-                    <div className="space-y-1 text-xs text-zinc-400 font-mono">
+                    <div className="space-y-1 text-xs text-[#a1b0a6] font-mono">
                       {m.document && <p>Documento: {m.document}</p>}
                       {m.billingEmail && <p>E-mail: {m.billingEmail}</p>}
                     </div>
 
-                    <div className="pt-3 border-t border-zinc-800 flex justify-between items-center text-xs">
+                    <div className="pt-3 border-t border-[#213428] flex justify-between items-center text-xs">
                       <button
                         onClick={() => {
                           if (!canGenerateApiKeys) {
@@ -840,7 +841,7 @@ export default function PayDashboard() {
                           setKeyMerchantId(m.id);
                           setApiKeyModal(true);
                         }}
-                        className="text-[#e8b923] hover:underline font-bold flex items-center gap-1 cursor-pointer"
+                        className="text-[#00e66b] hover:underline font-bold flex items-center gap-1 cursor-pointer"
                       >
                         <Key className="w-3.5 h-3.5" />
                         <span>{canGenerateApiKeys ? "Gerar Chave de API" : "Concluir KYC"}</span>
@@ -848,7 +849,7 @@ export default function PayDashboard() {
 
                       <button
                         onClick={() => handleToggleMerchantStatus(m.id, m.status)}
-                        className="text-xs text-zinc-400 hover:text-white cursor-pointer"
+                        className="text-xs text-[#a1b0a6] hover:text-white cursor-pointer"
                       >
                         {m.status === "ACTIVE" ? "Desativar" : "Ativar"}
                       </button>
@@ -865,7 +866,7 @@ export default function PayDashboard() {
               <div className="flex justify-between items-center">
                 <div>
                   <h1 className="text-xl font-bold text-white tracking-tight">Chaves de API (Server-to-Server)</h1>
-                  <p className="text-xs text-zinc-400 mt-0.5">Credenciais criptografadas para emissão de cobranças PIX</p>
+                  <p className="text-xs text-[#a1b0a6] mt-0.5">Credenciais criptografadas para emissão de cobranças PIX</p>
                 </div>
                 <button
                   onClick={() => {
@@ -877,23 +878,23 @@ export default function PayDashboard() {
                     if (merchants.length > 0) setKeyMerchantId(merchants[0].id);
                     setApiKeyModal(true);
                   }}
-                  className="px-4 py-2 bg-[#e8b923] hover:bg-amber-400 text-black font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-yellow-500/10 flex items-center gap-2 cursor-pointer"
+                  className="px-4 py-2 bg-[#00e66b] hover:bg-[#69f0ae] text-black font-semibold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-emerald-500/10 flex items-center gap-2 cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
                   <span>{canGenerateApiKeys ? "Nova Chave de API" : "Concluir KYC"}</span>
                 </button>
               </div>
 
-              <div className="rounded-3xl bg-[#09090d] border border-zinc-800/80 p-6 space-y-4 shadow-xl">
+              <div className="rounded-3xl bg-[#09120d] border border-[#213428]/80 p-6 space-y-4 shadow-xl">
                 {apiKeys.length === 0 ? (
-                  <div className="py-12 text-center text-zinc-500 text-xs font-mono">
+                  <div className="py-12 text-center text-[#8b9f93] text-xs font-mono">
                     Nenhuma chave de API cadastrada.
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs">
                       <thead>
-                        <tr className="border-b border-zinc-800 text-zinc-500 font-mono text-[10px] uppercase">
+                        <tr className="border-b border-[#213428] text-[#8b9f93] font-mono text-[10px] uppercase">
                           <th className="pb-3">Nome da Chave</th>
                           <th className="pb-3">Merchant</th>
                           <th className="pb-3">Prefixo</th>
@@ -904,11 +905,11 @@ export default function PayDashboard() {
                       </thead>
                       <tbody className="divide-y divide-zinc-800/50">
                         {apiKeys.map((k) => (
-                          <tr key={k.id} className="hover:bg-zinc-900/50 transition">
+                          <tr key={k.id} className="hover:bg-[#101d14]/50 transition">
                             <td className="py-3 font-bold text-white">{k.name}</td>
-                            <td className="py-3 text-zinc-400">{k.merchantName}</td>
-                            <td className="py-3 font-mono text-zinc-300">{k.keyPrefix}...</td>
-                            <td className="py-3 font-mono text-[11px] text-zinc-400">
+                            <td className="py-3 text-[#a1b0a6]">{k.merchantName}</td>
+                            <td className="py-3 font-mono text-[#b5c6bb]">{k.keyPrefix}...</td>
+                            <td className="py-3 font-mono text-[11px] text-[#a1b0a6]">
                               {(k.scopes || []).join(", ")}
                             </td>
                             <td className="py-3">
@@ -939,19 +940,19 @@ export default function PayDashboard() {
             <div className="space-y-6 animate-fadeIn">
               <div>
                 <h1 className="text-xl font-bold text-white tracking-tight">Histórico de Transações</h1>
-                <p className="text-xs text-zinc-400 mt-0.5">Todas as intenções de pagamento registradas no PostgreSQL</p>
+                <p className="text-xs text-[#a1b0a6] mt-0.5">Todas as intenções de pagamento registradas no PostgreSQL</p>
               </div>
 
-              <div className="rounded-3xl bg-[#09090d] border border-zinc-800/80 p-6 space-y-4 shadow-xl">
+              <div className="rounded-3xl bg-[#09120d] border border-[#213428]/80 p-6 space-y-4 shadow-xl">
                 {transactions.length === 0 ? (
-                  <div className="py-12 text-center text-zinc-500 text-xs font-mono">
+                  <div className="py-12 text-center text-[#8b9f93] text-xs font-mono">
                     Nenhuma transação registrada no banco até o momento.
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs">
                       <thead>
-                        <tr className="border-b border-zinc-800 text-zinc-500 font-mono text-[10px] uppercase">
+                        <tr className="border-b border-[#213428] text-[#8b9f93] font-mono text-[10px] uppercase">
                           <th className="pb-3">Correlation ID</th>
                           <th className="pb-3">Merchant</th>
                           <th className="pb-3">Valor</th>
@@ -962,17 +963,17 @@ export default function PayDashboard() {
                       </thead>
                       <tbody className="divide-y divide-zinc-800/50">
                         {transactions.map((tx) => (
-                          <tr key={tx.id} className="hover:bg-zinc-900/50 transition">
-                            <td className="py-3 font-mono text-zinc-300 select-all">{tx.correlationId}</td>
+                          <tr key={tx.id} className="hover:bg-[#101d14]/50 transition">
+                            <td className="py-3 font-mono text-[#b5c6bb] select-all">{tx.correlationId}</td>
                             <td className="py-3 font-semibold text-white">{tx.merchantName}</td>
-                            <td className="py-3 font-mono font-bold text-[#e8b923]">
+                            <td className="py-3 font-mono font-bold text-[#00e66b]">
                               R$ {(tx.amountCents / 100).toFixed(2)}
                             </td>
                             <td className="py-3">
                               <StatusBadge status={tx.status} />
                             </td>
-                            <td className="py-3 font-mono text-zinc-400">{tx.provider}</td>
-                            <td className="py-3 text-zinc-400 font-mono">
+                            <td className="py-3 font-mono text-[#a1b0a6]">{tx.provider}</td>
+                            <td className="py-3 text-[#a1b0a6] font-mono">
                               {new Date(tx.createdAt).toLocaleString("pt-BR")}
                             </td>
                           </tr>
@@ -991,7 +992,7 @@ export default function PayDashboard() {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <h1 className="text-xl font-bold text-white tracking-tight">Cadastro da organização & KYC</h1>
-                  <p className="mt-0.5 text-xs text-zinc-400">Dados usados para abrir sua operação no gateway. O documento completo não é armazenado pelo AXION Pay.</p>
+                  <p className="mt-0.5 text-xs text-[#a1b0a6]">Dados usados para abrir sua operação no gateway. O documento completo não é armazenado pelo AXION Pay.</p>
                 </div>
                 <StatusBadge status={onboarding?.status || "DRAFT"} />
               </div>
@@ -1017,66 +1018,66 @@ export default function PayDashboard() {
                   </div>
                 </div>
               ) : (
-                <form onSubmit={handleSaveOnboarding} className="space-y-5 rounded-3xl border border-zinc-800/80 bg-[#09090d] p-6 shadow-xl">
+                <form onSubmit={handleSaveOnboarding} className="space-y-5 rounded-3xl border border-[#213428]/80 bg-[#09120d] p-6 shadow-xl">
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
-                      <label className="mb-1.5 block text-xs font-medium text-zinc-300">Tipo de cadastro</label>
+                      <label className="mb-1.5 block text-xs font-medium text-[#b5c6bb]">Tipo de cadastro</label>
                       <select
                         value={onboardingForm.legalEntityType}
                         onChange={(e) => setOnboardingForm({ ...onboardingForm, legalEntityType: e.target.value as OnboardingForm["legalEntityType"] })}
-                        className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 text-sm text-white focus:border-[#e8b923] focus:outline-none"
+                        className="w-full rounded-xl border border-[#213428] bg-[#050c08] px-3.5 py-2.5 text-sm text-white focus:border-[#00e66b] focus:outline-none"
                       >
                         <option value="BUSINESS">Pessoa jurídica</option>
                         <option value="INDIVIDUAL">Pessoa física</option>
                       </select>
                     </div>
                     <div>
-                      <label className="mb-1.5 block text-xs font-medium text-zinc-300">País</label>
-                      <input value={onboardingForm.countryCode} maxLength={2} onChange={(e) => setOnboardingForm({ ...onboardingForm, countryCode: e.target.value.toUpperCase() })} className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 text-sm text-white focus:border-[#e8b923] focus:outline-none" />
+                      <label className="mb-1.5 block text-xs font-medium text-[#b5c6bb]">País</label>
+                      <input value={onboardingForm.countryCode} maxLength={2} onChange={(e) => setOnboardingForm({ ...onboardingForm, countryCode: e.target.value.toUpperCase() })} className="w-full rounded-xl border border-[#213428] bg-[#050c08] px-3.5 py-2.5 text-sm text-white focus:border-[#00e66b] focus:outline-none" />
                     </div>
                   </div>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
-                      <label className="mb-1.5 block text-xs font-medium text-zinc-300">{onboardingForm.legalEntityType === "BUSINESS" ? "Razão social" : "Nome completo"}</label>
-                      <input required value={onboardingForm.legalName} onChange={(e) => setOnboardingForm({ ...onboardingForm, legalName: e.target.value })} className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 text-sm text-white focus:border-[#e8b923] focus:outline-none" />
+                      <label className="mb-1.5 block text-xs font-medium text-[#b5c6bb]">{onboardingForm.legalEntityType === "BUSINESS" ? "Razão social" : "Nome completo"}</label>
+                      <input required value={onboardingForm.legalName} onChange={(e) => setOnboardingForm({ ...onboardingForm, legalName: e.target.value })} className="w-full rounded-xl border border-[#213428] bg-[#050c08] px-3.5 py-2.5 text-sm text-white focus:border-[#00e66b] focus:outline-none" />
                     </div>
                     <div>
-                      <label className="mb-1.5 block text-xs font-medium text-zinc-300">Nome fantasia (opcional)</label>
-                      <input value={onboardingForm.tradingName} onChange={(e) => setOnboardingForm({ ...onboardingForm, tradingName: e.target.value })} className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 text-sm text-white focus:border-[#e8b923] focus:outline-none" />
-                    </div>
-                  </div>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-1.5 block text-xs font-medium text-zinc-300">CPF ou CNPJ</label>
-                      <input required inputMode="numeric" value={onboardingForm.documentNumber} onChange={(e) => setOnboardingForm({ ...onboardingForm, documentNumber: e.target.value })} placeholder="Somente usado para hash e verificação" className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 text-sm text-white focus:border-[#e8b923] focus:outline-none" />
-                      {onboarding?.documentLastFour && <p className="mt-1 text-[11px] text-zinc-500">Documento salvo com final {onboarding.documentLastFour}.</p>}
-                    </div>
-                    <div>
-                      <label className="mb-1.5 block text-xs font-medium text-zinc-300">Telefone em formato internacional</label>
-                      <input required type="tel" value={onboardingForm.phoneE164} onChange={(e) => setOnboardingForm({ ...onboardingForm, phoneE164: e.target.value })} placeholder="+5511999999999" className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 text-sm text-white focus:border-[#e8b923] focus:outline-none" />
+                      <label className="mb-1.5 block text-xs font-medium text-[#b5c6bb]">Nome fantasia (opcional)</label>
+                      <input value={onboardingForm.tradingName} onChange={(e) => setOnboardingForm({ ...onboardingForm, tradingName: e.target.value })} className="w-full rounded-xl border border-[#213428] bg-[#050c08] px-3.5 py-2.5 text-sm text-white focus:border-[#00e66b] focus:outline-none" />
                     </div>
                   </div>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
-                      <label className="mb-1.5 block text-xs font-medium text-zinc-300">E-mail financeiro</label>
-                      <input required type="email" value={onboardingForm.billingEmail} onChange={(e) => setOnboardingForm({ ...onboardingForm, billingEmail: e.target.value })} className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 text-sm text-white focus:border-[#e8b923] focus:outline-none" />
+                      <label className="mb-1.5 block text-xs font-medium text-[#b5c6bb]">CPF ou CNPJ</label>
+                      <input required inputMode="numeric" value={onboardingForm.documentNumber} onChange={(e) => setOnboardingForm({ ...onboardingForm, documentNumber: e.target.value })} placeholder="Somente usado para hash e verificação" className="w-full rounded-xl border border-[#213428] bg-[#050c08] px-3.5 py-2.5 text-sm text-white focus:border-[#00e66b] focus:outline-none" />
+                      {onboarding?.documentLastFour && <p className="mt-1 text-[11px] text-[#8b9f93]">Documento salvo com final {onboarding.documentLastFour}.</p>}
                     </div>
                     <div>
-                      <label className="mb-1.5 block text-xs font-medium text-zinc-300">Site (opcional)</label>
-                      <input type="url" value={onboardingForm.websiteUrl} onChange={(e) => setOnboardingForm({ ...onboardingForm, websiteUrl: e.target.value })} placeholder="https://" className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 text-sm text-white focus:border-[#e8b923] focus:outline-none" />
+                      <label className="mb-1.5 block text-xs font-medium text-[#b5c6bb]">Telefone em formato internacional</label>
+                      <input required type="tel" value={onboardingForm.phoneE164} onChange={(e) => setOnboardingForm({ ...onboardingForm, phoneE164: e.target.value })} placeholder="+5511999999999" className="w-full rounded-xl border border-[#213428] bg-[#050c08] px-3.5 py-2.5 text-sm text-white focus:border-[#00e66b] focus:outline-none" />
+                    </div>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1.5 block text-xs font-medium text-[#b5c6bb]">E-mail financeiro</label>
+                      <input required type="email" value={onboardingForm.billingEmail} onChange={(e) => setOnboardingForm({ ...onboardingForm, billingEmail: e.target.value })} className="w-full rounded-xl border border-[#213428] bg-[#050c08] px-3.5 py-2.5 text-sm text-white focus:border-[#00e66b] focus:outline-none" />
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-xs font-medium text-[#b5c6bb]">Site (opcional)</label>
+                      <input type="url" value={onboardingForm.websiteUrl} onChange={(e) => setOnboardingForm({ ...onboardingForm, websiteUrl: e.target.value })} placeholder="https://" className="w-full rounded-xl border border-[#213428] bg-[#050c08] px-3.5 py-2.5 text-sm text-white focus:border-[#00e66b] focus:outline-none" />
                     </div>
                   </div>
                   <div>
-                    <label className="mb-1.5 block text-xs font-medium text-zinc-300">Atividade e uso previsto do gateway</label>
-                    <textarea required minLength={10} maxLength={1000} value={onboardingForm.businessDescription} onChange={(e) => setOnboardingForm({ ...onboardingForm, businessDescription: e.target.value })} className="min-h-28 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 text-sm text-white focus:border-[#e8b923] focus:outline-none" />
+                    <label className="mb-1.5 block text-xs font-medium text-[#b5c6bb]">Atividade e uso previsto do gateway</label>
+                    <textarea required minLength={10} maxLength={1000} value={onboardingForm.businessDescription} onChange={(e) => setOnboardingForm({ ...onboardingForm, businessDescription: e.target.value })} className="min-h-28 w-full rounded-xl border border-[#213428] bg-[#050c08] px-3.5 py-2.5 text-sm text-white focus:border-[#00e66b] focus:outline-none" />
                   </div>
-                  <div className="space-y-3 rounded-2xl border border-zinc-800 bg-zinc-950/60 p-4 text-xs text-zinc-300">
+                  <div className="space-y-3 rounded-2xl border border-[#213428] bg-[#050c08]/60 p-4 text-xs text-[#b5c6bb]">
                     <label className="flex cursor-pointer items-start gap-3"><input type="checkbox" checked={onboardingForm.acceptTerms} onChange={(e) => setOnboardingForm({ ...onboardingForm, acceptTerms: e.target.checked })} className="mt-0.5" /><span>Aceito os termos de uso do gateway e confirmo que possuo poderes para cadastrar esta operação.</span></label>
                     <label className="flex cursor-pointer items-start gap-3"><input type="checkbox" checked={onboardingForm.acceptPrivacy} onChange={(e) => setOnboardingForm({ ...onboardingForm, acceptPrivacy: e.target.checked })} className="mt-0.5" /><span>Li a política de privacidade e autorizo o tratamento dos dados estritamente para prevenção a fraude, compliance e KYC.</span></label>
                   </div>
                   <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-                    <button type="submit" disabled={submittingAction === "onboarding-save"} className="rounded-xl border border-zinc-700 bg-zinc-800 px-5 py-2.5 text-xs font-bold text-white transition hover:bg-zinc-700 disabled:cursor-wait disabled:opacity-60">{submittingAction === "onboarding-save" ? "Salvando…" : "Salvar cadastro"}</button>
-                    <button type="button" onClick={handleSubmitOnboarding} disabled={submittingAction === "onboarding-submit"} className="rounded-xl bg-[#e8b923] px-5 py-2.5 text-xs font-extrabold uppercase tracking-wider text-black transition hover:bg-amber-400 disabled:cursor-wait disabled:opacity-60">{submittingAction === "onboarding-submit" ? "Enviando…" : "Enviar para revisão KYC"}</button>
+                    <button type="submit" disabled={submittingAction === "onboarding-save"} className="rounded-xl border border-[#30513d] bg-[#182b20] px-5 py-2.5 text-xs font-bold text-white transition hover:bg-[#294333] disabled:cursor-wait disabled:opacity-60">{submittingAction === "onboarding-save" ? "Salvando…" : "Salvar cadastro"}</button>
+                    <button type="button" onClick={handleSubmitOnboarding} disabled={submittingAction === "onboarding-submit"} className="rounded-xl bg-[#00e66b] px-5 py-2.5 text-xs font-semibold uppercase tracking-wider text-black transition hover:bg-[#69f0ae] disabled:cursor-wait disabled:opacity-60">{submittingAction === "onboarding-submit" ? "Enviando…" : "Enviar para revisão KYC"}</button>
                   </div>
                 </form>
               )}
@@ -1088,24 +1089,24 @@ export default function PayDashboard() {
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <h1 className="text-xl font-bold text-white tracking-tight">Fila de análise KYC</h1>
-                  <p className="mt-0.5 text-xs text-zinc-400">Somente dados minimizados são exibidos. Cada decisão gera trilha de auditoria.</p>
+                  <p className="mt-0.5 text-xs text-[#a1b0a6]">Somente dados minimizados são exibidos. Cada decisão gera trilha de auditoria.</p>
                 </div>
-                <button type="button" onClick={loadAllData} disabled={loadingData} className="inline-flex items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-200 transition hover:bg-zinc-800 disabled:opacity-60"><RefreshCw className={`h-4 w-4 ${loadingData ? "animate-spin" : ""}`} aria-hidden="true" />Atualizar</button>
+                <button type="button" onClick={loadAllData} disabled={loadingData} className="inline-flex items-center gap-2 rounded-xl border border-[#30513d] bg-[#101d14] px-3 py-2 text-xs font-bold text-[#d4e7da] transition hover:bg-[#182b20] disabled:opacity-60"><RefreshCw className={`h-4 w-4 ${loadingData ? "animate-spin" : ""}`} aria-hidden="true" />Atualizar</button>
               </div>
-              <div className="overflow-x-auto rounded-3xl border border-zinc-800/80 bg-[#09090d] p-2 shadow-xl">
+              <div className="overflow-x-auto rounded-3xl border border-[#213428]/80 bg-[#09120d] p-2 shadow-xl">
                 {kycApplications.length === 0 ? (
-                  <div className="py-14 text-center text-xs font-mono text-zinc-500">Não há solicitações KYC pendentes.</div>
+                  <div className="py-14 text-center text-xs font-mono text-[#8b9f93]">Não há solicitações KYC pendentes.</div>
                 ) : (
                   <table className="w-full text-left text-xs">
-                    <thead><tr className="border-b border-zinc-800 text-[10px] font-mono uppercase tracking-wider text-zinc-500"><th className="px-4 py-3">Titular</th><th className="px-4 py-3">Organização</th><th className="px-4 py-3">Documento</th><th className="px-4 py-3">Enviado</th><th className="px-4 py-3 text-right">Ação</th></tr></thead>
+                    <thead><tr className="border-b border-[#213428] text-[10px] font-mono uppercase tracking-wider text-[#8b9f93]"><th className="px-4 py-3">Titular</th><th className="px-4 py-3">Organização</th><th className="px-4 py-3">Documento</th><th className="px-4 py-3">Enviado</th><th className="px-4 py-3 text-right">Ação</th></tr></thead>
                     <tbody className="divide-y divide-zinc-800/70">
                       {kycApplications.map((application) => (
-                        <tr key={application.authUserId} className="transition hover:bg-zinc-900/60">
-                          <td className="px-4 py-3"><p className="font-bold text-white">{application.userDisplayName || "Titular AXION"}</p><p className="mt-0.5 text-zinc-500">{application.userEmail}</p></td>
-                          <td className="px-4 py-3 text-zinc-200">{application.legalName}</td>
-                          <td className="px-4 py-3 font-mono text-zinc-400">•••• {application.documentLastFour}</td>
-                          <td className="px-4 py-3 text-zinc-400">{application.submittedAt ? new Date(application.submittedAt).toLocaleString("pt-BR") : "—"}</td>
-                          <td className="px-4 py-3 text-right"><button type="button" onClick={() => { setKycReviewModal(application); setKycReviewStatus("IN_REVIEW"); setKycReviewReason(""); }} className="rounded-lg border border-[#e8b923]/40 px-3 py-1.5 text-xs font-bold text-[#e8b923] transition hover:bg-[#e8b923]/10">Analisar</button></td>
+                        <tr key={application.authUserId} className="transition hover:bg-[#101d14]/60">
+                          <td className="px-4 py-3"><p className="font-bold text-white">{application.userDisplayName || "Titular AXION"}</p><p className="mt-0.5 text-[#8b9f93]">{application.userEmail}</p></td>
+                          <td className="px-4 py-3 text-[#d4e7da]">{application.legalName}</td>
+                          <td className="px-4 py-3 font-mono text-[#a1b0a6]">•••• {application.documentLastFour}</td>
+                          <td className="px-4 py-3 text-[#a1b0a6]">{application.submittedAt ? new Date(application.submittedAt).toLocaleString("pt-BR") : "—"}</td>
+                          <td className="px-4 py-3 text-right"><button type="button" onClick={() => { setKycReviewModal(application); setKycReviewStatus("IN_REVIEW"); setKycReviewReason(""); }} className="rounded-lg border border-[#00e66b]/40 px-3 py-1.5 text-xs font-bold text-[#00e66b] transition hover:bg-[#00e66b]/10">Analisar</button></td>
                         </tr>
                       ))}
                     </tbody>
@@ -1120,26 +1121,26 @@ export default function PayDashboard() {
             <div className="space-y-6 animate-fadeIn">
               <div>
                 <h1 className="text-xl font-bold text-white tracking-tight">Plano & cobrança</h1>
-                <p className="mt-0.5 text-xs text-zinc-400">A assinatura é concluída na página hospedada pela Stripe. O portal não recebe dados do cartão.</p>
+                <p className="mt-0.5 text-xs text-[#a1b0a6]">A assinatura é concluída na página hospedada pela Stripe. O portal não recebe dados do cartão.</p>
               </div>
-              <div className="rounded-3xl border border-zinc-800/80 bg-[#09090d] p-6 shadow-xl">
+              <div className="rounded-3xl border border-[#213428]/80 bg-[#09120d] p-6 shadow-xl">
                 <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
                   <div className="flex items-start gap-3">
-                    <div className="rounded-xl border border-[#e8b923]/30 bg-[#e8b923]/10 p-2.5"><CreditCard className="h-5 w-5 text-[#e8b923]" aria-hidden="true" /></div>
+                    <div className="rounded-xl border border-[#00e66b]/30 bg-[#00e66b]/10 p-2.5"><CreditCard className="h-5 w-5 text-[#00e66b]" aria-hidden="true" /></div>
                     <div>
                       <p className="text-sm font-bold text-white">Assinatura do gateway</p>
-                      <p className="mt-1 max-w-xl text-xs leading-5 text-zinc-400">Checkout, cobrança recorrente, cancelamento e atualização de pagamento são processados pela Stripe com confirmação por webhook assinado.</p>
+                      <p className="mt-1 max-w-xl text-xs leading-5 text-[#a1b0a6]">Checkout, cobrança recorrente, cancelamento e atualização de pagamento são processados pela Stripe com confirmação por webhook assinado.</p>
                     </div>
                   </div>
                   <StatusBadge status={billing?.subscription_status || "NOT_SUBSCRIBED"} />
                 </div>
-                <div className="mt-6 grid gap-3 border-t border-zinc-800 pt-5 sm:grid-cols-2">
-                  <div><p className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">Plano</p><p className="mt-1 text-sm text-zinc-200">{billing?.price_id || "Nenhum plano ativo"}</p></div>
-                  <div><p className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">Próximo ciclo</p><p className="mt-1 text-sm text-zinc-200">{billing?.current_period_end ? new Date(billing.current_period_end).toLocaleDateString("pt-BR") : "—"}</p></div>
+                <div className="mt-6 grid gap-3 border-t border-[#213428] pt-5 sm:grid-cols-2">
+                  <div><p className="text-[10px] font-mono uppercase tracking-wider text-[#8b9f93]">Plano</p><p className="mt-1 text-sm text-[#d4e7da]">{billing?.price_id || "Nenhum plano ativo"}</p></div>
+                  <div><p className="text-[10px] font-mono uppercase tracking-wider text-[#8b9f93]">Próximo ciclo</p><p className="mt-1 text-sm text-[#d4e7da]">{billing?.current_period_end ? new Date(billing.current_period_end).toLocaleDateString("pt-BR") : "—"}</p></div>
                 </div>
                 <div className="mt-6 flex flex-wrap gap-3">
-                  <button type="button" onClick={handleBillingCheckout} disabled={submittingAction === "billing-checkout"} className="inline-flex min-w-44 items-center justify-center gap-2 rounded-xl bg-[#e8b923] px-4 py-2.5 text-xs font-extrabold uppercase tracking-wider text-black transition hover:bg-amber-400 disabled:cursor-wait disabled:opacity-60"><CreditCard className="h-4 w-4" aria-hidden="true" />{submittingAction === "billing-checkout" ? "Abrindo checkout…" : "Assinar plano"}</button>
-                  <button type="button" onClick={handleBillingPortal} disabled={submittingAction === "billing-portal"} className="inline-flex min-w-44 items-center justify-center gap-2 rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-2.5 text-xs font-bold text-zinc-200 transition hover:bg-zinc-800 disabled:cursor-wait disabled:opacity-60"><Settings className="h-4 w-4" aria-hidden="true" />{submittingAction === "billing-portal" ? "Abrindo portal…" : "Gerenciar assinatura"}</button>
+                  <button type="button" onClick={handleBillingCheckout} disabled={submittingAction === "billing-checkout"} className="inline-flex min-w-44 items-center justify-center gap-2 rounded-xl bg-[#00e66b] px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-black transition hover:bg-[#69f0ae] disabled:cursor-wait disabled:opacity-60"><CreditCard className="h-4 w-4" aria-hidden="true" />{submittingAction === "billing-checkout" ? "Abrindo checkout…" : "Assinar plano"}</button>
+                  <button type="button" onClick={handleBillingPortal} disabled={submittingAction === "billing-portal"} className="inline-flex min-w-44 items-center justify-center gap-2 rounded-xl border border-[#30513d] bg-[#101d14] px-4 py-2.5 text-xs font-bold text-[#d4e7da] transition hover:bg-[#182b20] disabled:cursor-wait disabled:opacity-60"><Settings className="h-4 w-4" aria-hidden="true" />{submittingAction === "billing-portal" ? "Abrindo portal…" : "Gerenciar assinatura"}</button>
                 </div>
               </div>
             </div>
@@ -1150,7 +1151,7 @@ export default function PayDashboard() {
             <div className="space-y-6 animate-fadeIn">
               <div>
                 <h1 className="text-xl font-bold text-white tracking-tight">Integrações & Endpoints</h1>
-                <p className="text-xs text-zinc-400 mt-0.5">Parâmetros de conexão do gateway industrial</p>
+                <p className="text-xs text-[#a1b0a6] mt-0.5">Parâmetros de conexão do gateway industrial</p>
               </div>
 
               <div className={`rounded-2xl border p-5 ${integrations?.paymentsEnabled ? "border-emerald-500/30 bg-emerald-500/10" : "border-amber-500/30 bg-amber-500/10"}`}>
@@ -1158,7 +1159,7 @@ export default function PayDashboard() {
                   {integrations?.paymentsEnabled ? <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" /> : <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />}
                   <div>
                     <p className="text-sm font-bold text-white">{integrations?.paymentsEnabled ? "PIX operacional" : "PIX aguardando ativação"}</p>
-                    <p className="mt-1 text-xs leading-5 text-zinc-300">
+                    <p className="mt-1 text-xs leading-5 text-[#b5c6bb]">
                       {integrations?.paymentsEnabled
                         ? `Provedor ${String(integrations.provider || "Woovi")} ativo. As cobranças podem ser criadas pela API autenticada.`
                         : "As rotas estão documentadas, mas a criação de cobranças retorna 503 até a configuração segura da credencial Woovi."}
@@ -1168,29 +1169,29 @@ export default function PayDashboard() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-6 rounded-2xl bg-[#09090d] border border-zinc-800/80 space-y-4">
+                <div className="p-6 rounded-2xl bg-[#09120d] border border-[#213428]/80 space-y-4">
                   <div className="flex items-center gap-3">
-                    <Globe className="w-5 h-5 text-[#e8b923]" />
+                    <Globe className="w-5 h-5 text-[#00e66b]" />
                     <h3 className="text-sm font-bold text-white">Endpoint de Criação de Cobranças</h3>
                   </div>
-                  <code className="block p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-mono text-[#e8b923] select-all">
+                  <code className="block p-3 rounded-xl bg-[#050c08] border border-[#213428] text-xs font-mono text-[#00e66b] select-all">
                     POST https://api.axionenterprise.cloud/v1/charges
                   </code>
-                  <div className="space-y-2 text-xs text-zinc-400 font-mono">
+                  <div className="space-y-2 text-xs text-[#a1b0a6] font-mono">
                     <p>Header: <span className="text-white">Idempotency-Key: &lt;uuid&gt;</span></p>
                     <p>Header: <span className="text-white">Authorization: Bearer axp_live_...</span></p>
                   </div>
                 </div>
 
-                <div className="p-6 rounded-2xl bg-[#09090d] border border-zinc-800/80 space-y-4">
+                <div className="p-6 rounded-2xl bg-[#09120d] border border-[#213428]/80 space-y-4">
                   <div className="flex items-center gap-3">
                     <Zap className="w-5 h-5 text-emerald-400" />
                     <h3 className="text-sm font-bold text-white">Endpoint de Webhook (Woovi/OpenPix)</h3>
                   </div>
-                  <code className="block p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-mono text-emerald-400 select-all">
+                  <code className="block p-3 rounded-xl bg-[#050c08] border border-[#213428] text-xs font-mono text-emerald-400 select-all">
                     POST https://api.axionenterprise.cloud/webhooks/woovi
                   </code>
-                  <div className="space-y-2 text-xs text-zinc-400 font-mono">
+                  <div className="space-y-2 text-xs text-[#a1b0a6] font-mono">
                     <p>Header: <span className="text-white">x-webhook-signature: &lt;RSA-SHA256 signature&gt;</span></p>
                     <p>Trilho: <span className="text-white">Deduplicação atômica em PostgreSQL</span></p>
                   </div>
@@ -1204,25 +1205,25 @@ export default function PayDashboard() {
             <div className="space-y-6 animate-fadeIn max-w-2xl">
               <div>
                 <h1 className="text-xl font-bold text-white tracking-tight">Configurações da Conta</h1>
-                <p className="text-xs text-zinc-400 mt-0.5">Definições da organização</p>
+                <p className="text-xs text-[#a1b0a6] mt-0.5">Definições da organização</p>
               </div>
 
-              <form onSubmit={handleSaveSettings} className="p-6 rounded-2xl bg-[#09090d] border border-zinc-800/80 space-y-4">
+              <form onSubmit={handleSaveSettings} className="p-6 rounded-2xl bg-[#09120d] border border-[#213428]/80 space-y-4">
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1.5">Nome da Organização</label>
+                  <label className="block text-xs font-medium text-[#b5c6bb] mb-1.5">Nome da Organização</label>
                   <input
                     type="text"
                     required
                     placeholder="Ex: AXION Enterprise LTDA"
                     value={settings.organizationName || ""}
                     onChange={(e) => setSettings({ ...settings, organizationName: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-sm text-white focus:border-[#e8b923] focus:outline-none"
+                    className="w-full px-3.5 py-2.5 bg-[#050c08] border border-[#213428] rounded-xl text-sm text-white focus:border-[#00e66b] focus:outline-none"
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={submittingAction === "settings"}
-                  className="px-5 py-2.5 bg-[#e8b923] hover:bg-amber-400 text-black font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-yellow-500/10 cursor-pointer"
+                  className="px-5 py-2.5 bg-[#00e66b] hover:bg-[#69f0ae] text-black font-semibold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-emerald-500/10 cursor-pointer"
                 >
                   {submittingAction === "settings" ? "Salvando…" : "Salvar Configurações"}
                 </button>
@@ -1233,27 +1234,27 @@ export default function PayDashboard() {
       </div>
 
       {toast && (
-        <div className="fixed bottom-5 right-5 z-[70] w-[min(24rem,calc(100vw-2.5rem))] rounded-2xl border border-zinc-700 bg-[#18181f]/95 p-4 shadow-2xl backdrop-blur" role="status" aria-live="polite">
+        <div className="fixed bottom-5 right-5 z-[70] w-[min(24rem,calc(100vw-2.5rem))] rounded-2xl border border-[#30513d] bg-[#18181f]/95 p-4 shadow-2xl backdrop-blur" role="status" aria-live="polite">
           <div className="flex items-start gap-3">
             {toast.type === "success" ? <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" aria-hidden="true" /> : toast.type === "error" ? <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-400" aria-hidden="true" /> : <Activity className="mt-0.5 h-5 w-5 shrink-0 text-sky-400" aria-hidden="true" />}
-            <p className="flex-1 text-sm leading-5 text-zinc-100">{toast.message}</p>
-            <button type="button" onClick={() => setToast(null)} aria-label="Fechar notificação" className="text-zinc-500 transition hover:text-white"><X className="h-4 w-4" aria-hidden="true" /></button>
+            <p className="flex-1 text-sm leading-5 text-[#f3f7f4]">{toast.message}</p>
+            <button type="button" onClick={() => setToast(null)} aria-label="Fechar notificação" className="text-[#8b9f93] transition hover:text-white"><X className="h-4 w-4" aria-hidden="true" /></button>
           </div>
         </div>
       )}
 
       {pendingRevoke && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !submittingAction) setPendingRevoke(null); }}>
-          <section role="alertdialog" aria-modal="true" aria-labelledby="revoke-title" aria-describedby="revoke-description" className="w-full max-w-md rounded-3xl border border-red-500/30 bg-[#09090d] p-6 shadow-2xl">
+          <section role="alertdialog" aria-modal="true" aria-labelledby="revoke-title" aria-describedby="revoke-description" className="w-full max-w-md rounded-3xl border border-red-500/30 bg-[#09120d] p-6 shadow-2xl">
             <div className="flex items-start gap-3">
               <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-red-500/10 text-red-400"><Trash2 className="h-5 w-5" aria-hidden="true" /></div>
               <div>
                 <h2 id="revoke-title" className="text-base font-bold text-white">Revogar chave de API?</h2>
-                <p id="revoke-description" className="mt-2 text-sm leading-6 text-zinc-400">A chave “{pendingRevoke.name}” deixará de funcionar imediatamente. Esta ação não pode ser desfeita.</p>
+                <p id="revoke-description" className="mt-2 text-sm leading-6 text-[#a1b0a6]">A chave “{pendingRevoke.name}” deixará de funcionar imediatamente. Esta ação não pode ser desfeita.</p>
               </div>
             </div>
             <div className="mt-6 flex justify-end gap-3">
-              <button type="button" onClick={() => setPendingRevoke(null)} disabled={Boolean(submittingAction)} className="rounded-xl border border-zinc-700 px-4 py-2.5 text-xs font-bold text-zinc-200 transition hover:bg-zinc-800 disabled:opacity-50">Cancelar</button>
+              <button type="button" onClick={() => setPendingRevoke(null)} disabled={Boolean(submittingAction)} className="rounded-xl border border-[#30513d] px-4 py-2.5 text-xs font-bold text-[#d4e7da] transition hover:bg-[#182b20] disabled:opacity-50">Cancelar</button>
               <button type="button" onClick={() => handleRevokeApiKey(pendingRevoke.id)} disabled={submittingAction === `revoke-${pendingRevoke.id}`} className="rounded-xl bg-red-500 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-red-400 disabled:cursor-wait disabled:opacity-60">{submittingAction === `revoke-${pendingRevoke.id}` ? "Revogando…" : "Revogar chave"}</button>
             </div>
           </section>
@@ -1262,18 +1263,18 @@ export default function PayDashboard() {
 
       {kycReviewModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !submittingAction) setKycReviewModal(null); }}>
-          <section role="dialog" aria-modal="true" aria-labelledby="kyc-review-title" className="w-full max-w-lg rounded-3xl border border-zinc-700 bg-[#09090d] p-6 shadow-2xl">
+          <section role="dialog" aria-modal="true" aria-labelledby="kyc-review-title" className="w-full max-w-lg rounded-3xl border border-[#30513d] bg-[#09120d] p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-4">
-              <div><h2 id="kyc-review-title" className="text-base font-bold text-white">Analisar solicitação KYC</h2><p className="mt-1 text-xs text-zinc-400">{kycReviewModal.legalName} · documento final {kycReviewModal.documentLastFour}</p></div>
-              <button type="button" onClick={() => setKycReviewModal(null)} disabled={Boolean(submittingAction)} aria-label="Fechar análise KYC" className="text-zinc-500 transition hover:text-white"><X className="h-5 w-5" aria-hidden="true" /></button>
+              <div><h2 id="kyc-review-title" className="text-base font-bold text-white">Analisar solicitação KYC</h2><p className="mt-1 text-xs text-[#a1b0a6]">{kycReviewModal.legalName} · documento final {kycReviewModal.documentLastFour}</p></div>
+              <button type="button" onClick={() => setKycReviewModal(null)} disabled={Boolean(submittingAction)} aria-label="Fechar análise KYC" className="text-[#8b9f93] transition hover:text-white"><X className="h-5 w-5" aria-hidden="true" /></button>
             </div>
             <div className="mt-5 space-y-4">
-              <div className="grid grid-cols-2 gap-3 text-xs"><div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3"><p className="text-zinc-500">E-mail</p><p className="mt-1 break-all text-zinc-200">{kycReviewModal.billingEmail}</p></div><div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3"><p className="text-zinc-500">Telefone</p><p className="mt-1 text-zinc-200">{kycReviewModal.phoneE164}</p></div></div>
-              <div><label className="mb-1.5 block text-xs font-medium text-zinc-300">Decisão</label><select value={kycReviewStatus} onChange={(e) => setKycReviewStatus(e.target.value as typeof kycReviewStatus)} className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3.5 py-2.5 text-sm text-white focus:border-[#e8b923] focus:outline-none"><option value="IN_REVIEW">Manter em revisão</option><option value="ACTION_REQUIRED">Solicitar ajustes</option><option value="APPROVED">Aprovar organização</option><option value="REJECTED">Rejeitar solicitação</option></select></div>
-              <div><label className="mb-1.5 block text-xs font-medium text-zinc-300">Motivo {(["ACTION_REQUIRED", "REJECTED"].includes(kycReviewStatus) ? "(obrigatório)" : "(opcional)")}</label><textarea value={kycReviewReason} onChange={(e) => setKycReviewReason(e.target.value)} maxLength={1000} className="min-h-24 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3.5 py-2.5 text-sm text-white focus:border-[#e8b923] focus:outline-none" /></div>
+              <div className="grid grid-cols-2 gap-3 text-xs"><div className="rounded-xl border border-[#213428] bg-[#050c08] p-3"><p className="text-[#8b9f93]">E-mail</p><p className="mt-1 break-all text-[#d4e7da]">{kycReviewModal.billingEmail}</p></div><div className="rounded-xl border border-[#213428] bg-[#050c08] p-3"><p className="text-[#8b9f93]">Telefone</p><p className="mt-1 text-[#d4e7da]">{kycReviewModal.phoneE164}</p></div></div>
+              <div><label className="mb-1.5 block text-xs font-medium text-[#b5c6bb]">Decisão</label><select value={kycReviewStatus} onChange={(e) => setKycReviewStatus(e.target.value as typeof kycReviewStatus)} className="w-full rounded-xl border border-[#30513d] bg-[#050c08] px-3.5 py-2.5 text-sm text-white focus:border-[#00e66b] focus:outline-none"><option value="IN_REVIEW">Manter em revisão</option><option value="ACTION_REQUIRED">Solicitar ajustes</option><option value="APPROVED">Aprovar organização</option><option value="REJECTED">Rejeitar solicitação</option></select></div>
+              <div><label className="mb-1.5 block text-xs font-medium text-[#b5c6bb]">Motivo {(["ACTION_REQUIRED", "REJECTED"].includes(kycReviewStatus) ? "(obrigatório)" : "(opcional)")}</label><textarea value={kycReviewReason} onChange={(e) => setKycReviewReason(e.target.value)} maxLength={1000} className="min-h-24 w-full rounded-xl border border-[#30513d] bg-[#050c08] px-3.5 py-2.5 text-sm text-white focus:border-[#00e66b] focus:outline-none" /></div>
               <p className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-xs leading-5 text-amber-100/80">A decisão é registrada com seu usuário AXION e pode liberar ou bloquear imediatamente novas chaves de API do solicitante.</p>
             </div>
-            <div className="mt-6 flex justify-end gap-3"><button type="button" onClick={() => setKycReviewModal(null)} disabled={Boolean(submittingAction)} className="rounded-xl border border-zinc-700 px-4 py-2.5 text-xs font-bold text-zinc-200 transition hover:bg-zinc-800 disabled:opacity-50">Cancelar</button><button type="button" onClick={handleReviewKyc} disabled={submittingAction === "kyc-review"} className="rounded-xl bg-[#e8b923] px-4 py-2.5 text-xs font-extrabold text-black transition hover:bg-amber-400 disabled:cursor-wait disabled:opacity-60">{submittingAction === "kyc-review" ? "Registrando…" : "Registrar decisão"}</button></div>
+            <div className="mt-6 flex justify-end gap-3"><button type="button" onClick={() => setKycReviewModal(null)} disabled={Boolean(submittingAction)} className="rounded-xl border border-[#30513d] px-4 py-2.5 text-xs font-bold text-[#d4e7da] transition hover:bg-[#182b20] disabled:opacity-50">Cancelar</button><button type="button" onClick={handleReviewKyc} disabled={submittingAction === "kyc-review"} className="rounded-xl bg-[#00e66b] px-4 py-2.5 text-xs font-semibold text-black transition hover:bg-[#69f0ae] disabled:cursor-wait disabled:opacity-60">{submittingAction === "kyc-review" ? "Registrando…" : "Registrar decisão"}</button></div>
           </section>
         </div>
       )}
@@ -1281,53 +1282,53 @@ export default function PayDashboard() {
       {/* MODAL NOVO MERCHANT */}
       {merchantModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-[#09090d] border border-zinc-800 rounded-3xl p-6 space-y-5">
+          <div className="w-full max-w-md bg-[#09120d] border border-[#213428] rounded-3xl p-6 space-y-5">
             <div className="flex justify-between items-center">
               <h3 className="text-base font-bold text-white">Cadastrar Novo Merchant</h3>
-              <button onClick={() => setMerchantModal(false)} className="text-zinc-400 hover:text-white">
+              <button onClick={() => setMerchantModal(false)} className="text-[#a1b0a6] hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <form onSubmit={handleCreateMerchant} className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-1.5">Nome da Operação / Loja</label>
+                <label className="block text-xs font-medium text-[#b5c6bb] mb-1.5">Nome da Operação / Loja</label>
                 <input
                   type="text"
                   required
                   placeholder="Ex: AXION Cloud Services"
                   value={newMerchantName}
                   onChange={(e) => setNewMerchantName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-sm text-white focus:border-[#e8b923] focus:outline-none"
+                  className="w-full px-3.5 py-2.5 bg-[#050c08] border border-[#213428] rounded-xl text-sm text-white focus:border-[#00e66b] focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-1.5">CNPJ / CPF (Opcional)</label>
+                <label className="block text-xs font-medium text-[#b5c6bb] mb-1.5">CNPJ / CPF (Opcional)</label>
                 <input
                   type="text"
                   placeholder="00.000.000/0001-00"
                   value={newMerchantDoc}
                   onChange={(e) => setNewMerchantDoc(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-sm text-white focus:border-[#e8b923] focus:outline-none"
+                  className="w-full px-3.5 py-2.5 bg-[#050c08] border border-[#213428] rounded-xl text-sm text-white focus:border-[#00e66b] focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-1.5">E-mail Financeiro (Opcional)</label>
+                <label className="block text-xs font-medium text-[#b5c6bb] mb-1.5">E-mail Financeiro (Opcional)</label>
                 <input
                   type="email"
                   placeholder="financeiro@empresa.com"
                   value={newMerchantEmail}
                   onChange={(e) => setNewMerchantEmail(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-sm text-white focus:border-[#e8b923] focus:outline-none"
+                  className="w-full px-3.5 py-2.5 bg-[#050c08] border border-[#213428] rounded-xl text-sm text-white focus:border-[#00e66b] focus:outline-none"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={submittingAction === "merchant"}
-                className="w-full py-3 bg-[#e8b923] hover:bg-amber-400 text-black font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-yellow-500/10 cursor-pointer"
+                className="w-full py-3 bg-[#00e66b] hover:bg-[#69f0ae] text-black font-semibold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-emerald-500/10 cursor-pointer"
               >
                 {submittingAction === "merchant" ? "Cadastrando…" : "Confirmar Cadastro"}
               </button>
@@ -1339,7 +1340,7 @@ export default function PayDashboard() {
       {/* MODAL NOVA CHAVE DE API */}
       {apiKeyModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-[#09090d] border border-zinc-800 rounded-3xl p-6 space-y-5">
+          <div className="w-full max-w-md bg-[#09120d] border border-[#213428] rounded-3xl p-6 space-y-5">
             <div className="flex justify-between items-center">
               <h3 className="text-base font-bold text-white">Gerar Chave de API</h3>
               <button
@@ -1347,7 +1348,7 @@ export default function PayDashboard() {
                   setApiKeyModal(false);
                   setGeneratedKey(null);
                 }}
-                className="text-zinc-400 hover:text-white"
+                className="text-[#a1b0a6] hover:text-white"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1365,8 +1366,8 @@ export default function PayDashboard() {
                   </p>
                 </div>
 
-                <div className="p-3 bg-zinc-950 border border-zinc-800 rounded-xl flex items-center justify-between gap-2">
-                  <code className="text-xs font-mono text-[#e8b923] select-all break-all">{generatedKey}</code>
+                <div className="p-3 bg-[#050c08] border border-[#213428] rounded-xl flex items-center justify-between gap-2">
+                  <code className="text-xs font-mono text-[#00e66b] select-all break-all">{generatedKey}</code>
                   <CopyBtn text={generatedKey} />
                 </div>
 
@@ -1375,7 +1376,7 @@ export default function PayDashboard() {
                     setApiKeyModal(false);
                     setGeneratedKey(null);
                   }}
-                  className="w-full py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-xs rounded-xl"
+                  className="w-full py-2.5 bg-[#182b20] hover:bg-[#294333] text-white font-bold text-xs rounded-xl"
                 >
                   Concluir
                 </button>
@@ -1383,12 +1384,12 @@ export default function PayDashboard() {
             ) : (
               <form onSubmit={handleCreateApiKey} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1.5">Merchant Vinculado</label>
+                  <label className="block text-xs font-medium text-[#b5c6bb] mb-1.5">Merchant Vinculado</label>
                   <select
                     value={keyMerchantId}
                     onChange={(e) => setKeyMerchantId(e.target.value)}
                     required
-                    className="w-full px-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-xs font-mono text-white focus:border-[#e8b923] focus:outline-none"
+                    className="w-full px-3.5 py-2.5 bg-[#050c08] border border-[#213428] rounded-xl text-xs font-mono text-white focus:border-[#00e66b] focus:outline-none"
                   >
                     {merchants.map((m) => (
                       <option key={m.id} value={m.id}>
@@ -1399,21 +1400,21 @@ export default function PayDashboard() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1.5">Identificador da Chave</label>
+                  <label className="block text-xs font-medium text-[#b5c6bb] mb-1.5">Identificador da Chave</label>
                   <input
                     type="text"
                     required
                     placeholder="Ex: Produção Backend Flow"
                     value={keyName}
                     onChange={(e) => setKeyName(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-sm text-white focus:border-[#e8b923] focus:outline-none"
+                    className="w-full px-3.5 py-2.5 bg-[#050c08] border border-[#213428] rounded-xl text-sm text-white focus:border-[#00e66b] focus:outline-none"
                   />
                 </div>
 
                 <button
                   type="submit"
                   disabled={submittingAction === "api-key"}
-                  className="w-full py-3 bg-[#e8b923] hover:bg-amber-400 text-black font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-yellow-500/10 cursor-pointer"
+                  className="w-full py-3 bg-[#00e66b] hover:bg-[#69f0ae] text-black font-semibold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-emerald-500/10 cursor-pointer"
                 >
                   {submittingAction === "api-key" ? "Gerando…" : "Gerar Chave Segura"}
                 </button>

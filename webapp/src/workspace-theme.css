@@ -1,0 +1,44 @@
+.pay-workspace {
+  --font-sans: "Manrope", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+  --color-gold: #00e66b;
+  font-family: "Manrope", sans-serif;
+  color: #f3f7f4;
+  background: #040806;
+  min-height: 100vh;
+  color-scheme: dark;
+}
+.pay-workspace :is(h1,h2,h3,h4) {
+  font-family: "Sora", sans-serif;
+  letter-spacing: -.035em;
+  font-weight: 500;
+}
+.pay-workspace :is(code,pre,.font-mono) { font-family: "JetBrains Mono", monospace; }
+.pay-workspace svg { stroke-width: 1.6; }
+.pay-workspace :is(button,a,input,select,textarea) {
+  transition-duration: 200ms;
+  transition-timing-function: cubic-bezier(.16,1,.3,1);
+}
+.pay-workspace :is(a,button,input,select,textarea):focus-visible {
+  outline: 2px solid #69f0ae;
+  outline-offset: 3px;
+}
+.pay-workspace :is(input,select,textarea) { accent-color: #00e66b; }
+.pay-workspace :is(button,a)[class*="bg-[#00e66b]"]:not([class*="/"]) {
+  color: #032111;
+  border-radius: 8px;
+}
+.pay-workspace :is(button,a)[class*="bg-[#00e66b]"]:hover { filter: brightness(1.08); }
+.pay-workspace :is(article,section)[class*="rounded"] {
+  box-shadow: inset 0 1px 0 #96ffb206;
+}
+.pay-workspace table { font-variant-numeric: tabular-nums; }
+.pay-workspace ::selection { background: #00c853; color: #04150a; }
+.pay-workspace ::-webkit-scrollbar-thumb { background: #294333; border-radius: 6px; }
+.pay-workspace ::-webkit-scrollbar-track { background: #040806; }
+@media (prefers-reduced-motion: reduce) {
+  .pay-workspace *, .pay-workspace *::before, .pay-workspace *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}
