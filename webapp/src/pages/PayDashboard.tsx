@@ -641,6 +641,15 @@ export default function PayDashboard() {
         {/* TOPBAR */}
         <header className="h-16 px-6 border-b border-[#213428]/80 flex items-center justify-between bg-[#040806]/80 backdrop-blur-md sticky top-0 z-30">
           <div className="flex items-center gap-3">
+            {canReviewKyc && (
+              <a
+                href="https://admin.pay.axionenterprise.cloud"
+                className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-[#30513d] bg-[#101d14] px-3 py-1.5 text-xs font-bold text-[#69f0ae] hover:bg-[#182b20]"
+              >
+                <Shield className="h-3.5 w-3.5" />
+                Admin financeiro
+              </a>
+            )}
             <button
               onClick={() => setMobileOpen(true)}
               className="md:hidden p-2 rounded-lg text-[#a1b0a6] hover:text-white hover:bg-[#101d14]"

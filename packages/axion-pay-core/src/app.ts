@@ -32,6 +32,7 @@ import { WooviWebhookService } from './services/webhook.service.js';
 import { FlowBillingService } from './services/flow-billing.service.js';
 import { getOnboardingProfile, isOnboardingApproved, listKycApplications, reviewOnboardingProfile, saveOnboardingProfile, submitOnboardingProfile } from './services/onboarding.service.js';
 import { createCustomerPortal, createSubscriptionCheckout, getBillingStatus, ingestStripeWebhook } from './services/stripe-billing.service.js';
+import { getAdminOverview, listAdminTransactions } from './services/admin.service.js';
 import { openapi } from './openapi.js';
 
 const createChargeSchema = z.object({
@@ -325,6 +326,18 @@ export async function buildApp(dependencies: AppDependencies = {}) {
     const onboarding = await reviewOnboardingProfile(database, authUserId, reviewer.id, decision);
     if (!onboarding) return reply.code(409).send({ error: 'Solicitação ausente ou não está disponível para revisão.' });
     return { onboarding };
+  });
+
+  app.get('/v1/internal/admin/overview', async (request, reply) => {
+    const reviewer = await requireKycReviewer(request, reply, database);
+    if (!reviewer) return;
+    return { overview: await getAdminOverview(database), user: reviewer };
+  });
+
+  app.get('/v1/internal/admin/transactions', async (request, reply) => {
+    const reviewer = await requireKycReviewer(request, reply, database);
+    if (!reviewer) return;
+    return { transactions: await listAdminTransactions(database) };
   });
 
   app.get('/v1/dashboard/integrations', async (request, reply) => {
