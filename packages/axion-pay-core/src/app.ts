@@ -33,12 +33,14 @@ import { FlowBillingService } from './services/flow-billing.service.js';
 import { getOnboardingProfile, isOnboardingApproved, listKycApplications, reviewOnboardingProfile, saveOnboardingProfile, submitOnboardingProfile } from './services/onboarding.service.js';
 import { createCustomerPortal, createSubscriptionCheckout, getBillingStatus, ingestStripeWebhook } from './services/stripe-billing.service.js';
 import { getAdminOverview, listAdminTransactions } from './services/admin.service.js';
+import { CardPaymentError, createCardPaymentIntent } from './services/card-payments.service.js';
 import { openapi } from './openapi.js';
 
 const createChargeSchema = z.object({
   amountCents: z.number().int().positive().max(100_000_000),
   comment: z.string().trim().min(1).max(140).optional(),
 });
+const cardPaymentIntentSchema = z.object({ amountCents: z.number().int().min(100).max(100_000_000) });
 
 const correlationIdParams = z.object({ correlationId: z.string().uuid() });
 const merchantIdParams = z.object({ merchantId: z.string().uuid() });
@@ -356,6 +358,29 @@ export async function buildApp(dependencies: AppDependencies = {}) {
         webhookEndpoint: '/webhooks/stripe',
       },
     };
+  });
+
+  app.get('/v1/card/config', async (_request, reply) => {
+    if (!config.STRIPE_PUBLISHABLE_KEY || !config.STRIPE_SECRET_KEY) {
+      return reply.code(503).send({ error: 'Pagamentos por cartão não estão configurados.' });
+    }
+    return { publishableKey: config.STRIPE_PUBLISHABLE_KEY, currency: 'BRL', minimumAmountCents: 100 };
+  });
+
+  app.post('/v1/card/payment-intents', async (request, reply) => {
+    const user = await requireDashboardUser(request, reply, database);
+    if (!user) return;
+    const idempotencyKey = String(request.headers['idempotency-key'] ?? '').trim();
+    if (!idempotencyKey || idempotencyKey.length > 255) {
+      return reply.code(400).send({ error: 'Header Idempotency-Key é obrigatório.' });
+    }
+    const { amountCents } = cardPaymentIntentSchema.parse(request.body);
+    try {
+      return reply.code(201).send(await createCardPaymentIntent(database, config.STRIPE_SECRET_KEY, user, amountCents, idempotencyKey));
+    } catch (error) {
+      if (error instanceof CardPaymentError) return reply.code(error.statusCode).send({ error: error.message });
+      throw error;
+    }
   });
 
   // AXION Flow usa esta superfície, sempre autenticada pelo AXION Auth. Não há

@@ -58,6 +58,7 @@ const envSchema = z.object({
   // provider Woovi; Flow e Pay usam preços e estados independentes.
   STRIPE_ENABLED: boolFromEnv,
   STRIPE_SECRET_KEY: z.string().optional(),
+  STRIPE_PUBLISHABLE_KEY: z.string().regex(/^pk_(test|live)_[A-Za-z0-9]+$/).optional(),
   STRIPE_WEBHOOK_SECRET: z.string().regex(/^whsec_[A-Za-z0-9]+$/).optional(),
   STRIPE_FLOW_STARTER_PRICE_ID: z.string().regex(/^price_[A-Za-z0-9]+$/).optional(),
   STRIPE_FLOW_PROFESSIONAL_PRICE_ID: z.string().regex(/^price_[A-Za-z0-9]+$/).optional(),
