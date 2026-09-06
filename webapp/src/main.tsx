@@ -6,6 +6,8 @@ import "./index.css";
 
 const PayDashboard = lazy(() => import("./pages/PayDashboard"));
 const ApiDocs = lazy(() => import("./pages/ApiDocs"));
+const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
+const adminHost = window.location.hostname === "admin.pay.axionenterprise.cloud";
 
 const LazyLoad = ({ children }: { children: React.ReactNode }) => (
   <Suspense fallback={
@@ -20,10 +22,14 @@ const LazyLoad = ({ children }: { children: React.ReactNode }) => (
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <BrowserRouter>
     <Routes>
+      {adminHost && <Route path="*" element={<LazyLoad><AdminDashboard /></LazyLoad>} />}
+      {!adminHost && <>
       <Route path="/" element={<App />} />
       <Route path="/dashboard/*" element={<LazyLoad><PayDashboard /></LazyLoad>} />
       <Route path="/docs" element={<LazyLoad><ApiDocs /></LazyLoad>} />
+      <Route path="/admin/*" element={<LazyLoad><AdminDashboard /></LazyLoad>} />
       <Route path="/checkout/*" element={<App />} />
+      </>}
     </Routes>
   </BrowserRouter>
 );
