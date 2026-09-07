@@ -45,6 +45,16 @@ export const openapi = {
         responses: { '200': { description: 'Dependências disponíveis.' }, '503': { description: 'Dependência indisponível.' } },
       },
     },
+    '/v1/sandbox/validate': {
+      get: {
+        summary: 'Valida uma chave pública do ambiente sandbox',
+        responses: {
+          '200': { description: 'Chave sandbox autenticada e isolada de pagamentos live.' },
+          '401': { description: 'Chave inválida.' },
+          '403': { description: 'Chave sem escopo sandbox:read.' },
+        },
+      },
+    },
     '/v1/charges': {
       post: {
         summary: 'Cria uma cobrança PIX',
