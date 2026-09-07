@@ -63,6 +63,31 @@ export const openapi = {
         responses: { '200': { description: 'Cobrança.', content: { 'application/json': { schema: { $ref: '#/components/schemas/Charge' } } } }, '404': { description: 'Não encontrada.' } },
       },
     },
+    '/v1/card/config': {
+      get: {
+        security: [],
+        summary: 'Retorna a configuração pública do checkout de cartão',
+        responses: {
+          '200': { description: 'Chave publicável Stripe e limites do checkout.' },
+          '503': { description: 'Pagamentos por cartão ainda não configurados.' },
+        },
+      },
+    },
+    '/v1/card/payment-intents': {
+      post: {
+        summary: 'Cria um PaymentIntent para confirmação direta via Stripe.js',
+        security: [{ axionSession: [] }],
+        parameters: [{ name: 'Idempotency-Key', in: 'header', required: true, schema: { type: 'string', maxLength: 255 } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['amountCents'], properties: { amountCents: { type: 'integer', minimum: 100, maximum: 100000000 } } } } } },
+        responses: {
+          '201': { description: 'PaymentIntent criado; confirme o clientSecret no navegador usando Stripe.js.' },
+          '400': { description: 'Idempotency-Key ausente ou inválida.' },
+          '401': { description: 'Sessão AXION inválida.' },
+          '422': { description: 'Merchant ativo não encontrado.' },
+          '503': { description: 'Pagamentos por cartão ainda não configurados.' },
+        },
+      },
+    },
     '/v1/dashboard/me': {
       get: {
         summary: 'Valida a sessão AXION e retorna o usuário do dashboard',
