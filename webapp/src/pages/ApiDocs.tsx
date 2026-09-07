@@ -38,7 +38,7 @@ export default function ApiDocs() {
     if (endpoint.path === "/v1/card/payment-intents") {
       return language === "curl"
         ? `curl -X POST ${API_BASE}${endpoint.path} \\\n  -H "Authorization: Bearer $AXION_SESSION_TOKEN" \\\n  -H "Idempotency-Key: pagamento-001" \\\n  -H "Content-Type: application/json" \\\n  -d '{"amountCents":1990}'`
-        : `const intent = await fetch("${API_BASE}${endpoint.path}", {\n  method: "POST",\n  credentials: "include",\n  headers: {\n    "Content-Type": "application/json",\n    "Idempotency-Key": "pagamento-001"\n  },\n  body: JSON.stringify({ amountCents: 1990 })\n}).then((response) => response.json());\n\n// O Payment Element envia o cartão direto à Stripe.\nawait stripe.confirmPayment({\n  elements,\n  clientSecret: intent.clientSecret,\n  confirmParams: { return_url: `${location.origin}/card-checkout` }\n});`;
+        : `const intent = await fetch("${API_BASE}${endpoint.path}", {\n  method: "POST",\n  credentials: "include",\n  headers: {\n    "Content-Type": "application/json",\n    "Idempotency-Key": "pagamento-001"\n  },\n  body: JSON.stringify({ amountCents: 1990 })\n}).then((response) => response.json());\n\n// O Payment Element envia o cartão direto à Stripe.\nawait stripe.confirmPayment({\n  elements,\n  clientSecret: intent.clientSecret,\n  confirmParams: { return_url: window.location.origin + "/card-checkout" }\n});`;
     }
     if (endpoint.path === "/v1/dashboard/billing/checkout" || endpoint.path === "/v1/dashboard/billing/portal") {
       return language === "curl"
