@@ -97,6 +97,28 @@ test('health propaga X-Trace-ID para rastrear atendimento sem expor sessão', as
   }
 });
 
+test('chave pública sandbox valida isolamento e não recebe escopo de cobrança', async () => {
+  const appUrl = new URL('../dist/src/app.js', import.meta.url).href;
+  const sandboxKey = 'axp_test_docs_abcdefghijklmnopqrstuvwxyz';
+  const script = `
+    import { buildApp } from ${JSON.stringify(appUrl)};
+    const database = { async query() { return { rows: [], rowCount: 0 }; } };
+    const cache = { async ping() { return 'PONG' }, async incr() { return 1 }, async expire() { return 1 } };
+    const app = await buildApp({ database, cache, provider: { name: 'woovi' } });
+    const validate = await app.inject({ method: 'GET', url: '/v1/sandbox/validate', headers: { authorization: 'Bearer ' + process.env.SANDBOX_KEY } });
+    const charge = await app.inject({ method: 'POST', url: '/v1/charges', headers: { authorization: 'Bearer ' + process.env.SANDBOX_KEY, 'idempotency-key': 'must-not-run' }, payload: { amountCents: 100 } });
+    console.log('VALIDATE=' + validate.statusCode + ':' + validate.payload);
+    console.log('CHARGE=' + charge.statusCode);
+    await app.close();
+  `;
+  const { stdout } = await execFileAsync(process.execPath, ['--input-type=module', '--eval', script], {
+    env: { ...process.env, NODE_ENV: 'test', SANDBOX_KEY: sandboxKey, AXION_API_KEYS: `${sandboxKey}:merchant-sandbox:sandbox:read` },
+  });
+  assert.match(stdout, /VALIDATE=200:.*"environment":"sandbox"/);
+  assert.match(stdout, /"livePaymentsAllowed":false/);
+  assert.match(stdout, /CHARGE=403/);
+});
+
 test('CORS permite salvar onboarding com PUT a partir do dashboard AXION', async () => {
   const database = { async query() { return { rows: [{ ok: 1 }], rowCount: 1 }; } };
   const cache = { async ping() { return 'PONG'; }, async incr() { return 1; }, async expire() { return 1; } };

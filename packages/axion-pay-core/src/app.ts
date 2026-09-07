@@ -475,6 +475,20 @@ export async function buildApp(dependencies: AppDependencies = {}) {
     return reply.code(201).send(publicIntent(result));
   });
 
+  app.get('/v1/sandbox/validate', async (request, reply) => {
+    const merchant = await requireMerchant(request, reply, ['sandbox:read'], cache, database);
+    if (!merchant) return;
+
+    return reply.code(200).send({
+      environment: 'sandbox',
+      authenticated: true,
+      isolated: true,
+      capabilities: ['health:read', 'sandbox:read'],
+      livePaymentsAllowed: false,
+      keyFingerprint: merchant.keyFingerprint,
+    });
+  });
+
   app.get('/v1/charges/:correlationId', async (request, reply) => {
     const merchant = await requireMerchant(request, reply, ['charges:read'], cache, database);
     if (!merchant) return;
