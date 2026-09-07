@@ -1125,7 +1125,7 @@ export default function PayDashboard() {
             <div className="space-y-6 animate-fadeIn">
               <div>
                 <h1 className="text-xl font-bold text-white tracking-tight">Plano & cobrança</h1>
-                <p className="mt-0.5 text-xs text-[#a1b0a6]">A assinatura é concluída na página hospedada pela Stripe. O portal não recebe dados do cartão.</p>
+                <p className="mt-0.5 text-xs text-[#a1b0a6]">A assinatura é concluída no checkout seguro AXION Pay. O portal não recebe dados brutos do cartão.</p>
               </div>
               <div className="rounded-3xl border border-[#213428]/80 bg-[#09120d] p-6 shadow-xl">
                 <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
@@ -1133,7 +1133,7 @@ export default function PayDashboard() {
                     <div className="rounded-xl border border-[#00e66b]/30 bg-[#00e66b]/10 p-2.5"><CreditCard className="h-5 w-5 text-[#00e66b]" aria-hidden="true" /></div>
                     <div>
                       <p className="text-sm font-bold text-white">Assinatura do gateway</p>
-                      <p className="mt-1 max-w-xl text-xs leading-5 text-[#a1b0a6]">Checkout, cobrança recorrente, cancelamento e atualização de pagamento são processados pela Stripe com confirmação por webhook assinado.</p>
+                      <p className="mt-1 max-w-xl text-xs leading-5 text-[#a1b0a6]">Checkout, cobrança recorrente, cancelamento e atualização de pagamento são processados pelo AXION Pay com confirmação por eventos assinados.</p>
                     </div>
                   </div>
                   <StatusBadge status={billing?.subscription_status || "NOT_SUBSCRIBED"} />
@@ -1165,8 +1165,8 @@ export default function PayDashboard() {
                     <p className="text-sm font-bold text-white">{integrations?.paymentsEnabled ? "PIX operacional" : "PIX aguardando ativação"}</p>
                     <p className="mt-1 text-xs leading-5 text-[#b5c6bb]">
                       {integrations?.paymentsEnabled
-                        ? `Provedor ${String(integrations.provider || "Woovi")} ativo. As cobranças podem ser criadas pela API autenticada.`
-                        : "As rotas estão documentadas, mas a criação de cobranças retorna 503 até a configuração segura da credencial Woovi."}
+                        ? "Infraestrutura AXION Pay ativa. As cobranças podem ser criadas pela API autenticada."
+                        : "A criação de cobranças ficará disponível após a ativação segura da operação PIX AXION Pay."}
                     </p>
                   </div>
                 </div>
@@ -1190,14 +1190,14 @@ export default function PayDashboard() {
                 <div className="p-6 rounded-2xl bg-[#09120d] border border-[#213428]/80 space-y-4">
                   <div className="flex items-center gap-3">
                     <Zap className="w-5 h-5 text-emerald-400" />
-                    <h3 className="text-sm font-bold text-white">Endpoint de Webhook (Woovi/OpenPix)</h3>
+                    <h3 className="text-sm font-bold text-white">Endpoint de Consulta de Cobrança</h3>
                   </div>
                   <code className="block p-3 rounded-xl bg-[#050c08] border border-[#213428] text-xs font-mono text-emerald-400 select-all">
-                    POST https://api.axionenterprise.cloud/webhooks/woovi
+                    GET https://api.axionenterprise.cloud/v1/charges/&#123;correlationId&#125;
                   </code>
                   <div className="space-y-2 text-xs text-[#a1b0a6] font-mono">
-                    <p>Header: <span className="text-white">x-webhook-signature: &lt;RSA-SHA256 signature&gt;</span></p>
-                    <p>Trilho: <span className="text-white">Deduplicação atômica em PostgreSQL</span></p>
+                    <p>Header: <span className="text-white">Authorization: Bearer axp_live_...</span></p>
+                    <p>Resposta: <span className="text-white">Status conciliado em tempo real</span></p>
                   </div>
                 </div>
               </div>

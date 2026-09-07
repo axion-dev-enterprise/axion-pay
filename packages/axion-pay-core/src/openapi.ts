@@ -68,19 +68,19 @@ export const openapi = {
         security: [],
         summary: 'Retorna a configuração pública do checkout de cartão',
         responses: {
-          '200': { description: 'Chave publicável Stripe e limites do checkout.' },
+          '200': { description: 'Configuração pública dos campos seguros e limites do checkout.' },
           '503': { description: 'Pagamentos por cartão ainda não configurados.' },
         },
       },
     },
     '/v1/card/payment-intents': {
       post: {
-        summary: 'Cria um PaymentIntent para confirmação direta via Stripe.js',
+        summary: 'Cria uma intenção de pagamento para confirmação nos campos seguros AXION Pay',
         security: [{ axionSession: [] }],
         parameters: [{ name: 'Idempotency-Key', in: 'header', required: true, schema: { type: 'string', maxLength: 255 } }],
         requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['amountCents'], properties: { amountCents: { type: 'integer', minimum: 100, maximum: 100000000 } } } } } },
         responses: {
-          '201': { description: 'PaymentIntent criado; confirme o clientSecret no navegador usando Stripe.js.' },
+          '201': { description: 'Intenção criada; confirme o clientSecret no navegador usando AXION Secure Fields.' },
           '400': { description: 'Idempotency-Key ausente ou inválida.' },
           '401': { description: 'Sessão AXION inválida.' },
           '422': { description: 'Merchant ativo não encontrado.' },
@@ -211,21 +211,21 @@ export const openapi = {
       get: {
         summary: 'Obtém o estado persistido da assinatura do portal',
         security: [{ axionSession: [] }],
-        responses: { '200': { description: 'Estado de assinatura e configuração da Stripe.' } },
+        responses: { '200': { description: 'Estado da assinatura e configuração do AXION Billing.' } },
       },
     },
     '/v1/dashboard/billing/checkout': {
       post: {
-        summary: 'Cria uma sessão Stripe Checkout de assinatura mensal',
+        summary: 'Cria uma sessão AXION Pay para assinatura mensal',
         security: [{ axionSession: [] }],
-        responses: { '201': { description: 'URL hospedada de Checkout da Stripe.' }, '503': { description: 'Stripe ainda não configurada.' } },
+        responses: { '201': { description: 'URL segura do checkout AXION Pay.' }, '503': { description: 'Cobrança recorrente ainda não configurada.' } },
       },
     },
     '/v1/dashboard/billing/portal': {
       post: {
-        summary: 'Cria sessão do Customer Portal da Stripe',
+        summary: 'Cria sessão do portal de assinatura AXION Pay',
         security: [{ axionSession: [] }],
-        responses: { '200': { description: 'URL hospedada de gestão de assinatura.' }, '503': { description: 'Stripe ainda não configurada.' } },
+        responses: { '200': { description: 'URL segura de gestão da assinatura.' }, '503': { description: 'Cobrança recorrente ainda não configurada.' } },
       },
     },
     '/v1/internal/kyc/applications': {
@@ -250,22 +250,6 @@ export const openapi = {
         summary: 'Retorna o estado real do provedor e dos pagamentos',
         security: [{ axionSession: [] }],
         responses: { '200': { description: 'Estado do gateway.' } },
-      },
-    },
-    '/webhooks/woovi': {
-      post: {
-        security: [],
-        summary: 'Recebe eventos assinados da Woovi/OpenPix',
-        parameters: [{ name: 'x-webhook-signature', in: 'header', required: true, schema: { type: 'string' } }],
-        responses: { '200': { description: 'Evento aceito.' }, '401': { description: 'Assinatura inválida.' } },
-      },
-    },
-    '/webhooks/stripe': {
-      post: {
-        security: [],
-        summary: 'Recebe eventos Stripe assinados e persiste estado mínimo de assinatura',
-        parameters: [{ name: 'stripe-signature', in: 'header', required: true, schema: { type: 'string' } }],
-        responses: { '200': { description: 'Evento aceito.' }, '401': { description: 'Assinatura inválida.' }, '503': { description: 'Stripe ainda não configurada.' } },
       },
     },
   },

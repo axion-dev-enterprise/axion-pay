@@ -27,7 +27,7 @@ export default function CardCheckout() {
       script.async = true;
       script.onload = async () => {
         try {
-          if (!window.Stripe) throw new Error('Stripe.js não foi carregado.');
+          if (!window.Stripe) throw new Error('Os campos seguros AXION Pay não foram carregados.');
           const stripe = window.Stripe(config.publishableKey);
           const returnedSecret = new URLSearchParams(window.location.search).get('payment_intent_client_secret');
           if (returnedSecret) {
@@ -56,7 +56,7 @@ export default function CardCheckout() {
           stripeRef.current = stripe;
           elementsRef.current = elements;
           setReady(true);
-          setStatus('Dados protegidos pela Stripe. A AXION não recebe número ou CVC.');
+          setStatus('Dados protegidos pelo AXION Secure Fields. Número e CVC não passam pela API do merchant.');
         } catch (error: any) { setStatus(error.message); }
       };
       document.head.appendChild(script);
@@ -69,7 +69,7 @@ export default function CardCheckout() {
     event.preventDefault();
     if (!stripeRef.current || !elementsRef.current) return;
     setSubmitting(true);
-    setStatus('Confirmando diretamente com a Stripe…');
+    setStatus('Confirmando pagamento com o AXION Pay…');
     const result = await stripeRef.current.confirmPayment({
       elements: elementsRef.current,
       confirmParams: { return_url: `${window.location.origin}/card-checkout?payment=complete` },
@@ -88,7 +88,7 @@ export default function CardCheckout() {
         <div className="my-7 flex items-end justify-between border-y border-[#213428] py-5"><span className="text-sm text-[#a1b0a6]">Validação AXION Pay</span><strong className="font-mono text-3xl">R$ 1,00</strong></div>
         <form onSubmit={submit}><div ref={mountRef} className="min-h-36" /><button type="submit" disabled={!ready || submitting} className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#00e66b] px-5 py-3.5 font-semibold text-[#032111] disabled:cursor-wait disabled:opacity-50"><LockKeyhole className="h-4 w-4" aria-hidden="true" />{submitting ? 'Confirmando…' : 'Pagar R$ 1,00'}</button></form>
         <p className="mt-4 min-h-6 text-center text-xs text-[#a1b0a6]">{status}</p>
-        <div className="mt-5 flex items-center justify-center gap-2 text-xs text-[#6f8978]"><ShieldCheck className="h-4 w-4" aria-hidden="true" />PCI via Stripe Elements · 3DS habilitado</div>
+        <div className="mt-5 flex items-center justify-center gap-2 text-xs text-[#6f8978]"><ShieldCheck className="h-4 w-4" aria-hidden="true" />AXION Secure Fields · PCI · 3DS habilitado</div>
       </section>
     </div>
   </main>;
