@@ -48,7 +48,7 @@ export default function ApiDocs() {
   async function runTest() {
     if (!endpoint.executable) return;
     setRunning(true); setResult(null);
-    const trace = `docs_${crypto.randomUUID().replaceAll("-", "")}`;
+    const trace = `docs_${crypto.randomUUID().replace(/-/g, "")}`;
     const started = performance.now();
     try {
       const response = await fetch(`${API_BASE}${endpoint.path}`, { cache: "no-store", headers: endpoint.executable === "sandbox" ? { Authorization: `Bearer ${SANDBOX_KEY}`, "X-Trace-Id": trace } : { "X-Trace-Id": trace } });
