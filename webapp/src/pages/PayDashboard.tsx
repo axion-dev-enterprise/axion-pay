@@ -1,5 +1,6 @@
 import "../workspace-theme.css";
 import React, { useState, useEffect } from "react";
+import { useLocation, useNavigate, Link } from "react-router-dom";
 import {
   Building2,
   Key,
@@ -220,8 +221,55 @@ const emptyOnboardingForm: OnboardingForm = {
   acceptPrivacy: false,
 };
 
+const VALID_SECTIONS: Record<string, string> = {
+  "": "overview",
+  "overview": "overview",
+  "merchants": "merchants",
+  "api-keys": "api-keys",
+  "transactions": "transactions",
+  "onboarding": "onboarding",
+  "kyc": "onboarding",
+  "kyc-review": "kyc-review",
+  "kyc-applications": "kyc-review",
+  "billing": "billing",
+  "integrations": "integrations",
+  "settings": "settings",
+};
+
+function getSectionFromPath(pathname: string): string {
+  const normalized = pathname.replace(/^\/dashboard\/?/, "").replace(/\/+$/, "");
+  const segment = normalized.split("/")[0]?.trim().toLowerCase() || "";
+  return VALID_SECTIONS[segment] || "overview";
+}
+
 export default function PayDashboard() {
-  const [activeSection, setActiveSection] = useState<string>("overview");
+  const location = useLocation();
+  const navigate = useNavigate();
+  const activeSection = getSectionFromPath(location.pathname);
+
+  const setActiveSection = (section: string) => {
+    const targetPath = section === "overview" ? "/dashboard" : `/dashboard/${section}`;
+    if (location.pathname !== targetPath) {
+      navigate(targetPath);
+    }
+  };
+
+  useEffect(() => {
+    const titles: Record<string, string> = {
+      overview: "AXION Pay — Visão Geral",
+      merchants: "AXION Pay — Merchants & Operações",
+      "api-keys": "AXION Pay — Chaves de API",
+      transactions: "AXION Pay — Transações",
+      onboarding: "AXION Pay — Cadastro & KYC",
+      "kyc-review": "AXION Pay — Análise KYC",
+      billing: "AXION Pay — Plano & Cobrança",
+      integrations: "AXION Pay — Integrações",
+      settings: "AXION Pay — Configurações",
+    };
+    if (titles[activeSection]) {
+      document.title = titles[activeSection];
+    }
+  }, [activeSection]);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
@@ -658,15 +706,15 @@ export default function PayDashboard() {
   }
 
   const navItems = [
-    { id: "overview", label: "Visão Geral", icon: BarChart3 },
-    { id: "merchants", label: "Merchants & Operações", icon: Building2 },
-    { id: "api-keys", label: "Chaves de API", icon: Key },
-    { id: "transactions", label: "Transações", icon: Wallet },
-    { id: "onboarding", label: "Cadastro & KYC", icon: FileCheck2 },
-    ...(canReviewKyc ? [{ id: "kyc-review", label: "Análise KYC", icon: Shield }] : []),
-    { id: "billing", label: "Plano & Cobrança", icon: CreditCard },
-    { id: "integrations", label: "Integrações", icon: Globe },
-    { id: "settings", label: "Configurações", icon: Settings },
+    { id: "overview", label: "Visão Geral", icon: BarChart3, path: "/dashboard" },
+    { id: "merchants", label: "Merchants & Operações", icon: Building2, path: "/dashboard/merchants" },
+    { id: "api-keys", label: "Chaves de API", icon: Key, path: "/dashboard/api-keys" },
+    { id: "transactions", label: "Transações", icon: Wallet, path: "/dashboard/transactions" },
+    { id: "onboarding", label: "Cadastro & KYC", icon: FileCheck2, path: "/dashboard/onboarding" },
+    ...(canReviewKyc ? [{ id: "kyc-review", label: "Análise KYC", icon: Shield, path: "/dashboard/kyc-review" }] : []),
+    { id: "billing", label: "Plano & Cobrança", icon: CreditCard, path: "/dashboard/billing" },
+    { id: "integrations", label: "Integrações", icon: Globe, path: "/dashboard/integrations" },
+    { id: "settings", label: "Configurações", icon: Settings, path: "/dashboard/settings" },
   ];
   const canGenerateApiKeys = onboarding?.status === "APPROVED";
 
@@ -681,14 +729,14 @@ export default function PayDashboard() {
         <div>
           <div className="flex items-center justify-between px-5 h-16 border-b border-[#213428]/80">
             {(!collapsed || mobileOpen) && (
-              <a href="/" className="flex items-center gap-2.5">
+              <Link to="/dashboard" className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-xl bg-[#00e66b]/10 border border-[#00e66b]/30 flex items-center justify-center">
                   <img src="/axion-logo.png" className="h-8 w-8 object-contain" alt="" />
                 </div>
                 <span className="text-base font-semibold tracking-tight text-white">
                   AXION <span className="text-[#00e66b]">Pay</span>
                 </span>
-              </a>
+              </Link>
             )}
             <button
               onClick={() => setMobileOpen(false)}
@@ -700,12 +748,10 @@ export default function PayDashboard() {
 
           <nav className="p-3 space-y-1">
             {navItems.map((item) => (
-              <button
+              <Link
                 key={item.id}
-                onClick={() => {
-                  setActiveSection(item.id);
-                  setMobileOpen(false);
-                }}
+                to={item.path}
+                onClick={() => setMobileOpen(false)}
                 className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   activeSection === item.id
                     ? "bg-[#00e66b] text-black shadow-lg shadow-emerald-500/10"
@@ -714,7 +760,7 @@ export default function PayDashboard() {
               >
                 <item.icon className="w-4 h-4 shrink-0" />
                 {(!collapsed || mobileOpen) && <span>{item.label}</span>}
-              </button>
+              </Link>
             ))}
           </nav>
         </div>
@@ -1259,6 +1305,24 @@ export default function PayDashboard() {
                   </table>
                 )}
               </div>
+            </div>
+          )}
+
+          {activeSection === "kyc-review" && !canReviewKyc && (
+            <div className="rounded-3xl border border-[#30513d] bg-[#09120d] p-10 text-center space-y-4">
+              <Shield className="mx-auto h-10 w-10 text-amber-300" />
+              <h2 className="text-xl font-bold text-white">Acesso Restrito</h2>
+              <p className="text-xs text-[#a1b0a6] max-w-md mx-auto">
+                A fila de análise KYC é reservada a operadores financeiros e compliance da AXION.
+              </p>
+              <button
+                type="button"
+                onClick={() => setActiveSection("overview")}
+                className="inline-flex items-center gap-2 rounded-xl border border-[#30513d] bg-[#101d14] px-4 py-2 text-xs font-bold text-[#69f0ae] transition hover:bg-[#182b20]"
+              >
+                <BarChart3 className="h-4 w-4" />
+                Voltar à Visão Geral
+              </button>
             </div>
           )}
 

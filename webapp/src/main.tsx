@@ -26,6 +26,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       {adminHost && <Route path="*" element={<LazyLoad><AdminDashboard /></LazyLoad>} />}
       {!adminHost && <>
       <Route path="/" element={<App />} />
+      <Route path="/dashboard" element={<LazyLoad><PayDashboard /></LazyLoad>} />
       <Route path="/dashboard/*" element={<LazyLoad><PayDashboard /></LazyLoad>} />
       <Route path="/docs" element={<LazyLoad><ApiDocs /></LazyLoad>} />
       <Route path="/admin/*" element={<LazyLoad><AdminDashboard /></LazyLoad>} />
