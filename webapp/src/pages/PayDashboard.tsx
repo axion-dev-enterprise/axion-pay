@@ -247,6 +247,7 @@ export default function PayDashboard() {
   const [integrations, setIntegrations] = useState<any>(null);
   const [billing, setBilling] = useState<any>(null);
   const [onboarding, setOnboarding] = useState<any>(null);
+  const [onboardingLoaded, setOnboardingLoaded] = useState(false);
   const [onboardingForm, setOnboardingForm] = useState<OnboardingForm>(emptyOnboardingForm);
   const [kycFieldErrors, setKycFieldErrors] = useState<OnboardingErrors>({});
   const [canReviewKyc, setCanReviewKyc] = useState(false);
@@ -340,10 +341,10 @@ export default function PayDashboard() {
 
   // 1. Inicialização de Autenticação
   useEffect(() => {
-    checkAuth().then((authUser) => {
+    checkAuth().then(async (authUser) => {
       if (authUser) {
         setUser(authUser);
-        loadAllData();
+        await loadAllData();
       }
       setAuthLoading(false);
     });
@@ -388,11 +389,13 @@ export default function PayDashboard() {
           if (reviewRes?.applications) setKycApplications(reviewRes.applications);
         }
       }
+      setOnboardingLoaded(true);
       if (billingRes && !billingRes.error) setBilling(billingRes.billing);
     } catch (err: any) {
       setErrorMessage("Erro ao carregar dados do dashboard.");
     } finally {
       setLoadingData(false);
+      setOnboardingLoaded(true);
     }
   };
 
@@ -785,7 +788,7 @@ export default function PayDashboard() {
 
         {/* MAIN BODY */}
         <main className="p-6 sm:p-8 max-w-6xl w-full mx-auto space-y-8 flex-1">
-          {onboarding?.status !== "APPROVED" && (
+          {onboardingLoaded && onboarding?.status !== "APPROVED" && (
             <button
               type="button"
               onClick={() => setActiveSection("onboarding")}

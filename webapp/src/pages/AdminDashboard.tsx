@@ -34,7 +34,7 @@ export default function AdminDashboard() {
   const [overview,setOverview]=useState<Overview|null>(null); const [applications,setApplications]=useState<Kyc[]>([]); const [transactions,setTransactions]=useState<Transaction[]>([]);
   const [loading,setLoading]=useState(true); const [error,setError]=useState(""); const [forbidden,setForbidden]=useState(false); const [selected,setSelected]=useState<Kyc|null>(null); const [decision,setDecision]=useState("APPROVED"); const [reason,setReason]=useState(""); const [saving,setSaving]=useState(false);
   const load=useCallback(async()=>{setLoading(true);setError("");try{const [o,k,t]=await Promise.all([request("/v1/internal/admin/overview"),request("/v1/internal/kyc/applications"),request("/v1/internal/admin/transactions")]);setOverview(o.overview);setApplications(k.applications||[]);setTransactions(t.transactions||[]);setForbidden(false);}catch(e:any){if(e.status===403)setForbidden(true);else if(e.status===401){setUser(null);setAuthLoading(false);}else setError(e.message);}finally{setLoading(false);}},[]);
-  useEffect(()=>{checkAuth().then((authUser)=>{if(authUser){setUser(authUser);load();}setAuthLoading(false);});},[]);
+  useEffect(()=>{checkAuth().then(async (authUser)=>{if(authUser){setUser(authUser);await load();}setAuthLoading(false);});},[]);
 
   // Fail-closed: spinner while verifying session
   if (authLoading) return <div className="pay-workspace min-h-screen bg-[#040806] flex items-center justify-center"><div className="flex flex-col items-center gap-3"><Loader2 className="w-8 h-8 text-[#00e66b] animate-spin" /><span className="text-xs font-mono text-[#a1b0a6]">Verificando sessão segura AXION...</span></div></div>;
