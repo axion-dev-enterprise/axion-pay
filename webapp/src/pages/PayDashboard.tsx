@@ -50,8 +50,6 @@ async function clearAuth() {
 async function apiFetch(path: string, options: RequestInit = {}) {
   const headers = new Headers(options.headers);
   if (!headers.has("Accept")) headers.set("Accept", "application/json");
-  headers.set("Cache-Control", "no-cache, no-store, must-revalidate");
-  headers.set("Pragma", "no-cache");
 
   // A request without a payload must not advertise a JSON body. Besides being
   // semantically incorrect for GET and action-only POST endpoints, some API
@@ -62,6 +60,7 @@ async function apiFetch(path: string, options: RequestInit = {}) {
   }
 
   // Cache-busting para garantir que o navegador nunca sirva respostas defasadas em GET
+  // Nota: cache: "no-store" e timestamp _t não disparam preflight CORS restrito
   const isGet = !options.method || options.method.toUpperCase() === "GET";
   const separator = path.includes("?") ? "&" : "?";
   const url = isGet ? `${API_BASE}${path}${separator}_t=${Date.now()}` : `${API_BASE}${path}`;
@@ -91,9 +90,7 @@ async function checkAuth() {
     const res = await fetch(`${API_BASE}/v1/dashboard/me?_t=${Date.now()}`, {
       cache: "no-store",
       headers: {
-        Accept: "application/json",
-        "Cache-Control": "no-cache, no-store, must-revalidate",
-        Pragma: "no-cache"
+        Accept: "application/json"
       },
       credentials: "include"
     });

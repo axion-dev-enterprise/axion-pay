@@ -137,7 +137,7 @@ export async function buildApp(dependencies: AppDependencies = {}) {
       return callback(null, false);
     },
     credentials: true,
-    allowedHeaders: ['authorization', 'content-type', 'idempotency-key', 'x-trace-id'],
+    allowedHeaders: ['authorization', 'content-type', 'idempotency-key', 'x-trace-id', 'cache-control', 'pragma'],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'OPTIONS'],
   });
 
