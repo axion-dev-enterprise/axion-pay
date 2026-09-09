@@ -157,6 +157,55 @@ type OnboardingForm = {
   acceptPrivacy: boolean;
 };
 
+type OnboardingField = keyof OnboardingForm;
+type OnboardingErrors = Partial<Record<OnboardingField, string>>;
+
+function onlyDigits(value: string) {
+  return value.replace(/\D/g, "");
+}
+
+function formatDocument(value: string) {
+  const digits = onlyDigits(value).slice(0, 14);
+  if (digits.length <= 11) {
+    return digits
+      .replace(/(\d{3})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+  }
+  return digits
+    .replace(/(\d{2})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d)/, "$1/$2")
+    .replace(/(\d{4})(\d{1,2})$/, "$1-$2");
+}
+
+function formatPhone(value: string, countryCode: string) {
+  const digits = onlyDigits(value);
+  if (countryCode === "BR") {
+    const local = (digits.startsWith("55") ? digits.slice(2) : digits).slice(0, 11);
+    if (!local) return "+55 ";
+    if (local.length <= 2) return `+55 (${local}`;
+    if (local.length <= 6) return `+55 (${local.slice(0, 2)}) ${local.slice(2)}`;
+    return `+55 (${local.slice(0, 2)}) ${local.slice(2, 7)}${local.length > 7 ? `-${local.slice(7)}` : ""}`;
+  }
+  return value.replace(/[^\d+]/g, "").slice(0, 16);
+}
+
+function normalizePhone(value: string, countryCode: string) {
+  const digits = onlyDigits(value);
+  if (countryCode === "BR") {
+    const local = digits.startsWith("55") ? digits.slice(2) : digits;
+    return `+55${local}`;
+  }
+  return value.trim().startsWith("+") ? `+${digits}` : `+${digits}`;
+}
+
+function normalizeWebsite(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
 const emptyOnboardingForm: OnboardingForm = {
   legalEntityType: "BUSINESS",
   legalName: "",
@@ -199,6 +248,7 @@ export default function PayDashboard() {
   const [billing, setBilling] = useState<any>(null);
   const [onboarding, setOnboarding] = useState<any>(null);
   const [onboardingForm, setOnboardingForm] = useState<OnboardingForm>(emptyOnboardingForm);
+  const [kycFieldErrors, setKycFieldErrors] = useState<OnboardingErrors>({});
   const [canReviewKyc, setCanReviewKyc] = useState(false);
   const [kycApplications, setKycApplications] = useState<Array<any>>([]);
   const [kycReviewModal, setKycReviewModal] = useState<any>(null);
@@ -229,6 +279,46 @@ export default function PayDashboard() {
     setToast({ type, message });
     window.setTimeout(() => setToast(null), 4000);
   };
+
+  const updateOnboardingField = <K extends OnboardingField>(field: K, value: OnboardingForm[K]) => {
+    setOnboardingForm((current) => ({ ...current, [field]: value }));
+    setKycFieldErrors({});
+  };
+
+  const getOnboardingErrors = (): OnboardingErrors => {
+    const errors: OnboardingErrors = {};
+    const documentDigits = onlyDigits(onboardingForm.documentNumber);
+    const expectedDocumentLength = onboardingForm.legalEntityType === "INDIVIDUAL" ? 11 : 14;
+    const phoneDigits = onlyDigits(normalizePhone(onboardingForm.phoneE164, onboardingForm.countryCode));
+
+    if (onboardingForm.legalName.trim().length < 2) errors.legalName = "Informe o nome legal da organização ou da pessoa.";
+    if (documentDigits.length !== expectedDocumentLength) {
+      errors.documentNumber = onboardingForm.legalEntityType === "INDIVIDUAL"
+        ? "Informe os 11 dígitos do CPF."
+        : "Informe os 14 dígitos do CNPJ.";
+    }
+    if (!/^\S+@\S+\.\S+$/.test(onboardingForm.billingEmail.trim())) errors.billingEmail = "Informe um e-mail financeiro válido.";
+    if (phoneDigits.length < 10 || phoneDigits.length > 15) errors.phoneE164 = "Informe um telefone válido com DDD.";
+    if (onboardingForm.websiteUrl.trim() && !/^https?:\/\/[^\s]+$/i.test(normalizeWebsite(onboardingForm.websiteUrl))) errors.websiteUrl = "Informe uma URL válida ou deixe o campo em branco.";
+    if (onboardingForm.businessDescription.trim().length < 5) errors.businessDescription = "Descreva a atividade em ao menos 5 caracteres.";
+    if (!onboardingForm.acceptTerms) errors.acceptTerms = "Você precisa aceitar os termos para enviar a solicitação.";
+    if (!onboardingForm.acceptPrivacy) errors.acceptPrivacy = "Você precisa aceitar a política de privacidade para enviar a solicitação.";
+    return errors;
+  };
+
+  const onboardingPayload = () => ({
+    legalEntityType: onboardingForm.legalEntityType,
+    legalName: onboardingForm.legalName.trim(),
+    tradingName: onboardingForm.tradingName.trim(),
+    documentNumber: onlyDigits(onboardingForm.documentNumber),
+    billingEmail: onboardingForm.billingEmail.trim(),
+    phoneE164: normalizePhone(onboardingForm.phoneE164, onboardingForm.countryCode),
+    countryCode: onboardingForm.countryCode.trim().toUpperCase(),
+    websiteUrl: normalizeWebsite(onboardingForm.websiteUrl),
+    businessDescription: onboardingForm.businessDescription.trim(),
+    acceptTerms: onboardingForm.acceptTerms,
+    acceptPrivacy: onboardingForm.acceptPrivacy,
+  });
 
   const applyOnboardingProfile = (profile: any) => {
     setOnboarding(profile);
@@ -428,7 +518,7 @@ export default function PayDashboard() {
     try {
       const res = await apiFetch("/v1/dashboard/onboarding", {
         method: "PUT",
-        body: JSON.stringify(onboardingForm),
+        body: JSON.stringify(onboardingPayload()),
       });
       if (res?.onboarding) {
         applyOnboardingProfile(res.onboarding);
@@ -442,14 +532,30 @@ export default function PayDashboard() {
   };
 
   const handleSubmitOnboarding = async () => {
+    const errors = getOnboardingErrors();
+    if (Object.keys(errors).length > 0) {
+      setKycFieldErrors(errors);
+      notify("info", "Revise os campos destacados antes de enviar o KYC.");
+      return;
+    }
     setSubmittingAction("onboarding-submit");
     try {
+      // A submissão é atômica do ponto de vista do usuário: primeiro persiste a
+      // edição atual, depois inicia a revisão. Isso evita validar um rascunho antigo.
+      const saved = await apiFetch("/v1/dashboard/onboarding", {
+        method: "PUT",
+        body: JSON.stringify(onboardingPayload()),
+      });
+      if (!saved?.onboarding) {
+        notify("error", saved?.error || "Não foi possível salvar os dados antes da revisão.");
+        return;
+      }
       const res = await apiFetch("/v1/dashboard/onboarding/submit", { method: "POST" });
       if (res?.onboarding) {
         applyOnboardingProfile(res.onboarding);
         notify("success", "KYC enviado para revisão. A emissão de chaves será liberada após aprovação.");
       } else {
-        notify("error", res?.error || "Complete todos os campos obrigatórios antes de enviar o KYC.");
+        notify("error", res?.error || "Não foi possível enviar o KYC. Revise os campos e tente novamente.");
       }
     } finally {
       setSubmittingAction(null);
@@ -754,8 +860,9 @@ export default function PayDashboard() {
                 </div>
 
                 {transactions.length === 0 ? (
-                  <div className="py-12 text-center text-[#8b9f93] text-xs font-mono">
-                    Nenhuma transação registrada no banco até o momento.
+                  <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+                    <p className="text-xs font-mono text-[#8b9f93]">Ainda não há transações nesta organização.</p>
+                    <button type="button" onClick={() => setActiveSection("merchants")} className="inline-flex items-center gap-2 rounded-xl border border-[#30513d] bg-[#101d14] px-3 py-2 text-xs font-bold text-[#69f0ae] transition hover:bg-[#182b20]"><Building2 className="h-4 w-4" aria-hidden="true" />Cadastrar merchant</button>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
@@ -811,7 +918,14 @@ export default function PayDashboard() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {merchants.map((m) => (
+                {merchants.length === 0 ? (
+                  <div className="col-span-full flex min-h-72 flex-col items-center justify-center rounded-3xl border border-dashed border-[#30513d] bg-[#09120d] p-8 text-center">
+                    <Building2 className="h-8 w-8 text-[#69f0ae]" aria-hidden="true" />
+                    <h2 className="mt-4 text-base font-bold text-white">Crie sua primeira conta operacional</h2>
+                    <p className="mt-2 max-w-md text-xs leading-5 text-[#a1b0a6]">Cada merchant separa cobranças, permissões e chaves da sua operação.</p>
+                    <button type="button" onClick={() => setMerchantModal(true)} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#00e66b] px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-black transition hover:bg-[#69f0ae]"><Plus className="h-4 w-4" aria-hidden="true" />Cadastrar primeiro merchant</button>
+                  </div>
+                ) : merchants.map((m) => (
                   <div
                     key={m.id}
                     className="p-6 rounded-2xl bg-[#09120d] border border-[#213428]/80 space-y-4 relative"
@@ -891,8 +1005,21 @@ export default function PayDashboard() {
 
               <div className="rounded-3xl bg-[#09120d] border border-[#213428]/80 p-6 space-y-4 shadow-xl">
                 {apiKeys.length === 0 ? (
-                  <div className="py-12 text-center text-[#8b9f93] text-xs font-mono">
-                    Nenhuma chave de API cadastrada.
+                  <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+                    <p className="text-xs font-mono text-[#8b9f93]">Nenhuma chave de API ativa nesta organização.</p>
+                    <button type="button" onClick={() => {
+                      if (!canGenerateApiKeys) {
+                        setActiveSection("onboarding");
+                        return;
+                      }
+                      if (!merchants.length) {
+                        setMerchantModal(true);
+                        notify("info", "Cadastre um merchant antes de gerar a chave de API.");
+                        return;
+                      }
+                      setKeyMerchantId(merchants[0].id);
+                      setApiKeyModal(true);
+                    }} className="inline-flex items-center gap-2 rounded-xl border border-[#30513d] bg-[#101d14] px-3 py-2 text-xs font-bold text-[#69f0ae] transition hover:bg-[#182b20]"><Key className="h-4 w-4" aria-hidden="true" />{canGenerateApiKeys && merchants.length ? "Gerar chave" : canGenerateApiKeys ? "Cadastrar merchant" : "Concluir KYC"}</button>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
@@ -949,8 +1076,9 @@ export default function PayDashboard() {
 
               <div className="rounded-3xl bg-[#09120d] border border-[#213428]/80 p-6 space-y-4 shadow-xl">
                 {transactions.length === 0 ? (
-                  <div className="py-12 text-center text-[#8b9f93] text-xs font-mono">
-                    Nenhuma transação registrada no banco até o momento.
+                  <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+                    <p className="text-xs font-mono text-[#8b9f93]">Nenhuma transação registrada até o momento.</p>
+                    <a href="/docs" className="inline-flex items-center gap-2 rounded-xl border border-[#30513d] bg-[#101d14] px-3 py-2 text-xs font-bold text-[#69f0ae] transition hover:bg-[#182b20]"><Terminal className="h-4 w-4" aria-hidden="true" />Ver integração da API</a>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
@@ -1028,7 +1156,7 @@ export default function PayDashboard() {
                       <label className="mb-1.5 block text-xs font-medium text-[#b5c6bb]">Tipo de cadastro</label>
                       <select
                         value={onboardingForm.legalEntityType}
-                        onChange={(e) => setOnboardingForm({ ...onboardingForm, legalEntityType: e.target.value as OnboardingForm["legalEntityType"] })}
+                        onChange={(e) => updateOnboardingField("legalEntityType", e.target.value as OnboardingForm["legalEntityType"])}
                         className="w-full rounded-xl border border-[#213428] bg-[#050c08] px-3.5 py-2.5 text-sm text-white focus:border-[#00e66b] focus:outline-none"
                       >
                         <option value="BUSINESS">Pessoa jurídica</option>
@@ -1037,47 +1165,55 @@ export default function PayDashboard() {
                     </div>
                     <div>
                       <label className="mb-1.5 block text-xs font-medium text-[#b5c6bb]">País</label>
-                      <input value={onboardingForm.countryCode} maxLength={2} onChange={(e) => setOnboardingForm({ ...onboardingForm, countryCode: e.target.value.toUpperCase() })} className="w-full rounded-xl border border-[#213428] bg-[#050c08] px-3.5 py-2.5 text-sm text-white focus:border-[#00e66b] focus:outline-none" />
+                      <input value={onboardingForm.countryCode} maxLength={2} onChange={(e) => updateOnboardingField("countryCode", e.target.value.toUpperCase())} className="w-full rounded-xl border border-[#213428] bg-[#050c08] px-3.5 py-2.5 text-sm text-white focus:border-[#00e66b] focus:outline-none" />
                     </div>
                   </div>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
-                      <label className="mb-1.5 block text-xs font-medium text-[#b5c6bb]">{onboardingForm.legalEntityType === "BUSINESS" ? "Razão social" : "Nome completo"}</label>
-                      <input required value={onboardingForm.legalName} onChange={(e) => setOnboardingForm({ ...onboardingForm, legalName: e.target.value })} className="w-full rounded-xl border border-[#213428] bg-[#050c08] px-3.5 py-2.5 text-sm text-white focus:border-[#00e66b] focus:outline-none" />
+                      <label className="mb-1.5 block text-xs font-medium text-[#b5c6bb]">{onboardingForm.legalEntityType === "BUSINESS" ? "Razão social" : "Nome completo"} <span className="text-[#00e66b]">*</span></label>
+                      <input value={onboardingForm.legalName} onChange={(e) => updateOnboardingField("legalName", e.target.value)} aria-invalid={Boolean(kycFieldErrors.legalName)} className={`w-full rounded-xl border bg-[#050c08] px-3.5 py-2.5 text-sm text-white focus:border-[#00e66b] focus:outline-none ${kycFieldErrors.legalName ? "border-red-400" : "border-[#213428]"}`} />
+                      {kycFieldErrors.legalName && <p className="mt-1 text-[11px] text-red-300">{kycFieldErrors.legalName}</p>}
                     </div>
                     <div>
                       <label className="mb-1.5 block text-xs font-medium text-[#b5c6bb]">Nome fantasia (opcional)</label>
-                      <input value={onboardingForm.tradingName} onChange={(e) => setOnboardingForm({ ...onboardingForm, tradingName: e.target.value })} className="w-full rounded-xl border border-[#213428] bg-[#050c08] px-3.5 py-2.5 text-sm text-white focus:border-[#00e66b] focus:outline-none" />
+                      <input value={onboardingForm.tradingName} onChange={(e) => updateOnboardingField("tradingName", e.target.value)} className="w-full rounded-xl border border-[#213428] bg-[#050c08] px-3.5 py-2.5 text-sm text-white focus:border-[#00e66b] focus:outline-none" />
                     </div>
                   </div>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
-                      <label className="mb-1.5 block text-xs font-medium text-[#b5c6bb]">CPF ou CNPJ</label>
-                      <input required inputMode="numeric" value={onboardingForm.documentNumber} onChange={(e) => setOnboardingForm({ ...onboardingForm, documentNumber: e.target.value })} placeholder="Somente usado para hash e verificação" className="w-full rounded-xl border border-[#213428] bg-[#050c08] px-3.5 py-2.5 text-sm text-white focus:border-[#00e66b] focus:outline-none" />
+                      <label className="mb-1.5 block text-xs font-medium text-[#b5c6bb]">{onboardingForm.legalEntityType === "INDIVIDUAL" ? "CPF" : "CNPJ"} <span className="text-[#00e66b]">*</span></label>
+                      <input inputMode="numeric" value={onboardingForm.documentNumber} onChange={(e) => updateOnboardingField("documentNumber", formatDocument(e.target.value))} placeholder={onboardingForm.legalEntityType === "INDIVIDUAL" ? "000.000.000-00" : "00.000.000/0000-00"} aria-invalid={Boolean(kycFieldErrors.documentNumber)} className={`w-full rounded-xl border bg-[#050c08] px-3.5 py-2.5 text-sm text-white focus:border-[#00e66b] focus:outline-none ${kycFieldErrors.documentNumber ? "border-red-400" : "border-[#213428]"}`} />
+                      {kycFieldErrors.documentNumber ? <p className="mt-1 text-[11px] text-red-300">{kycFieldErrors.documentNumber}</p> : <p className="mt-1 text-[11px] text-[#8b9f93]">Formato automático. O número completo não é armazenado.</p>}
                       {onboarding?.documentLastFour && <p className="mt-1 text-[11px] text-[#8b9f93]">Documento salvo com final {onboarding.documentLastFour}.</p>}
                     </div>
                     <div>
-                      <label className="mb-1.5 block text-xs font-medium text-[#b5c6bb]">Telefone em formato internacional</label>
-                      <input required type="tel" value={onboardingForm.phoneE164} onChange={(e) => setOnboardingForm({ ...onboardingForm, phoneE164: e.target.value })} placeholder="+5511999999999" className="w-full rounded-xl border border-[#213428] bg-[#050c08] px-3.5 py-2.5 text-sm text-white focus:border-[#00e66b] focus:outline-none" />
+                      <label className="mb-1.5 block text-xs font-medium text-[#b5c6bb]">Telefone <span className="text-[#00e66b]">*</span></label>
+                      <input type="tel" inputMode="tel" value={onboardingForm.phoneE164} onChange={(e) => updateOnboardingField("phoneE164", formatPhone(e.target.value, onboardingForm.countryCode))} placeholder="+55 (11) 99999-9999" aria-invalid={Boolean(kycFieldErrors.phoneE164)} className={`w-full rounded-xl border bg-[#050c08] px-3.5 py-2.5 text-sm text-white focus:border-[#00e66b] focus:outline-none ${kycFieldErrors.phoneE164 ? "border-red-400" : "border-[#213428]"}`} />
+                      {kycFieldErrors.phoneE164 && <p className="mt-1 text-[11px] text-red-300">{kycFieldErrors.phoneE164}</p>}
                     </div>
                   </div>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
-                      <label className="mb-1.5 block text-xs font-medium text-[#b5c6bb]">E-mail financeiro</label>
-                      <input required type="email" value={onboardingForm.billingEmail} onChange={(e) => setOnboardingForm({ ...onboardingForm, billingEmail: e.target.value })} className="w-full rounded-xl border border-[#213428] bg-[#050c08] px-3.5 py-2.5 text-sm text-white focus:border-[#00e66b] focus:outline-none" />
+                      <label className="mb-1.5 block text-xs font-medium text-[#b5c6bb]">E-mail financeiro <span className="text-[#00e66b]">*</span></label>
+                      <input type="text" inputMode="email" value={onboardingForm.billingEmail} onChange={(e) => updateOnboardingField("billingEmail", e.target.value)} aria-invalid={Boolean(kycFieldErrors.billingEmail)} className={`w-full rounded-xl border bg-[#050c08] px-3.5 py-2.5 text-sm text-white focus:border-[#00e66b] focus:outline-none ${kycFieldErrors.billingEmail ? "border-red-400" : "border-[#213428]"}`} />
+                      {kycFieldErrors.billingEmail && <p className="mt-1 text-[11px] text-red-300">{kycFieldErrors.billingEmail}</p>}
                     </div>
                     <div>
                       <label className="mb-1.5 block text-xs font-medium text-[#b5c6bb]">Site (opcional)</label>
-                      <input type="url" value={onboardingForm.websiteUrl} onChange={(e) => setOnboardingForm({ ...onboardingForm, websiteUrl: e.target.value })} placeholder="https://" className="w-full rounded-xl border border-[#213428] bg-[#050c08] px-3.5 py-2.5 text-sm text-white focus:border-[#00e66b] focus:outline-none" />
+                      <input type="text" inputMode="url" value={onboardingForm.websiteUrl} onChange={(e) => updateOnboardingField("websiteUrl", e.target.value)} placeholder="https://" aria-invalid={Boolean(kycFieldErrors.websiteUrl)} className={`w-full rounded-xl border bg-[#050c08] px-3.5 py-2.5 text-sm text-white focus:border-[#00e66b] focus:outline-none ${kycFieldErrors.websiteUrl ? "border-red-400" : "border-[#213428]"}`} />
+                      {kycFieldErrors.websiteUrl && <p className="mt-1 text-[11px] text-red-300">{kycFieldErrors.websiteUrl}</p>}
                     </div>
                   </div>
                   <div>
-                    <label className="mb-1.5 block text-xs font-medium text-[#b5c6bb]">Atividade e uso previsto do gateway</label>
-                    <textarea required minLength={10} maxLength={1000} value={onboardingForm.businessDescription} onChange={(e) => setOnboardingForm({ ...onboardingForm, businessDescription: e.target.value })} className="min-h-28 w-full rounded-xl border border-[#213428] bg-[#050c08] px-3.5 py-2.5 text-sm text-white focus:border-[#00e66b] focus:outline-none" />
+                    <label className="mb-1.5 block text-xs font-medium text-[#b5c6bb]">Atividade e uso previsto do gateway <span className="text-[#00e66b]">*</span></label>
+                    <textarea maxLength={1000} value={onboardingForm.businessDescription} onChange={(e) => updateOnboardingField("businessDescription", e.target.value)} aria-invalid={Boolean(kycFieldErrors.businessDescription)} className={`min-h-28 w-full rounded-xl border bg-[#050c08] px-3.5 py-2.5 text-sm text-white focus:border-[#00e66b] focus:outline-none ${kycFieldErrors.businessDescription ? "border-red-400" : "border-[#213428]"}`} />
+                    {kycFieldErrors.businessDescription ? <p className="mt-1 text-[11px] text-red-300">{kycFieldErrors.businessDescription}</p> : <p className="mt-1 text-[11px] text-[#8b9f93]">Ex.: “Cursos online e vendas por PIX”.</p>}
                   </div>
                   <div className="space-y-3 rounded-2xl border border-[#213428] bg-[#050c08]/60 p-4 text-xs text-[#b5c6bb]">
-                    <label className="flex cursor-pointer items-start gap-3"><input type="checkbox" checked={onboardingForm.acceptTerms} onChange={(e) => setOnboardingForm({ ...onboardingForm, acceptTerms: e.target.checked })} className="mt-0.5" /><span>Aceito os termos de uso do gateway e confirmo que possuo poderes para cadastrar esta operação.</span></label>
-                    <label className="flex cursor-pointer items-start gap-3"><input type="checkbox" checked={onboardingForm.acceptPrivacy} onChange={(e) => setOnboardingForm({ ...onboardingForm, acceptPrivacy: e.target.checked })} className="mt-0.5" /><span>Li a política de privacidade e autorizo o tratamento dos dados estritamente para prevenção a fraude, compliance e KYC.</span></label>
+                    <label className="flex cursor-pointer items-start gap-3"><input type="checkbox" checked={onboardingForm.acceptTerms} onChange={(e) => updateOnboardingField("acceptTerms", e.target.checked)} className="mt-0.5" /><span>Aceito os termos de uso do gateway e confirmo que possuo poderes para cadastrar esta operação.</span></label>
+                    {kycFieldErrors.acceptTerms && <p className="text-[11px] text-red-300">{kycFieldErrors.acceptTerms}</p>}
+                    <label className="flex cursor-pointer items-start gap-3"><input type="checkbox" checked={onboardingForm.acceptPrivacy} onChange={(e) => updateOnboardingField("acceptPrivacy", e.target.checked)} className="mt-0.5" /><span>Li a política de privacidade e autorizo o tratamento dos dados estritamente para prevenção a fraude, compliance e KYC.</span></label>
+                    {kycFieldErrors.acceptPrivacy && <p className="text-[11px] text-red-300">{kycFieldErrors.acceptPrivacy}</p>}
                   </div>
                   <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
                     <button type="submit" disabled={submittingAction === "onboarding-save"} className="rounded-xl border border-[#30513d] bg-[#182b20] px-5 py-2.5 text-xs font-bold text-white transition hover:bg-[#294333] disabled:cursor-wait disabled:opacity-60">{submittingAction === "onboarding-save" ? "Salvando…" : "Salvar cadastro"}</button>
@@ -1099,7 +1235,10 @@ export default function PayDashboard() {
               </div>
               <div className="overflow-x-auto rounded-3xl border border-[#213428]/80 bg-[#09120d] p-2 shadow-xl">
                 {kycApplications.length === 0 ? (
-                  <div className="py-14 text-center text-xs font-mono text-[#8b9f93]">Não há solicitações KYC pendentes.</div>
+                  <div className="flex flex-col items-center justify-center gap-3 py-14 text-center">
+                    <p className="text-xs font-mono text-[#8b9f93]">Não há solicitações KYC pendentes.</p>
+                    <button type="button" onClick={() => setActiveSection("overview")} className="inline-flex items-center gap-2 rounded-xl border border-[#30513d] bg-[#101d14] px-3 py-2 text-xs font-bold text-[#69f0ae] transition hover:bg-[#182b20]"><BarChart3 className="h-4 w-4" aria-hidden="true" />Ver visão geral</button>
+                  </div>
                 ) : (
                   <table className="w-full text-left text-xs">
                     <thead><tr className="border-b border-[#213428] text-[10px] font-mono uppercase tracking-wider text-[#8b9f93]"><th className="px-4 py-3">Titular</th><th className="px-4 py-3">Organização</th><th className="px-4 py-3">Documento</th><th className="px-4 py-3">Enviado</th><th className="px-4 py-3 text-right">Ação</th></tr></thead>
