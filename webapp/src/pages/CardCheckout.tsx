@@ -82,7 +82,10 @@ export default function CardCheckout() {
 
   return <main className="pay-workspace min-h-screen bg-[#040806] px-5 py-12 text-white">
     <div className="mx-auto max-w-xl">
-      <a href="/" className="text-sm text-[#69f0ae]">AXION Pay</a>
+      <a href="/" className="inline-flex items-center gap-2.5 text-sm font-semibold text-[#69f0ae] hover:text-white transition-colors">
+        <img src="/axionpay_logo.png" className="h-7 w-7 object-contain" alt="AXION Pay" />
+        <span>AXION <span className="text-white">Pay</span></span>
+      </a>
       <section className="mt-8 rounded-3xl border border-[#213428] bg-[#09120d] p-6 shadow-2xl sm:p-8">
         <div className="flex items-start justify-between gap-4"><div><p className="font-mono text-xs tracking-[.16em] text-[#69f0ae]">CHECKOUT PERSONALIZADO</p><h1 className="mt-3 text-3xl font-semibold">Pagamento por cartão</h1></div><CreditCard className="h-8 w-8 text-[#00e66b]" aria-hidden="true" /></div>
         <div className="my-7 flex items-end justify-between border-y border-[#213428] py-5"><span className="text-sm text-[#a1b0a6]">Validação AXION Pay</span><strong className="font-mono text-3xl">R$ 1,00</strong></div>

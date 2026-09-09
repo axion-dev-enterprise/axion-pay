@@ -36,6 +36,12 @@ import {
   FileCheck2,
   QrCode,
   CreditCard,
+  ArrowUpRight,
+  Banknote,
+  Coins,
+  Percent,
+  CalendarClock,
+  DollarSign,
 } from "lucide-react";
 
 const AUTH_API = "https://auth.axionenterprise.cloud";
@@ -240,6 +246,8 @@ const VALID_SECTIONS: Record<string, string> = {
   "merchants": "merchants",
   "api-keys": "api-keys",
   "transactions": "transactions",
+  "payouts": "payouts",
+  "saques": "payouts",
   "onboarding": "onboarding",
   "kyc": "onboarding",
   "kyc-review": "kyc-review",
@@ -273,6 +281,7 @@ export default function PayDashboard() {
       merchants: "AXION Pay — Merchants & Operações",
       "api-keys": "AXION Pay — Chaves de API",
       transactions: "AXION Pay — Transações",
+      payouts: "AXION Pay — Saques & Saldos",
       onboarding: "AXION Pay — Cadastro & KYC",
       "kyc-review": "AXION Pay — Análise KYC",
       billing: "AXION Pay — Plano & Cobrança",
@@ -336,6 +345,39 @@ export default function PayDashboard() {
   const [keyMerchantId, setKeyMerchantId] = useState("");
   const [keyName, setKeyName] = useState("");
   const [generatedKey, setGeneratedKey] = useState<string | null>(null);
+
+  // Estados de Saques, Saldos e Taxas
+  const [balances, setBalances] = useState<{
+    availableBalanceCents: number;
+    pendingBalanceCents: number;
+    totalPaidOutCents: number;
+    grossVolumeCents: number;
+    totalFeesCents: number;
+    pixKey: string | null;
+    pixKeyType: string | null;
+    rates: {
+      feePixPercent: number;
+      feePixFixedCents: number;
+      feeCardPercent: number;
+      feePayoutFixedCents: number;
+      settlementDaysPix: number;
+      settlementDaysCard: number;
+    };
+  } | null>(null);
+  const [payouts, setPayouts] = useState<any[]>([]);
+  const [payoutModal, setPayoutModal] = useState(false);
+  const [payoutAmount, setPayoutAmount] = useState("");
+  const [pixKeyModal, setPixKeyModal] = useState(false);
+  const [selectedPixType, setSelectedPixType] = useState<"CPF" | "CNPJ" | "EMAIL" | "PHONE" | "RANDOM">("CPF");
+  const [pixKeyValue, setPixKeyValue] = useState("");
+  const [ratesModal, setRatesModal] = useState(false);
+  const [editingRatesMerchant, setEditingRatesMerchant] = useState<any>(null);
+  const [editFeePixPercent, setEditFeePixPercent] = useState("1.99");
+  const [editFeePixFixed, setEditFeePixFixed] = useState("0.50");
+  const [editFeeCardPercent, setEditFeeCardPercent] = useState("3.49");
+  const [editFeePayout, setEditFeePayout] = useState("2.00");
+  const [editSettlementPix, setEditSettlementPix] = useState("0");
+  const [editSettlementCard, setEditSettlementCard] = useState("14");
 
   const notify = (type: NonNullable<ToastState>["type"], message: string) => {
     setToast({ type, message });
@@ -424,7 +466,7 @@ export default function PayDashboard() {
     setLoadingData(true);
     setErrorMessage(null);
     try {
-      const [ovRes, mRes, kRes, txRes, intRes, stRes, onboardingRes, billingRes] = await Promise.allSettled([
+      const [ovRes, mRes, kRes, txRes, intRes, stRes, onboardingRes, billingRes, balRes, payRes] = await Promise.allSettled([
         apiFetch("/v1/dashboard/overview"),
         apiFetch("/v1/dashboard/merchants"),
         apiFetch("/v1/dashboard/api-keys"),
@@ -433,6 +475,8 @@ export default function PayDashboard() {
         apiFetch("/v1/dashboard/settings"),
         apiFetch("/v1/dashboard/onboarding"),
         apiFetch("/v1/dashboard/billing"),
+        apiFetch("/v1/dashboard/balances"),
+        apiFetch("/v1/dashboard/payouts"),
       ]);
 
       const ov = ovRes.status === "fulfilled" ? ovRes.value : null;
@@ -443,11 +487,15 @@ export default function PayDashboard() {
       const st = stRes.status === "fulfilled" ? stRes.value : null;
       const onb = onboardingRes.status === "fulfilled" ? onboardingRes.value : null;
       const bill = billingRes.status === "fulfilled" ? billingRes.value : null;
+      const bal = balRes.status === "fulfilled" ? balRes.value : null;
+      const pay = payRes.status === "fulfilled" ? payRes.value : null;
 
       if (ov && !ov.error) setOverview(ov);
       if (m?.merchants) setMerchants(m.merchants);
       if (k?.keys) setApiKeys(k.keys);
       if (tx?.transactions) setTransactions(tx.transactions);
+      if (bal?.balance) setBalances(bal.balance);
+      if (pay?.payouts) setPayouts(pay.payouts);
       if (int && !int.error) setIntegrations(int);
       if (st?.settings) setSettings(st.settings);
       if (onb && !onb.error) {
@@ -601,6 +649,108 @@ export default function PayDashboard() {
     }
   };
 
+  const handleRequestPayout = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanAmount = parseFloat(payoutAmount.replace(",", "."));
+    if (isNaN(cleanAmount) || cleanAmount < 10) {
+      notify("error", "O valor mínimo de saque é de R$ 10,00.");
+      return;
+    }
+    const amountCents = Math.round(cleanAmount * 100);
+    const activeMerchant = merchants[0];
+    if (!activeMerchant) {
+      notify("error", "Nenhum merchant ativo encontrado para saque.");
+      return;
+    }
+    if (!balances?.pixKey) {
+      notify("error", "Cadastre uma chave Pix antes de solicitar o saque.");
+      setPayoutModal(false);
+      setPixKeyModal(true);
+      return;
+    }
+    setSubmittingAction("payout");
+    try {
+      const res = await apiFetch("/v1/dashboard/payouts", {
+        method: "POST",
+        body: JSON.stringify({
+          merchantId: activeMerchant.id,
+          amountCents,
+        }),
+      });
+      if (res?.payout) {
+        notify("success", "Solicitação de saque Pix registrada com sucesso!");
+        setPayoutModal(false);
+        setPayoutAmount("");
+        await loadAllData();
+      } else {
+        notify("error", res?.error || "Falha ao solicitar saque.");
+      }
+    } finally {
+      setSubmittingAction(null);
+    }
+  };
+
+  const handleSavePixKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const activeMerchant = merchants[0];
+    if (!activeMerchant) {
+      notify("error", "Nenhum merchant ativo encontrado.");
+      return;
+    }
+    if (!pixKeyValue.trim()) {
+      notify("error", "Informe uma chave Pix válida.");
+      return;
+    }
+    setSubmittingAction("pix-key");
+    try {
+      const res = await apiFetch(`/v1/dashboard/merchants/${activeMerchant.id}/pix-key`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          pixKey: pixKeyValue.trim(),
+          pixKeyType: selectedPixType,
+        }),
+      });
+      if (res?.merchant) {
+        notify("success", "Chave Pix para recebimento atualizada com sucesso!");
+        setPixKeyModal(false);
+        await loadAllData();
+      } else {
+        notify("error", res?.error || "Erro ao salvar chave Pix.");
+      }
+    } finally {
+      setSubmittingAction(null);
+    }
+  };
+
+  const handleSaveMerchantRates = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingRatesMerchant) return;
+    setSubmittingAction("rates");
+    try {
+      const res = await apiFetch(`/v1/dashboard/merchants/${editingRatesMerchant.id}/rates`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          feePixPercent: parseFloat(editFeePixPercent) || 1.99,
+          feePixFixedCents: Math.round(parseFloat(editFeePixFixed || "0.5") * 100),
+          feeCardPercent: parseFloat(editFeeCardPercent) || 3.49,
+          feePayoutFixedCents: Math.round(parseFloat(editFeePayout || "2.0") * 100),
+          settlementDaysPix: parseInt(editSettlementPix) || 0,
+          settlementDaysCard: parseInt(editSettlementCard) || 14,
+        }),
+      });
+      if (res?.merchant) {
+        notify("success", "Taxas e prazos de liquidação atualizados com sucesso!");
+        setRatesModal(false);
+        setEditingRatesMerchant(null);
+        await loadAllData();
+      } else {
+        notify("error", res?.error || "Erro ao atualizar taxas da operação.");
+      }
+    } finally {
+      setSubmittingAction(null);
+    }
+  };
+
   const handleSaveOnboarding = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmittingAction("onboarding-save");
@@ -748,6 +898,7 @@ export default function PayDashboard() {
     { id: "merchants", label: "Merchants & Operações", icon: Building2, path: "/dashboard/merchants" },
     { id: "api-keys", label: "Chaves de API", icon: Key, path: "/dashboard/api-keys" },
     { id: "transactions", label: "Transações", icon: Wallet, path: "/dashboard/transactions" },
+    { id: "payouts", label: "Saques & Saldos", icon: Banknote, path: "/dashboard/payouts" },
     { id: "onboarding", label: "Cadastro & KYC", icon: FileCheck2, path: "/dashboard/onboarding" },
     ...(canReviewKyc ? [{ id: "kyc-review", label: "Análise KYC", icon: Shield, path: "/dashboard/kyc-review" }] : []),
     { id: "billing", label: "Plano & Cobrança", icon: CreditCard, path: "/dashboard/billing" },
@@ -766,14 +917,20 @@ export default function PayDashboard() {
       >
         <div>
           <div className="flex items-center justify-between px-5 h-16 border-b border-[#213428]/80">
-            {(!collapsed || mobileOpen) && (
+            {(!collapsed || mobileOpen) ? (
               <Link to="/dashboard" className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-[#00e66b]/10 border border-[#00e66b]/30 flex items-center justify-center">
-                  <img src="/axion-logo.png" className="h-8 w-8 object-contain" alt="" />
+                <div className="w-8 h-8 rounded-xl bg-[#00e66b]/10 border border-[#00e66b]/30 flex items-center justify-center overflow-hidden shadow-sm shadow-emerald-500/20">
+                  <img src="/axionpay_logo.png" className="h-8 w-8 object-contain p-0.5" alt="AXION Pay" />
                 </div>
                 <span className="text-base font-semibold tracking-tight text-white">
                   AXION <span className="text-[#00e66b]">Pay</span>
                 </span>
+              </Link>
+            ) : (
+              <Link to="/dashboard" className="mx-auto flex items-center justify-center">
+                <div className="w-8 h-8 rounded-xl bg-[#00e66b]/10 border border-[#00e66b]/30 flex items-center justify-center overflow-hidden shadow-sm shadow-emerald-500/20">
+                  <img src="/axionpay_logo.png" className="h-8 w-8 object-contain p-0.5" alt="AXION Pay" />
+                </div>
               </Link>
             )}
             <button
@@ -1205,6 +1362,158 @@ export default function PayDashboard() {
             </div>
           )}
 
+          {/* TAB: SAQUES & SALDOS */}
+          {activeSection === "payouts" && (
+            <div className="space-y-8 animate-fadeIn">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h1 className="text-2xl font-semibold text-white tracking-tight">Saques & Saldos</h1>
+                  <p className="text-xs text-[#a1b0a6] mt-1">Gestão de saldo líquido disponível, retenções de prazos e resgates em tempo real via Pix</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setPixKeyModal(true)}
+                    className="px-3.5 py-2 bg-[#101d14] hover:bg-[#182b20] border border-[#30513d] text-[#b5c6bb] hover:text-white font-semibold text-xs rounded-xl transition-all flex items-center gap-2 cursor-pointer"
+                  >
+                    <Key className="w-3.5 h-3.5 text-[#00e66b]" />
+                    <span>{balances?.pixKey ? "Alterar Chave Pix" : "Cadastrar Chave Pix"}</span>
+                  </button>
+                  <button
+                    onClick={() => setPayoutModal(true)}
+                    disabled={!balances || balances.availableBalanceCents < 1000}
+                    className="px-4 py-2 bg-[#00e66b] hover:bg-[#69f0ae] disabled:opacity-50 disabled:cursor-not-allowed text-black font-semibold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-emerald-500/10 flex items-center gap-2 cursor-pointer"
+                  >
+                    <ArrowUpRight className="w-4 h-4" />
+                    <span>Solicitar Saque Pix</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Grid de Saldos */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Saldo Disponível */}
+                <div className="p-5 rounded-2xl bg-[#09120d] border border-emerald-500/30 bg-emerald-500/5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#00e66b]">Saldo Disponível</span>
+                    <Banknote className="w-4 h-4 text-[#00e66b]" />
+                  </div>
+                  <div className="text-3xl font-semibold text-white">
+                    R$ {((balances?.availableBalanceCents ?? 0) / 100).toFixed(2).replace(".", ",")}
+                  </div>
+                  <p className="text-[11px] text-emerald-300/80">Liberado para transferência imediata via Pix</p>
+                </div>
+
+                {/* Saldo a Liberar */}
+                <div className="p-5 rounded-2xl bg-[#09120d] border border-amber-500/30 bg-amber-500/5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-amber-400">Saldo a Liberar</span>
+                    <CalendarClock className="w-4 h-4 text-amber-400" />
+                  </div>
+                  <div className="text-3xl font-semibold text-white">
+                    R$ {((balances?.pendingBalanceCents ?? 0) / 100).toFixed(2).replace(".", ",")}
+                  </div>
+                  <p className="text-[11px] text-amber-200/80">
+                    Prazo Pix: D+{balances?.rates?.settlementDaysPix ?? 0} · Cartão: D+{balances?.rates?.settlementDaysCard ?? 14}
+                  </p>
+                </div>
+
+                {/* Total Já Sacado */}
+                <div className="p-5 rounded-2xl bg-[#09120d] border border-[#213428]/80 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#8b9f93]">Total Já Transferido</span>
+                    <Coins className="w-4 h-4 text-[#8b9f93]" />
+                  </div>
+                  <div className="text-3xl font-semibold text-white">
+                    R$ {((balances?.totalPaidOutCents ?? 0) / 100).toFixed(2).replace(".", ",")}
+                  </div>
+                  <p className="text-[11px] text-[#a1b0a6]">Saques liquidados com sucesso</p>
+                </div>
+
+                {/* Chave Pix de Recebimento */}
+                <div className="p-5 rounded-2xl bg-[#09120d] border border-[#213428]/80 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#8b9f93]">Chave de Destino</span>
+                    <Key className="w-4 h-4 text-[#8b9f93]" />
+                  </div>
+                  <div className="text-sm font-mono font-semibold text-white truncate">
+                    {balances?.pixKey ? (
+                      <span className="text-emerald-400">{balances.pixKey}</span>
+                    ) : (
+                      <span className="text-[#a1b0a6] text-xs">Nenhuma chave cadastrada</span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-[#a1b0a6]">
+                    {balances?.pixKeyType ? `Tipo: ${balances.pixKeyType}` : "Clique em 'Cadastrar Chave Pix'"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Tabela de Histórico de Saques */}
+              <div className="rounded-3xl bg-[#09120d] border border-[#213428]/80 p-6 space-y-4 shadow-xl">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-white tracking-tight">Histórico de Saques & Transferências</h3>
+                  <span className="text-[11px] font-mono text-[#8b9f93]">{payouts.length} registro(s)</span>
+                </div>
+
+                {payouts.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+                    <Banknote className="w-8 h-8 text-[#8b9f93] opacity-40" />
+                    <p className="text-xs font-mono text-[#8b9f93]">Nenhum saque solicitado até o momento.</p>
+                    {balances && balances.availableBalanceCents >= 1000 && (
+                      <button
+                        onClick={() => setPayoutModal(true)}
+                        className="inline-flex items-center gap-2 rounded-xl border border-[#30513d] bg-[#101d14] px-3 py-2 text-xs font-bold text-[#69f0ae] transition hover:bg-[#182b20] cursor-pointer"
+                      >
+                        <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+                        Solicitar primeiro saque
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-[#213428] text-[#8b9f93] font-mono text-[10px] uppercase">
+                          <th className="pb-3">Data / Hora</th>
+                          <th className="pb-3">Valor Solicitado</th>
+                          <th className="pb-3">Taxa de Saque</th>
+                          <th className="pb-3">Valor Líquido</th>
+                          <th className="pb-3">Chave Pix</th>
+                          <th className="pb-3">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-800/50">
+                        {payouts.map((p) => (
+                          <tr key={p.id} className="hover:bg-[#101d14]/50 transition">
+                            <td className="py-3 text-[#a1b0a6] font-mono">
+                              {new Date(p.createdAt).toLocaleString("pt-BR")}
+                            </td>
+                            <td className="py-3 font-semibold text-white">
+                              R$ {(p.amountCents / 100).toFixed(2).replace(".", ",")}
+                            </td>
+                            <td className="py-3 font-mono text-[#a1b0a6]">
+                              R$ {(p.feeCents / 100).toFixed(2).replace(".", ",")}
+                            </td>
+                            <td className="py-3 font-bold text-emerald-400 font-mono">
+                              R$ {(p.netAmountCents / 100).toFixed(2).replace(".", ",")}
+                            </td>
+                            <td className="py-3 font-mono text-xs text-[#d4e7da]">
+                              <span className="text-[10px] text-[#8b9f93] uppercase mr-1">[{p.pixKeyType}]</span>
+                              {p.pixKey}
+                            </td>
+                            <td className="py-3">
+                              <StatusBadge status={p.status} />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* TAB 5: CADASTRO E KYC */}
           {activeSection === "onboarding" && (
             <div className="space-y-6 animate-fadeIn max-w-3xl">
@@ -1476,6 +1785,127 @@ export default function PayDashboard() {
                   {submittingAction === "settings" ? "Salvando…" : "Salvar Configurações"}
                 </button>
               </form>
+
+              {/* CARD DE DADOS BANCÁRIOS & PIX */}
+              <div className="p-6 rounded-2xl bg-[#09120d] border border-[#213428]/80 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Key className="w-5 h-5 text-[#00e66b]" />
+                    <div>
+                      <h3 className="text-sm font-bold text-white">Chave Pix de Recebimento de Saques</h3>
+                      <p className="text-xs text-[#a1b0a6]">Chave bancária onde os saques solicitados são creditados</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (balances?.pixKey) setPixKeyValue(balances.pixKey);
+                      if (balances?.pixKeyType) setSelectedPixType(balances.pixKeyType as any);
+                      setPixKeyModal(true);
+                    }}
+                    className="px-3.5 py-1.5 rounded-xl border border-[#30513d] bg-[#101d14] hover:bg-[#182b20] text-xs font-bold text-[#69f0ae] transition cursor-pointer"
+                  >
+                    {balances?.pixKey ? "Editar Chave" : "Cadastrar Chave"}
+                  </button>
+                </div>
+                <div className="p-4 rounded-xl bg-[#050c08] border border-[#213428] flex items-center justify-between text-xs">
+                  <div>
+                    <span className="text-[#8b9f93] font-mono text-[10px] uppercase block">Chave Ativa</span>
+                    <span className="font-mono text-white text-sm font-semibold">
+                      {balances?.pixKey ? balances.pixKey : "Nenhuma chave cadastrada"}
+                    </span>
+                  </div>
+                  {balances?.pixKeyType && (
+                    <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 font-mono text-[10px] font-bold border border-emerald-500/20 uppercase">
+                      {balances.pixKeyType}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* CARD DE TAXAS E PRAZOS COMERCIAIS */}
+              <div className="p-6 rounded-2xl bg-[#09120d] border border-[#213428]/80 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Percent className="w-5 h-5 text-[#00e66b]" />
+                    <div>
+                      <h3 className="text-sm font-bold text-white">Taxas & Prazos de Liquidação</h3>
+                      <p className="text-xs text-[#a1b0a6]">Condições comerciais ativas aplicadas às suas vendas</p>
+                    </div>
+                  </div>
+                  {canReviewKyc && merchants.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const m = merchants[0];
+                        setEditingRatesMerchant(m);
+                        setEditFeePixPercent(String(m.feePixPercent ?? 1.99));
+                        setEditFeePixFixed(String(((m.feePixFixedCents ?? 50) / 100).toFixed(2)));
+                        setEditFeeCardPercent(String(m.feeCardPercent ?? 3.49));
+                        setEditFeePayout(String(((m.feePayoutFixedCents ?? 200) / 100).toFixed(2)));
+                        setEditSettlementPix(String(m.settlementDaysPix ?? 0));
+                        setEditSettlementCard(String(m.settlementDaysCard ?? 14));
+                        setRatesModal(true);
+                      }}
+                      className="px-3.5 py-1.5 rounded-xl border border-[#30513d] bg-[#101d14] hover:bg-[#182b20] text-xs font-bold text-[#69f0ae] transition cursor-pointer"
+                    >
+                      Editar Taxas (Admin)
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <div className="p-3.5 rounded-xl bg-[#050c08] border border-[#213428] space-y-1">
+                    <span className="text-[10px] font-mono text-[#8b9f93] uppercase block">MDR Pix</span>
+                    <span className="text-base font-bold text-white">
+                      {balances?.rates?.feePixPercent ?? 1.99}% + R$ {(((balances?.rates?.feePixFixedCents ?? 50) / 100).toFixed(2)).replace(".", ",")}
+                    </span>
+                    <span className="text-[10px] text-[#a1b0a6] block">Por transação paga</span>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-[#050c08] border border-[#213428] space-y-1">
+                    <span className="text-[10px] font-mono text-[#8b9f93] uppercase block">Prazo Pix</span>
+                    <span className="text-base font-bold text-emerald-400">
+                      D+{balances?.rates?.settlementDaysPix ?? 0}
+                    </span>
+                    <span className="text-[10px] text-[#a1b0a6] block">
+                      {(balances?.rates?.settlementDaysPix ?? 0) === 0 ? "Liquidação imediata" : "Dias úteis"}
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-[#050c08] border border-[#213428] space-y-1">
+                    <span className="text-[10px] font-mono text-[#8b9f93] uppercase block">Taxa Cartão</span>
+                    <span className="text-base font-bold text-white">
+                      {balances?.rates?.feeCardPercent ?? 3.49}%
+                    </span>
+                    <span className="text-[10px] text-[#a1b0a6] block">À vista nacional</span>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-[#050c08] border border-[#213428] space-y-1">
+                    <span className="text-[10px] font-mono text-[#8b9f93] uppercase block">Prazo Cartão</span>
+                    <span className="text-base font-bold text-amber-400">
+                      D+{balances?.rates?.settlementDaysCard ?? 14}
+                    </span>
+                    <span className="text-[10px] text-[#a1b0a6] block">Dias de carência</span>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-[#050c08] border border-[#213428] space-y-1">
+                    <span className="text-[10px] font-mono text-[#8b9f93] uppercase block">Taxa de Saque</span>
+                    <span className="text-base font-bold text-white">
+                      R$ {(((balances?.rates?.feePayoutFixedCents ?? 200) / 100).toFixed(2)).replace(".", ",")}
+                    </span>
+                    <span className="text-[10px] text-[#a1b0a6] block">Por solicitação Pix</span>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-[#050c08] border border-[#213428] space-y-1">
+                    <span className="text-[10px] font-mono text-[#8b9f93] uppercase block">Saque Mínimo</span>
+                    <span className="text-base font-bold text-white">
+                      R$ 10,00
+                    </span>
+                    <span className="text-[10px] text-[#a1b0a6] block">Valor mínimo</span>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </main>
@@ -1668,6 +2098,268 @@ export default function PayDashboard() {
                 </button>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL SOLICITAR SAQUE PIX */}
+      {payoutModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-md bg-[#09120d] border border-[#213428] rounded-3xl p-6 space-y-5 shadow-2xl">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-[#00e66b]/10 border border-[#00e66b]/30 flex items-center justify-center">
+                  <ArrowUpRight className="w-4 h-4 text-[#00e66b]" />
+                </div>
+                <h3 className="text-base font-bold text-white">Solicitar Saque Pix</h3>
+              </div>
+              <button onClick={() => setPayoutModal(false)} className="text-[#a1b0a6] hover:text-white cursor-pointer" aria-label="Fechar">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleRequestPayout} className="space-y-4">
+              <div className="p-4 rounded-xl bg-[#050c08] border border-[#213428] space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span className="text-[#8b9f93]">Saldo Disponível</span>
+                  <span className="font-bold text-white font-mono">
+                    R$ {((balances?.availableBalanceCents ?? 0) / 100).toFixed(2).replace(".", ",")}
+                  </span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-[#8b9f93]">Chave Pix de Destino</span>
+                  <span className="font-mono text-emerald-400 font-semibold truncate max-w-[200px]">
+                    {balances?.pixKey || "Nenhuma chave cadastrada"}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-[#b5c6bb] mb-1.5">
+                  Valor do Saque (R$) <span className="text-[#8b9f93]">(mínimo R$ 10,00)</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-2.5 text-xs text-[#8b9f93] font-mono">R$</span>
+                  <input
+                    type="text"
+                    required
+                    placeholder="0,00"
+                    value={payoutAmount}
+                    onChange={(e) => setPayoutAmount(e.target.value)}
+                    className="w-full pl-10 pr-3.5 py-2.5 bg-[#050c08] border border-[#213428] rounded-xl text-sm font-mono text-white focus:border-[#00e66b] focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Resumo da Transferência */}
+              {parseFloat(payoutAmount.replace(",", ".")) >= 10 && (
+                <div className="p-3.5 rounded-xl bg-[#101d14] border border-[#30513d] text-xs space-y-1.5">
+                  <div className="flex justify-between text-[#b5c6bb]">
+                    <span>Valor solicitado:</span>
+                    <span className="font-mono">R$ {parseFloat(payoutAmount.replace(",", ".")).toFixed(2).replace(".", ",")}</span>
+                  </div>
+                  <div className="flex justify-between text-[#a1b0a6]">
+                    <span>Taxa de saque:</span>
+                    <span className="font-mono">- R$ {(((balances?.rates?.feePayoutFixedCents ?? 200) / 100).toFixed(2)).replace(".", ",")}</span>
+                  </div>
+                  <div className="border-t border-[#213428] pt-1.5 flex justify-between font-bold text-white">
+                    <span>Você receberá:</span>
+                    <span className="text-emerald-400 font-mono">
+                      R$ {Math.max(0, parseFloat(payoutAmount.replace(",", ".")) - ((balances?.rates?.feePayoutFixedCents ?? 200) / 100)).toFixed(2).replace(".", ",")}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={submittingAction === "payout" || !payoutAmount}
+                className="w-full py-3 bg-[#00e66b] hover:bg-[#69f0ae] text-black font-semibold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-emerald-500/10 cursor-pointer disabled:opacity-50"
+              >
+                {submittingAction === "payout" ? "Processando Saque…" : "Confirmar Saque Pix"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CONFIGURAR CHAVE PIX */}
+      {pixKeyModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-md bg-[#09120d] border border-[#213428] rounded-3xl p-6 space-y-5 shadow-2xl">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-[#00e66b]/10 border border-[#00e66b]/30 flex items-center justify-center">
+                  <Key className="w-4 h-4 text-[#00e66b]" />
+                </div>
+                <h3 className="text-base font-bold text-white">Cadastrar Chave Pix</h3>
+              </div>
+              <button onClick={() => setPixKeyModal(false)} className="text-[#a1b0a6] hover:text-white cursor-pointer" aria-label="Fechar">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSavePixKey} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-[#b5c6bb] mb-1.5">Tipo de Chave Pix</label>
+                <select
+                  value={selectedPixType}
+                  onChange={(e) => setSelectedPixType(e.target.value as any)}
+                  className="w-full px-3.5 py-2.5 bg-[#050c08] border border-[#213428] rounded-xl text-xs font-mono text-white focus:border-[#00e66b] focus:outline-none"
+                >
+                  <option value="CPF">CPF</option>
+                  <option value="CNPJ">CNPJ</option>
+                  <option value="EMAIL">E-mail</option>
+                  <option value="PHONE">Telefone Celular</option>
+                  <option value="RANDOM">Chave Aleatória (EVP)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-[#b5c6bb] mb-1.5">Chave Pix de Destino</label>
+                <input
+                  type="text"
+                  required
+                  placeholder={
+                    selectedPixType === "CPF"
+                      ? "000.000.000-00"
+                      : selectedPixType === "CNPJ"
+                      ? "00.000.000/0001-00"
+                      : selectedPixType === "EMAIL"
+                      ? "seu@email.com"
+                      : selectedPixType === "PHONE"
+                      ? "+5511999999999"
+                      : "Chave aleatória UUID"
+                  }
+                  value={pixKeyValue}
+                  onChange={(e) => setPixKeyValue(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-[#050c08] border border-[#213428] rounded-xl text-sm font-mono text-white focus:border-[#00e66b] focus:outline-none"
+                />
+              </div>
+
+              <p className="text-[11px] text-[#a1b0a6] leading-relaxed">
+                Esta chave será usada exclusivamente para receber os saques e transferências de saldo da sua conta AXION Pay.
+              </p>
+
+              <button
+                type="submit"
+                disabled={submittingAction === "pix-key"}
+                className="w-full py-3 bg-[#00e66b] hover:bg-[#69f0ae] text-black font-semibold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-emerald-500/10 cursor-pointer"
+              >
+                {submittingAction === "pix-key" ? "Salvando…" : "Salvar Chave Pix"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL EDITAR TAXAS & PRAZOS (ADMIN) */}
+      {ratesModal && editingRatesMerchant && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-lg bg-[#09120d] border border-[#213428] rounded-3xl p-6 space-y-5 shadow-2xl">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center">
+                  <Percent className="w-4 h-4 text-amber-400" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Editar Taxas & Prazos da Operação</h3>
+                  <p className="text-xs text-[#a1b0a6]">{editingRatesMerchant.name}</p>
+                </div>
+              </div>
+              <button onClick={() => setRatesModal(false)} className="text-[#a1b0a6] hover:text-white cursor-pointer" aria-label="Fechar">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveMerchantRates} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-[#b5c6bb] mb-1.5">MDR Pix (%)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={editFeePixPercent}
+                    onChange={(e) => setEditFeePixPercent(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-[#050c08] border border-[#213428] rounded-xl text-sm font-mono text-white focus:border-[#00e66b] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[#b5c6bb] mb-1.5">Taxa Fixa Pix (R$)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={editFeePixFixed}
+                    onChange={(e) => setEditFeePixFixed(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-[#050c08] border border-[#213428] rounded-xl text-sm font-mono text-white focus:border-[#00e66b] focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-[#b5c6bb] mb-1.5">Prazo Liquidação Pix (Dias)</label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    required
+                    placeholder="0 para D+0"
+                    value={editSettlementPix}
+                    onChange={(e) => setEditSettlementPix(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-[#050c08] border border-[#213428] rounded-xl text-sm font-mono text-white focus:border-[#00e66b] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[#b5c6bb] mb-1.5">Taxa por Saque Pix (R$)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={editFeePayout}
+                    onChange={(e) => setEditFeePayout(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-[#050c08] border border-[#213428] rounded-xl text-sm font-mono text-white focus:border-[#00e66b] focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-[#b5c6bb] mb-1.5">MDR Cartão à Vista (%)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={editFeeCardPercent}
+                    onChange={(e) => setEditFeeCardPercent(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-[#050c08] border border-[#213428] rounded-xl text-sm font-mono text-white focus:border-[#00e66b] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[#b5c6bb] mb-1.5">Prazo Cartão (Dias)</label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    required
+                    placeholder="14 para D+14"
+                    value={editSettlementCard}
+                    onChange={(e) => setEditSettlementCard(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-[#050c08] border border-[#213428] rounded-xl text-sm font-mono text-white focus:border-[#00e66b] focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={submittingAction === "rates"}
+                className="w-full py-3 bg-[#00e66b] hover:bg-[#69f0ae] text-black font-semibold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-emerald-500/10 cursor-pointer"
+              >
+                {submittingAction === "rates" ? "Atualizando Taxas…" : "Salvar Novas Taxas da Operação"}
+              </button>
+            </form>
           </div>
         </div>
       )}

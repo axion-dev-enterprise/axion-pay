@@ -6,7 +6,7 @@ const CONSOLE = 'https://pay.axionenterprise.cloud/dashboard';
 const DOCS = 'https://pay.axionenterprise.cloud/docs';
 
 function Brand() {
-  return <a className="brand" href="#inicio" aria-label="AXION Pay — início"><img src="/axion-logo.png" width="830" height="887" alt="" /><span>AXION<span className="brand-pay">pay</span></span></a>;
+  return <a className="brand" href="#inicio" aria-label="AXION Pay — início"><img src="/axionpay_logo.png" width="830" height="887" alt="AXION Pay" /><span>AXION<span className="brand-pay">pay</span></span></a>;
 }
 
 export default function Home() {
