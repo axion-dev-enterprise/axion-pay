@@ -1,3 +1,5 @@
+@import "./index.css";
+
 .pay-workspace {
   --font-sans: "Manrope", sans-serif;
   --font-mono: "JetBrains Mono", monospace;
