@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Activity, BadgeDollarSign, Building2, CheckCircle2, CreditCard, FileCheck2, RefreshCw, ShieldCheck, Users, X } from "lucide-react";
+import { Activity, BadgeDollarSign, Building2, CheckCircle2, CreditCard, FileCheck2, Loader2, Lock, LogIn, RefreshCw, ShieldCheck, Users, X } from "lucide-react";
 import "../workspace-theme.css";
 
 const API = "https://api.axionenterprise.cloud";
@@ -17,13 +17,30 @@ async function request(path:string, options:RequestInit={}) {
   return data;
 }
 
+async function checkAuth() {
+  try {
+    const res = await fetch(`${API}/v1/dashboard/me`, { headers: { Accept: "application/json" }, credentials: "include" });
+    const data = await res.json().catch(() => null);
+    if (res.ok && data?.user) return data.user;
+  } catch { /* Fail-closed: no confirmation from Core means no access */ }
+  return null;
+}
+
 function money(cents:string|number) { return new Intl.NumberFormat("pt-BR", {style:"currency",currency:"BRL"}).format(Number(cents)/100); }
 
 export default function AdminDashboard() {
+  const [authLoading, setAuthLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
   const [overview,setOverview]=useState<Overview|null>(null); const [applications,setApplications]=useState<Kyc[]>([]); const [transactions,setTransactions]=useState<Transaction[]>([]);
   const [loading,setLoading]=useState(true); const [error,setError]=useState(""); const [forbidden,setForbidden]=useState(false); const [selected,setSelected]=useState<Kyc|null>(null); const [decision,setDecision]=useState("APPROVED"); const [reason,setReason]=useState(""); const [saving,setSaving]=useState(false);
-  const load=useCallback(async()=>{setLoading(true);setError("");try{const [o,k,t]=await Promise.all([request("/v1/internal/admin/overview"),request("/v1/internal/kyc/applications"),request("/v1/internal/admin/transactions")]);setOverview(o.overview);setApplications(k.applications||[]);setTransactions(t.transactions||[]);setForbidden(false);}catch(e:any){if(e.status===403)setForbidden(true);else if(e.status===401)window.location.assign(`${AUTH}/login?return_to=${encodeURIComponent(window.location.href)}`);else setError(e.message);}finally{setLoading(false);}},[]);
-  useEffect(()=>{void load();},[load]);
+  const load=useCallback(async()=>{setLoading(true);setError("");try{const [o,k,t]=await Promise.all([request("/v1/internal/admin/overview"),request("/v1/internal/kyc/applications"),request("/v1/internal/admin/transactions")]);setOverview(o.overview);setApplications(k.applications||[]);setTransactions(t.transactions||[]);setForbidden(false);}catch(e:any){if(e.status===403)setForbidden(true);else if(e.status===401){setUser(null);setAuthLoading(false);}else setError(e.message);}finally{setLoading(false);}},[]);
+  useEffect(()=>{checkAuth().then((authUser)=>{if(authUser){setUser(authUser);load();}setAuthLoading(false);});},[]);
+
+  // Fail-closed: spinner while verifying session
+  if (authLoading) return <div className="pay-workspace min-h-screen bg-[#040806] flex items-center justify-center"><div className="flex flex-col items-center gap-3"><Loader2 className="w-8 h-8 text-[#00e66b] animate-spin" /><span className="text-xs font-mono text-[#a1b0a6]">Verificando sessão segura AXION...</span></div></div>;
+
+  // Fail-closed: no user session, show login prompt
+  if (!user) { const returnUrl = encodeURIComponent(window.location.href); return <div className="pay-workspace min-h-screen bg-[#040806] flex items-center justify-center p-4"><div className="w-full max-w-md p-8 rounded-3xl bg-[#09120d]/90 border border-[#213428] shadow-2xl text-center space-y-6"><div className="w-14 h-14 rounded-2xl bg-[#00e66b]/10 border border-[#00e66b]/20 flex items-center justify-center mx-auto"><Lock className="w-7 h-7 text-[#00e66b]" /></div><div className="space-y-1.5"><h2 className="text-xl font-bold text-white tracking-tight">Painel Administrativo AXION Pay</h2><p className="text-xs text-[#a1b0a6] leading-relaxed">Autenticação obrigatória. Faça login com sua conta corporativa AXION para acessar o painel administrativo.</p></div><a href={`${AUTH}/login?return_to=${returnUrl}`} className="w-full py-3.5 bg-[#00e66b] hover:bg-[#69f0ae] text-black font-semibold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-emerald-500/10 flex items-center justify-center gap-2"><LogIn className="w-4 h-4" /><span>Entrar com AXION Single Sign-On</span></a></div></div>; }
   async function review(){if(!selected)return;setSaving(true);try{await request(`/v1/internal/kyc/applications/${encodeURIComponent(selected.authUserId)}/review`,{method:"POST",body:JSON.stringify({status:decision,reason:reason.trim()||undefined})});setSelected(null);setReason("");await load();}catch(e:any){setError(e.message);}finally{setSaving(false);}}
   if(forbidden)return <main className="pay-workspace grid min-h-screen place-items-center p-6"><div className="max-w-md rounded-2xl border border-red-400/20 bg-[#09120d] p-8 text-center"><ShieldCheck className="mx-auto h-9 w-9 text-red-300"/><h1 className="mt-5 text-2xl">Acesso administrativo restrito</h1><p className="mt-3 text-sm leading-6 text-[#a1b0a6]">Sua identidade AXION não está cadastrada como revisora KYC.</p></div></main>;
   const cards=[ [Building2,"Merchants ativos",overview?.merchants??0], [FileCheck2,"KYC pendentes",overview?.pendingKyc??0], [Activity,"Cobranças hoje",overview?.chargesToday??0], [BadgeDollarSign,"Volume confirmado no mês",money(overview?.volumeMonthCents??0)], [CreditCard,"Assinaturas Gateway",overview?.gatewaySubscriptions??0], [Users,"Assinaturas Flow",overview?.flowSubscriptions??0] ] as const;
