@@ -59,14 +59,16 @@ const dashboardSettingsSchema = z.object({ organizationName: z.string().trim().m
 const flowCheckoutSchema = z.object({ plan: z.enum(['starter', 'professional', 'enterprise']).default('professional') });
 const onboardingProfileSchema = z.object({
   legalEntityType: z.enum(['INDIVIDUAL', 'BUSINESS']).default('BUSINESS'),
-  legalName: z.string().trim().min(2).max(160).optional(),
-  tradingName: z.string().trim().min(2).max(160).optional(),
-  documentNumber: z.string().trim().min(11).max(32).optional(),
-  billingEmail: z.string().trim().email().max(254).optional(),
-  phoneE164: z.string().trim().regex(/^\+[1-9]\d{7,14}$/).optional(),
+  // A draft must be saveable while a user is still completing the form. The
+  // stricter, field-level checks run only when it is submitted for KYC review.
+  legalName: z.string().trim().max(160).optional(),
+  tradingName: z.string().trim().max(160).optional(),
+  documentNumber: z.string().trim().max(32).optional(),
+  billingEmail: z.string().trim().max(254).optional(),
+  phoneE164: z.string().trim().max(32).optional(),
   countryCode: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/).default('BR'),
-  websiteUrl: z.string().trim().url().max(2_048).optional(),
-  businessDescription: z.string().trim().min(10).max(1_000).optional(),
+  websiteUrl: z.string().trim().max(2_048).optional(),
+  businessDescription: z.string().trim().max(1_000).optional(),
   acceptTerms: z.boolean().optional(),
   acceptPrivacy: z.boolean().optional(),
 });
@@ -307,7 +309,7 @@ export async function buildApp(dependencies: AppDependencies = {}) {
     const profile = await submitOnboardingProfile(database, user.id);
     if (!profile) {
       return reply.code(422).send({
-        error: 'Complete os dados legais, documento, contato, atividade e aceites antes de enviar o KYC.',
+        error: 'Revise os campos obrigatórios antes de enviar o KYC.',
       });
     }
     return { onboarding: profile };

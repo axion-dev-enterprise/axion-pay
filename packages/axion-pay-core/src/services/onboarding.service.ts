@@ -58,10 +58,12 @@ export async function getOnboardingProfile(database: Database, userId: string) {
 
 export async function saveOnboardingProfile(database: Database, userId: string, input: OnboardingProfileInput) {
   const normalizedDocument = input.documentNumber ? normalizeDocument(input.documentNumber) : null;
-  const documentHash = normalizedDocument
+  const documentIsComplete = normalizedDocument ? [11, 14].includes(normalizedDocument.length) : false;
+  const documentHash = documentIsComplete && normalizedDocument
     ? crypto.createHash('sha256').update(normalizedDocument).digest('hex')
     : null;
-  const documentLastFour = normalizedDocument ? normalizedDocument.slice(-4) : null;
+  const documentLastFour = documentIsComplete && normalizedDocument ? normalizedDocument.slice(-4) : null;
+  const nullable = (value?: string) => value?.trim() || null;
 
   const result = await database.query(
     `INSERT INTO gateway_onboarding_profiles (
@@ -92,15 +94,15 @@ export async function saveOnboardingProfile(database: Database, userId: string, 
     [
       userId,
       input.legalEntityType,
-      input.legalName ?? null,
-      input.tradingName ?? null,
+      nullable(input.legalName),
+      nullable(input.tradingName),
       documentHash,
       documentLastFour,
-      input.billingEmail ?? null,
-      input.phoneE164 ?? null,
+      nullable(input.billingEmail),
+      nullable(input.phoneE164),
       input.countryCode,
-      input.websiteUrl ?? null,
-      input.businessDescription ?? null,
+      nullable(input.websiteUrl),
+      nullable(input.businessDescription),
       input.acceptTerms === true,
       input.acceptPrivacy === true,
     ],
@@ -114,11 +116,12 @@ export async function submitOnboardingProfile(database: Database, userId: string
         SET status = 'SUBMITTED', submitted_at = NOW(), review_reason = NULL, updated_at = NOW()
       WHERE auth_user_id = $1
         AND status IN ('DRAFT', 'ACTION_REQUIRED')
-        AND legal_name IS NOT NULL
+        AND length(trim(COALESCE(legal_name, ''))) >= 2
         AND document_hash IS NOT NULL
-        AND billing_email IS NOT NULL
-        AND phone_e164 IS NOT NULL
-        AND business_description IS NOT NULL
+        AND COALESCE(billing_email, '') ~ '^[^[:space:]@]+@[^[:space:]@]+\\.[^[:space:]@]+$'
+        AND COALESCE(phone_e164, '') ~ '^\\+[1-9][0-9]{7,14}$'
+        AND (website_url IS NULL OR website_url = '' OR website_url ~ '^https?://[^[:space:]]+$')
+        AND length(trim(COALESCE(business_description, ''))) >= 5
         AND terms_accepted_at IS NOT NULL
         AND privacy_accepted_at IS NOT NULL
       RETURNING *`,
