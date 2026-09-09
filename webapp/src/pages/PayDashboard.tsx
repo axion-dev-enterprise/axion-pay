@@ -50,6 +50,8 @@ async function clearAuth() {
 async function apiFetch(path: string, options: RequestInit = {}) {
   const headers = new Headers(options.headers);
   if (!headers.has("Accept")) headers.set("Accept", "application/json");
+  headers.set("Cache-Control", "no-cache, no-store, must-revalidate");
+  headers.set("Pragma", "no-cache");
 
   // A request without a payload must not advertise a JSON body. Besides being
   // semantically incorrect for GET and action-only POST endpoints, some API
@@ -59,8 +61,14 @@ async function apiFetch(path: string, options: RequestInit = {}) {
     headers.set("Content-Type", "application/json");
   }
 
+  // Cache-busting para garantir que o navegador nunca sirva respostas defasadas em GET
+  const isGet = !options.method || options.method.toUpperCase() === "GET";
+  const separator = path.includes("?") ? "&" : "?";
+  const url = isGet ? `${API_BASE}${path}${separator}_t=${Date.now()}` : `${API_BASE}${path}`;
+
   try {
-    const res = await fetch(`${API_BASE}${path}`, {
+    const res = await fetch(url, {
+      cache: "no-store",
       ...options,
       headers,
       credentials: "include",
@@ -80,7 +88,15 @@ async function checkAuth() {
   // shared HttpOnly session here proves that the cookie reached the API and
   // that the API could validate it against Auth before any dashboard request.
   try {
-    const res = await fetch(`${API_BASE}/v1/dashboard/me`, { headers: { Accept: "application/json" }, credentials: "include" });
+    const res = await fetch(`${API_BASE}/v1/dashboard/me?_t=${Date.now()}`, {
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        Pragma: "no-cache"
+      },
+      credentials: "include"
+    });
     const data = await res.json().catch(() => null);
     if (res.ok && data?.user) return data.user;
   } catch {
@@ -411,7 +427,7 @@ export default function PayDashboard() {
     setLoadingData(true);
     setErrorMessage(null);
     try {
-      const [ovRes, mRes, kRes, txRes, intRes, stRes, onboardingRes, billingRes] = await Promise.all([
+      const [ovRes, mRes, kRes, txRes, intRes, stRes, onboardingRes, billingRes] = await Promise.allSettled([
         apiFetch("/v1/dashboard/overview"),
         apiFetch("/v1/dashboard/merchants"),
         apiFetch("/v1/dashboard/api-keys"),
@@ -422,15 +438,24 @@ export default function PayDashboard() {
         apiFetch("/v1/dashboard/billing"),
       ]);
 
-      if (ovRes && !ovRes.error) setOverview(ovRes);
-      if (mRes?.merchants) setMerchants(mRes.merchants);
-      if (kRes?.keys) setApiKeys(kRes.keys);
-      if (txRes?.transactions) setTransactions(txRes.transactions);
-      if (intRes && !intRes.error) setIntegrations(intRes);
-      if (stRes?.settings) setSettings(stRes.settings);
-      if (onboardingRes && !onboardingRes.error) {
-        applyOnboardingProfile(onboardingRes.onboarding);
-        const reviewer = Boolean(onboardingRes.canReviewKyc);
+      const ov = ovRes.status === "fulfilled" ? ovRes.value : null;
+      const m = mRes.status === "fulfilled" ? mRes.value : null;
+      const k = kRes.status === "fulfilled" ? kRes.value : null;
+      const tx = txRes.status === "fulfilled" ? txRes.value : null;
+      const int = intRes.status === "fulfilled" ? intRes.value : null;
+      const st = stRes.status === "fulfilled" ? stRes.value : null;
+      const onb = onboardingRes.status === "fulfilled" ? onboardingRes.value : null;
+      const bill = billingRes.status === "fulfilled" ? billingRes.value : null;
+
+      if (ov && !ov.error) setOverview(ov);
+      if (m?.merchants) setMerchants(m.merchants);
+      if (k?.keys) setApiKeys(k.keys);
+      if (tx?.transactions) setTransactions(tx.transactions);
+      if (int && !int.error) setIntegrations(int);
+      if (st?.settings) setSettings(st.settings);
+      if (onb && !onb.error) {
+        applyOnboardingProfile(onb.onboarding);
+        const reviewer = Boolean(onb.canReviewKyc);
         setCanReviewKyc(reviewer);
         if (reviewer) {
           const reviewRes = await apiFetch("/v1/internal/kyc/applications?status=SUBMITTED");
@@ -438,7 +463,7 @@ export default function PayDashboard() {
         }
       }
       setOnboardingLoaded(true);
-      if (billingRes && !billingRes.error) setBilling(billingRes.billing);
+      if (bill && !bill.error) setBilling(bill.billing);
     } catch (err: any) {
       setErrorMessage("Erro ao carregar dados do dashboard.");
     } finally {
@@ -465,7 +490,11 @@ export default function PayDashboard() {
         setNewMerchantName("");
         setNewMerchantDoc("");
         setNewMerchantEmail("");
+        // 1. Atualização reativa imediata na UI (elimina sensação de vazio)
+        setMerchants((prev) => [res.merchant, ...prev.filter((m) => m.id !== res.merchant.id)]);
+        setOverview((prev) => ({ ...prev, merchants: Math.max(prev.merchants + 1, prev.merchants) }));
         notify("success", "Merchant cadastrado e isolado para esta organização.");
+        // 2. Sincronização em background para garantir integridade relacional
         await loadAllData();
       } else {
         notify("error", res?.error || "Não foi possível cadastrar o merchant.");
@@ -484,6 +513,9 @@ export default function PayDashboard() {
         body: JSON.stringify({ status: nextStatus }),
       });
       if (res?.merchant) {
+        setMerchants((prev) =>
+          prev.map((m) => (m.id === id ? { ...m, status: nextStatus } : m))
+        );
         notify("success", nextStatus === "ACTIVE" ? "Merchant ativado." : "Merchant desativado.");
         await loadAllData();
       } else {
@@ -513,7 +545,13 @@ export default function PayDashboard() {
         }),
       });
       if (res?.key) {
+        const createdKey = {
+          ...res.key,
+          merchantName: merchants.find((m) => m.id === keyMerchantId)?.name || "Merchant",
+        };
         setGeneratedKey(res.key.secret);
+        setApiKeys((prev) => [createdKey, ...prev.filter((k) => k.id !== res.key.id)]);
+        setOverview((prev) => ({ ...prev, activeKeys: prev.activeKeys + 1 }));
         notify("success", "Chave criada. Copie-a agora: ela não será exibida novamente.");
         await loadAllData();
       } else {
@@ -530,8 +568,10 @@ export default function PayDashboard() {
       const res = await apiFetch(`/v1/dashboard/api-keys/${id}/revoke`, {
         method: "POST",
       });
-      if (res?.key) {
+      if (res?.key || !res?.error) {
         setPendingRevoke(null);
+        setApiKeys((prev) => prev.map((k) => (k.id === id ? { ...k, status: "REVOKED" } : k)));
+        setOverview((prev) => ({ ...prev, activeKeys: Math.max(0, prev.activeKeys - 1) }));
         notify("success", "Chave de API revogada imediatamente.");
         await loadAllData();
       } else {
@@ -552,7 +592,8 @@ export default function PayDashboard() {
         method: "POST",
         body: JSON.stringify({ organizationName: org }),
       });
-      if (res?.settings) {
+      if (res?.settings || !res?.error) {
+        setSettings({ organizationName: org });
         notify("success", "Configurações salvas com sucesso.");
         await loadAllData();
       } else {
