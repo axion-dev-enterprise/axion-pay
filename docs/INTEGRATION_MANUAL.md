@@ -230,3 +230,172 @@ print("Client Secret:", data["clientSecret"])
 | `409 Conflict` | `Idempotency-Key já usada com outro valor.` | O mesmo `Idempotency-Key` já foi registrado para outro valor. Use uma nova chave única. |
 | `422 Unprocessable` | `Merchant inativo ou não encontrado.` | A conta vinculada à chave precisa estar com status `ACTIVE` no console. |
 | `429 Too Many Requests` | `Limite de requisições excedido.` | Reduza a taxa de chamadas (rate limit padrão por minuto). |
+
+---
+
+## 8. Assinaturas Recorrentes Server-to-Server (`/v1/subscriptions`)
+
+O AXION Pay suporta faturamento recorrente automatizado com cobrança em cartão de crédito.
+
+### 8.1. Criando uma Assinatura
+`POST /v1/subscriptions`  
+**Headers obrigatórios**: `Authorization: Bearer <API_KEY>`, `Idempotency-Key: <UUID>`
+
+```json
+{
+  "customerEmail": "assinante@manadiario.com",
+  "customerName": "Vinicios Coelho",
+  "amountCents": 4990,
+  "interval": "month",
+  "currency": "BRL",
+  "metadata": {
+    "plano": "premium_anual",
+    "usuarioId": "usr_9981"
+  }
+}
+```
+
+**Resposta (`201 Created`)**:
+```json
+{
+  "id": "d748f3e2-89aa-4034-8cbb-1875e4785461",
+  "merchantId": "b3bea37c-9756-4c4f-a9db-123456789abc",
+  "customerEmail": "assinante@manadiario.com",
+  "customerName": "Vinicios Coelho",
+  "stripeCustomerId": "cus_R9b2K4...",
+  "stripeSubscriptionId": "sub_1Q123...",
+  "status": "ACTIVE",
+  "amountCents": 4990,
+  "currency": "BRL",
+  "interval": "month",
+  "currentPeriodEnd": "2026-10-10T17:30:00.000Z",
+  "cancelAtPeriodEnd": false,
+  "checkoutUrl": "https://pay.axionenterprise.cloud/checkout/success?session_id=cs_...",
+  "createdAt": "2026-09-10T17:30:00.000Z"
+}
+```
+
+Se `paymentMethodId` for fornecido (obtido via Secure Fields), o débito é imediato. Caso contrário, utilize `checkoutUrl` para direcionar o cliente ao checkout seguro de cadastro do cartão.
+
+### 8.2. Consultando uma Assinatura
+`GET /v1/subscriptions/{id}`  
+Retorna o status atual (`ACTIVE`, `TRIALING`, `PAST_DUE`, `CANCELED`) e a data do próximo ciclo (`currentPeriodEnd`).
+
+### 8.3. Cancelando uma Assinatura
+`POST /v1/subscriptions/{id}/cancel`
+```json
+{
+  "immediately": false
+}
+```
+- `immediately: false` (padrão): Mantém o acesso ativo até o término do ciclo atual faturado (`cancelAtPeriodEnd: true`).
+- `immediately: true`: Interrompe a assinatura imediatamente.
+
+---
+
+## 9. Webhooks & Notificações Outbound
+
+O AXION Pay notifica seu servidor em tempo real a cada mudança de estado de pagamentos e assinaturas.
+
+### 9.1. Cadastro de Endpoint de Webhook
+`POST /v1/merchant/webhooks`  
+**Headers**: `Authorization: Bearer <API_KEY>`
+
+```json
+{
+  "url": "https://api.manadiario.com/webhooks/axion-pay",
+  "events": [
+    "payment.succeeded",
+    "payment.failed",
+    "subscription.created",
+    "subscription.renewed",
+    "subscription.past_due",
+    "subscription.canceled"
+  ]
+}
+```
+
+**Resposta (`201 Created`)**:
+```json
+{
+  "webhook": {
+    "id": "e931b742-1245-4dfc-91aa-902318491823",
+    "merchantId": "b3bea37c-9756-4c4f-a9db-123456789abc",
+    "url": "https://api.manadiario.com/webhooks/axion-pay",
+    "secret": "whsec_38e7f12a9b40c6e1882d90a1bc34e56f78129034",
+    "events": ["payment.succeeded", "payment.failed", "subscription.created", "subscription.renewed", "subscription.past_due", "subscription.canceled"],
+    "status": "ACTIVE",
+    "createdAt": "2026-09-10T17:30:00.000Z"
+  }
+}
+```
+> [!IMPORTANT]
+> Guarde o campo `secret` (`whsec_*`) em suas variáveis de ambiente para validação das assinaturas das notificações.
+
+### 9.2. Catálogo de Eventos
+
+| Evento | Disparo / Significado |
+|---|---|
+| `payment.succeeded` | Pagamento PIX ou fatura de cartão aprovada com sucesso. |
+| `payment.failed` | Falha na cobrança de cartão de crédito ou PIX expirado. |
+| `subscription.created` | Nova assinatura recorrente registrada. |
+| `subscription.renewed` | Renovação periódica (mensal/anual) faturada com sucesso. |
+| `subscription.past_due` | Tentativa de renovação recusada (cartão sem limite/expirado). |
+| `subscription.canceled` | Assinatura cancelada pelo cliente ou merchant. |
+
+### 9.3. Cabeçalhos HTTP Enviados no Webhook
+- `Content-Type: application/json`
+- `User-Agent: AXION-Pay-Webhook/1.0`
+- `X-Axion-Signature: t=1725984000,v1=9f83a48e71...`
+- `X-Axion-Event-Id: <UUID>`
+
+### 9.4. Validação Criptográfica de Assinatura (HMAC SHA-256)
+
+#### Node.js / TypeScript
+```typescript
+import crypto from 'node:crypto';
+
+export function verifyAxionWebhook(rawBody: string, signatureHeader: string, secret: string): boolean {
+  const parts = signatureHeader.split(',');
+  const timestamp = parts.find((p) => p.startsWith('t='))?.slice(2);
+  const signature = parts.find((p) => p.startsWith('v1='))?.slice(3);
+
+  if (!timestamp || !signature) return false;
+
+  // Tolerância máxima de 5 minutos contra replay attacks
+  const now = Math.floor(Date.now() / 1000);
+  if (Math.abs(now - Number(timestamp)) > 300) return false;
+
+  const expected = crypto
+    .createHmac('sha256', secret)
+    .update(`${timestamp}.${rawBody}`)
+    .digest('hex');
+
+  return crypto.timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(expected, 'hex'));
+}
+```
+
+#### Python / FastAPI
+```python
+import hmac
+import hashlib
+import time
+
+def verify_axion_webhook(raw_body: bytes, signature_header: str, secret: str) -> bool:
+    try:
+        parts = dict(item.split("=") for item in signature_header.split(","))
+        timestamp = parts.get("t")
+        received_sig = parts.get("v1")
+        if not timestamp or not received_sig:
+            return False
+
+        if abs(int(time.time()) - int(timestamp)) > 300:
+            return False
+
+        payload_to_sign = f"{timestamp}.".encode("utf-8") + raw_body
+        expected_sig = hmac.new(secret.encode("utf-8"), payload_to_sign, hashlib.sha256).hexdigest()
+        return hmac.compare_digest(received_sig, expected_sig)
+    except Exception:
+        return False
+```
+

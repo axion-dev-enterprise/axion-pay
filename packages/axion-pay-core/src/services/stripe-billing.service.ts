@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { Pool } from 'pg';
+import { dispatchMerchantEventAsync } from './merchant-webhook-dispatcher.service.js';
 
 type BillingDatabase = Pick<Pool, 'query'>;
 
@@ -192,20 +193,64 @@ export async function ingestStripeWebhook(database: BillingDatabase, config: Str
 
   if (event.type.startsWith('payment_intent.') && typeof object.id === 'string') {
     const paymentStatus = typeof object.status === 'string' ? object.status.toUpperCase() : 'PROCESSING';
-    const paymentIntent = await database.query<{ id: string; amount_cents: string }>(
+    const paymentIntent = await database.query<{ id: string; merchant_id: string; amount_cents: string }>(
       `UPDATE payment_intents SET status = $2, updated_at = NOW()
         WHERE provider = 'stripe' AND provider_charge_id = $1
-        RETURNING id, amount_cents`,
+        RETURNING id, merchant_id, amount_cents`,
       [object.id, paymentStatus],
     );
-    if (event.type === 'payment_intent.succeeded' && paymentIntent.rowCount) {
+    if (paymentIntent.rowCount && paymentIntent.rows[0].merchant_id) {
+      const merchantId = paymentIntent.rows[0].merchant_id;
+      if (event.type === 'payment_intent.succeeded') {
+        await database.query(
+          `INSERT INTO financial_transactions
+            (payment_intent_id, provider, provider_transaction_id, amount_cents, direction, status, occurred_at)
+           VALUES ($1, 'stripe', $2, $3, 'CREDIT', 'CONFIRMED', to_timestamp($4))
+           ON CONFLICT (provider, provider_transaction_id) DO NOTHING`,
+          [paymentIntent.rows[0].id, object.id, paymentIntent.rows[0].amount_cents, event.created],
+        );
+        dispatchMerchantEventAsync(database, merchantId, 'payment.succeeded', {
+          id: paymentIntent.rows[0].id,
+          providerChargeId: object.id,
+          amountCents: Number(paymentIntent.rows[0].amount_cents),
+          currency: 'BRL',
+          method: 'card',
+          status: 'PAID',
+        });
+      } else if (event.type === 'payment_intent.payment_failed') {
+        dispatchMerchantEventAsync(database, merchantId, 'payment.failed', {
+          id: paymentIntent.rows[0].id,
+          providerChargeId: object.id,
+          amountCents: Number(paymentIntent.rows[0].amount_cents),
+          currency: 'BRL',
+          method: 'card',
+          status: 'FAILED',
+        });
+      }
+    }
+  }
+
+  // Despacha eventos para merchant_subscriptions se a assinatura pertencer a um merchant externo
+  if (subscriptionId) {
+    const mSub = await database.query<{ id: string; merchant_id: string }>(
+      `SELECT id, merchant_id FROM merchant_subscriptions WHERE stripe_subscription_id = $1 LIMIT 1`,
+      [subscriptionId],
+    );
+    if (mSub.rowCount) {
+      const mId = mSub.rows[0].merchant_id;
+      const periodEndTs = typeof object.current_period_end === 'number' ? new Date(object.current_period_end * 1000) : null;
+      const subStatus = typeof object.status === 'string' ? object.status.toUpperCase() : 'ACTIVE';
       await database.query(
-        `INSERT INTO financial_transactions
-          (payment_intent_id, provider, provider_transaction_id, amount_cents, direction, status, occurred_at)
-         VALUES ($1, 'stripe', $2, $3, 'CREDIT', 'CONFIRMED', to_timestamp($4))
-         ON CONFLICT (provider, provider_transaction_id) DO NOTHING`,
-        [paymentIntent.rows[0].id, object.id, paymentIntent.rows[0].amount_cents, event.created],
+        `UPDATE merchant_subscriptions SET status = $1, current_period_end = COALESCE($2, current_period_end), updated_at = NOW() WHERE id = $3`,
+        [subStatus, periodEndTs, mSub.rows[0].id],
       );
+      if (event.type === 'invoice.payment_succeeded' || event.type === 'customer.subscription.updated') {
+        dispatchMerchantEventAsync(database, mId, 'subscription.renewed', { subscriptionId: mSub.rows[0].id, stripeSubscriptionId: subscriptionId, status: subStatus });
+      } else if (event.type === 'invoice.payment_failed') {
+        dispatchMerchantEventAsync(database, mId, 'subscription.past_due', { subscriptionId: mSub.rows[0].id, stripeSubscriptionId: subscriptionId, status: 'PAST_DUE' });
+      } else if (event.type === 'customer.subscription.deleted') {
+        dispatchMerchantEventAsync(database, mId, 'subscription.canceled', { subscriptionId: mSub.rows[0].id, stripeSubscriptionId: subscriptionId, status: 'CANCELED' });
+      }
     }
   }
 
