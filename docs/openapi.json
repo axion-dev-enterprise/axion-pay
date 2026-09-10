@@ -868,6 +868,259 @@
           }
         }
       }
+    },
+    "/v1/merchant/webhooks": {
+      "get": {
+        "summary": "Lista webhooks cadastrados para o merchant",
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de webhooks."
+          }
+        }
+      },
+      "post": {
+        "summary": "Cadastra ou atualiza um endpoint de webhook",
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "url"
+                ],
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "events": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Webhook cadastrado; retorna URL e segredo de assinatura (whsec_*)."
+          },
+          "400": {
+            "description": "URL inválida ou eventos ausentes."
+          }
+        }
+      }
+    },
+    "/v1/merchant/webhooks/{id}": {
+      "delete": {
+        "summary": "Exclui um endpoint de webhook do merchant",
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Webhook excluído."
+          },
+          "404": {
+            "description": "Não encontrado."
+          }
+        }
+      }
+    },
+    "/v1/merchant/webhooks/deliveries": {
+      "get": {
+        "summary": "Lista histórico de entregas de webhooks do merchant",
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Histórico de tentativas e status das entregas."
+          }
+        }
+      }
+    },
+    "/v1/subscriptions": {
+      "post": {
+        "summary": "Cria uma assinatura recorrente para o cliente do merchant",
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "customerEmail",
+                  "amountCents"
+                ],
+                "properties": {
+                  "customerEmail": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "customerName": {
+                    "type": "string",
+                    "maxLength": 120
+                  },
+                  "amountCents": {
+                    "type": "integer",
+                    "minimum": 100,
+                    "maximum": 100000000
+                  },
+                  "interval": {
+                    "type": "string",
+                    "enum": [
+                      "month",
+                      "year"
+                    ],
+                    "default": "month"
+                  },
+                  "currency": {
+                    "type": "string",
+                    "example": "BRL"
+                  },
+                  "paymentMethodId": {
+                    "type": "string"
+                  },
+                  "metadata": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Assinatura criada com sucesso."
+          },
+          "400": {
+            "description": "Requisição inválida ou parâmetros ausentes."
+          },
+          "503": {
+            "description": "Assinaturas por cartão não configuradas."
+          }
+        }
+      }
+    },
+    "/v1/subscriptions/{id}": {
+      "get": {
+        "summary": "Consulta status e ciclo de uma assinatura recorrente",
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dados da assinatura."
+          },
+          "404": {
+            "description": "Não encontrada."
+          }
+        }
+      }
+    },
+    "/v1/subscriptions/{id}/cancel": {
+      "post": {
+        "summary": "Cancela uma assinatura recorrente",
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "immediately": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Assinatura cancelada."
+          },
+          "404": {
+            "description": "Não encontrada."
+          }
+        }
+      }
     }
   }
 }

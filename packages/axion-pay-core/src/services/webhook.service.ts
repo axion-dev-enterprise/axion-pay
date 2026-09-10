@@ -3,6 +3,7 @@ import type { Pool, PoolClient } from 'pg';
 import { db } from '../db.js';
 import type { PaymentStatus } from '../core/types.js';
 import { WooviProvider } from '../providers/woovi.provider.js';
+import { dispatchMerchantEventAsync } from './merchant-webhook-dispatcher.service.js';
 
 type WebhookDetails = {
   correlationId?: string;
@@ -103,7 +104,7 @@ export class WooviWebhookService {
       return 'identificador transacional ausente em evento pago';
     }
 
-    const updated = await client.query<{ id: string; amount_cents: number }>(
+    const updated = await client.query<{ id: string; merchant_id: string; amount_cents: number }>(
       `
         UPDATE payment_intents
         SET status = $1, updated_at = NOW()
@@ -116,7 +117,7 @@ export class WooviWebhookService {
           -- A signed event is still rejected if it does not describe the
           -- amount originally requested for this correlation id.
           AND ($3::bigint IS NULL OR amount_cents = $3::bigint)
-        RETURNING id, amount_cents
+        RETURNING id, merchant_id, amount_cents
       `,
       [details.status, details.correlationId, details.amountCents ?? null],
     );
@@ -141,6 +142,23 @@ export class WooviWebhookService {
           JSON.stringify(payload),
         ],
       );
+
+      if (updated.rows[0].merchant_id) {
+        dispatchMerchantEventAsync(
+          db,
+          updated.rows[0].merchant_id,
+          'payment.succeeded',
+          {
+            id: updated.rows[0].id,
+            correlationId: details.correlationId,
+            amountCents: Number(amount),
+            currency: 'BRL',
+            method: 'pix',
+            status: 'PAID',
+            endToEndId: details.endToEndId ?? null,
+          },
+        );
+      }
     }
 
     return null;

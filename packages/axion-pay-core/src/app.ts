@@ -34,6 +34,20 @@ import { getOnboardingProfile, isOnboardingApproved, listKycApplications, review
 import { createCustomerPortal, createSubscriptionCheckout, getBillingStatus, ingestStripeWebhook } from './services/stripe-billing.service.js';
 import { getAdminOverview, listAdminTransactions } from './services/admin.service.js';
 import { CardPaymentError, CardPaymentPrincipal, createCardPaymentIntent } from './services/card-payments.service.js';
+import Stripe from 'stripe';
+import {
+  createMerchantWebhook,
+  listMerchantWebhooks,
+  deleteMerchantWebhook,
+  listMerchantWebhookDeliveries,
+  MerchantWebhookError,
+} from './services/merchant-webhook-dispatcher.service.js';
+import {
+  createMerchantSubscription,
+  getMerchantSubscription,
+  cancelMerchantSubscription,
+  MerchantSubscriptionError,
+} from './services/merchant-subscriptions.service.js';
 import { openapi } from './openapi.js';
 
 const createChargeSchema = z.object({
@@ -50,6 +64,23 @@ const cardPaymentIntentSchema = z.object({
 const correlationIdParams = z.object({ correlationId: z.string().uuid() });
 const merchantIdParams = z.object({ merchantId: z.string().uuid() });
 const apiKeyIdParams = z.object({ keyId: z.string().uuid() });
+const subscriptionIdParams = z.object({ id: z.string().uuid() });
+const webhookIdParams = z.object({ id: z.string().uuid() });
+
+const createMerchantWebhookSchema = z.object({
+  url: z.string().url(),
+  events: z.array(z.string()).optional(),
+});
+
+const createMerchantSubscriptionSchema = z.object({
+  customerEmail: z.string().email(),
+  customerName: z.string().trim().max(120).optional(),
+  amountCents: z.number().int().min(100).max(100_000_000),
+  interval: z.enum(['month', 'year']).optional(),
+  currency: z.string().length(3).optional(),
+  paymentMethodId: z.string().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
 const dashboardMerchantSchema = z.object({
   name: z.string().trim().min(1).max(120),
   document: z.string().trim().max(32).optional(),
@@ -563,6 +594,113 @@ export async function buildApp(dependencies: AppDependencies = {}) {
     );
     if (!result.rowCount) return reply.code(404).send({ error: 'Cobrança não encontrada.' });
     return publicIntent(result.rows[0]);
+  });
+
+  // --- Merchant Outbound Webhooks Management ---
+  app.post('/v1/merchant/webhooks', async (request, reply) => {
+    const merchant = await requireMerchant(request, reply, ['charges:write'], cache, database);
+    if (!merchant) return;
+
+    try {
+      const body = createMerchantWebhookSchema.parse(request.body);
+      const webhook = await createMerchantWebhook(database, merchant.merchantId, body.url, body.events);
+      return reply.code(201).send({ webhook });
+    } catch (err) {
+      if (err instanceof MerchantWebhookError) return reply.code(err.statusCode).send({ error: err.message });
+      throw err;
+    }
+  });
+
+  app.get('/v1/merchant/webhooks', async (request, reply) => {
+    const merchant = await requireMerchant(request, reply, ['charges:read'], cache, database);
+    if (!merchant) return;
+
+    const webhooks = await listMerchantWebhooks(database, merchant.merchantId);
+    return reply.code(200).send({ webhooks });
+  });
+
+  app.delete('/v1/merchant/webhooks/:id', async (request, reply) => {
+    const merchant = await requireMerchant(request, reply, ['charges:write'], cache, database);
+    if (!merchant) return;
+
+    try {
+      const { id } = webhookIdParams.parse(request.params);
+      const result = await deleteMerchantWebhook(database, merchant.merchantId, id);
+      return reply.code(200).send(result);
+    } catch (err) {
+      if (err instanceof MerchantWebhookError) return reply.code(err.statusCode).send({ error: err.message });
+      throw err;
+    }
+  });
+
+  app.get('/v1/merchant/webhooks/deliveries', async (request, reply) => {
+    const merchant = await requireMerchant(request, reply, ['charges:read'], cache, database);
+    if (!merchant) return;
+
+    const deliveries = await listMerchantWebhookDeliveries(database, merchant.merchantId);
+    return reply.code(200).send({ deliveries });
+  });
+
+  // --- Merchant Recurring Subscriptions API S2S ---
+  app.post('/v1/subscriptions', async (request, reply) => {
+    const merchant = await requireMerchant(request, reply, ['charges:write'], cache, database);
+    if (!merchant) return;
+
+    if (!config.STRIPE_SECRET_KEY) {
+      return reply.code(503).send({ error: 'Assinaturas por cartão ainda não configuradas.' });
+    }
+
+    const idempotencyKey = String(request.headers['idempotency-key'] ?? '').trim();
+    if (!idempotencyKey || idempotencyKey.length > 255) {
+      return reply.code(400).send({ error: 'Header Idempotency-Key é obrigatório e deve ter até 255 caracteres.' });
+    }
+
+    try {
+      const body = createMerchantSubscriptionSchema.parse(request.body);
+      const stripe = new Stripe(config.STRIPE_SECRET_KEY);
+      const subscription = await createMerchantSubscription(database, stripe, merchant.merchantId, {
+        ...body,
+        idempotencyKey,
+      });
+      return reply.code(201).send(subscription);
+    } catch (err) {
+      if (err instanceof MerchantSubscriptionError) return reply.code(err.statusCode).send({ error: err.message });
+      throw err;
+    }
+  });
+
+  app.get('/v1/subscriptions/:id', async (request, reply) => {
+    const merchant = await requireMerchant(request, reply, ['charges:read'], cache, database);
+    if (!merchant) return;
+
+    try {
+      const { id } = subscriptionIdParams.parse(request.params);
+      const subscription = await getMerchantSubscription(database, merchant.merchantId, id);
+      return reply.code(200).send(subscription);
+    } catch (err) {
+      if (err instanceof MerchantSubscriptionError) return reply.code(err.statusCode).send({ error: err.message });
+      throw err;
+    }
+  });
+
+  app.post('/v1/subscriptions/:id/cancel', async (request, reply) => {
+    const merchant = await requireMerchant(request, reply, ['charges:write'], cache, database);
+    if (!merchant) return;
+
+    if (!config.STRIPE_SECRET_KEY) {
+      return reply.code(503).send({ error: 'Assinaturas por cartão ainda não configuradas.' });
+    }
+
+    try {
+      const { id } = subscriptionIdParams.parse(request.params);
+      const immediately = Boolean((request.body as Record<string, unknown> | undefined)?.immediately);
+      const stripe = new Stripe(config.STRIPE_SECRET_KEY);
+      const subscription = await cancelMerchantSubscription(database, stripe, merchant.merchantId, id, immediately);
+      return reply.code(200).send(subscription);
+    } catch (err) {
+      if (err instanceof MerchantSubscriptionError) return reply.code(err.statusCode).send({ error: err.message });
+      throw err;
+    }
   });
 
   if (config.ENABLE_BANK_RECONCILIATION) {
