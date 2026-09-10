@@ -143,7 +143,8 @@ export async function buildApp(dependencies: AppDependencies = {}) {
     },
     credentials: true,
     allowedHeaders: ['authorization', 'content-type', 'idempotency-key', 'x-trace-id', 'cache-control', 'pragma'],
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'OPTIONS'],
+    exposedHeaders: ['x-trace-id', 'x-ratelimit-limit', 'x-ratelimit-remaining'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
 
   await app.register(rawBody, {
@@ -198,10 +199,19 @@ export async function buildApp(dependencies: AppDependencies = {}) {
     });
   });
 
+  let lastHealthCheck = 0;
+  let lastHealthResult = { ok: true, status: 'ok', service: 'axion-pay-core', timestamp: new Date().toISOString() };
+
   app.get('/health', async (_request, reply) => {
+    const now = Date.now();
+    if (now - lastHealthCheck < 2000) {
+      return lastHealthResult;
+    }
     try {
       await Promise.all([database.query('SELECT 1'), cache.ping()]);
-      return { ok: true, status: 'ok', service: 'axion-pay-core', timestamp: new Date().toISOString() };
+      lastHealthCheck = now;
+      lastHealthResult = { ok: true, status: 'ok', service: 'axion-pay-core', timestamp: new Date().toISOString() };
+      return lastHealthResult;
     } catch {
       return reply.code(503).send({ ok: false, status: 'unavailable', service: 'axion-pay-core', timestamp: new Date().toISOString() });
     }
@@ -597,6 +607,16 @@ export async function buildApp(dependencies: AppDependencies = {}) {
   return app;
 }
 
+function getClientIp(request: FastifyRequest): string {
+  const cfIp = request.headers['cf-connecting-ip'];
+  if (typeof cfIp === 'string' && cfIp.trim()) return cfIp.trim();
+  const forwarded = request.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.trim()) {
+    return forwarded.split(',')[0].trim();
+  }
+  return request.ip || '127.0.0.1';
+}
+
 async function requireMerchant(
   request: FastifyRequest,
   reply: FastifyReply,
@@ -616,13 +636,30 @@ async function requireMerchant(
     return null;
   }
 
+  const isSandbox = principal.scopes.has('sandbox:read');
+  const clientIp = getClientIp(request);
   const window = Math.floor(Date.now() / 60_000);
-  const rateKey = `rate-limit:${principal.keyFingerprint}:${window}`;
+
+  // Chaves sandbox públicas possuem isolamento estrito por IP para evitar exaustão e DoS cruzado entre visitantes
+  const rateKey = isSandbox
+    ? `rate-limit:sandbox:${clientIp}:${window}`
+    : `rate-limit:${principal.keyFingerprint}:${window}`;
+
+  const limit = isSandbox
+    ? 30 // 30 requisições/minuto por IP para a chave pública sandbox
+    : config.RATE_LIMIT_PER_MINUTE;
+
   try {
     const current = await cache.incr(rateKey);
     if (current === 1) await cache.expire(rateKey, 70);
-    if (current > config.RATE_LIMIT_PER_MINUTE) {
-      reply.code(429).send({ error: 'Limite de requisições excedido.' });
+    reply.header('X-RateLimit-Limit', String(limit));
+    reply.header('X-RateLimit-Remaining', String(Math.max(0, limit - current)));
+    if (current > limit) {
+      reply.code(429).send({
+        error: isSandbox
+          ? 'Limite de requisições sandbox excedido para o seu IP. Aguarde 1 minuto.'
+          : 'Limite de requisições excedido.',
+      });
       return null;
     }
   } catch {

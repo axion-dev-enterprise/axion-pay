@@ -54,7 +54,11 @@ export default function ApiDocs() {
     const trace = `docs_${crypto.randomUUID().replace(/-/g, "")}`;
     const started = performance.now();
     try {
-      const response = await fetch(`${API_BASE}${endpoint.path}`, { cache: "no-store", headers: endpoint.executable === "sandbox" ? { Authorization: `Bearer ${SANDBOX_KEY}`, "X-Trace-Id": trace } : { "X-Trace-Id": trace } });
+      const response = await fetch(`${API_BASE}${endpoint.path}`, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(8000),
+        headers: endpoint.executable === "sandbox" ? { Authorization: `Bearer ${SANDBOX_KEY}`, "X-Trace-Id": trace } : { "X-Trace-Id": trace }
+      });
       const body = await response.json().catch(() => ({ error: "Resposta sem JSON" }));
       setResult({ status: response.status, elapsed: Math.round(performance.now() - started), trace: response.headers.get("x-trace-id") || trace, body });
     } catch (error) { setResult({ status: 0, elapsed: Math.round(performance.now() - started), trace, body: { error: error instanceof Error ? error.message : "Falha de rede" } }); }
