@@ -86,13 +86,14 @@ export const openapi = {
     '/v1/card/payment-intents': {
       post: {
         summary: 'Cria uma intenção de pagamento para confirmação nos campos seguros AXION Pay',
-        security: [{ axionSession: [] }],
+        security: [{ apiKey: [] }, { axionSession: [] }],
         parameters: [{ name: 'Idempotency-Key', in: 'header', required: true, schema: { type: 'string', maxLength: 255 } }],
-        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['amountCents'], properties: { amountCents: { type: 'integer', minimum: 100, maximum: 100000000 } } } } } },
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['amountCents'], properties: { amountCents: { type: 'integer', minimum: 100, maximum: 100000000 }, receiptEmail: { type: 'string', format: 'email' }, customerEmail: { type: 'string', format: 'email' }, metadata: { type: 'object', additionalProperties: { type: 'string' } } } } } } },
         responses: {
           '201': { description: 'Intenção criada; confirme o clientSecret no navegador usando AXION Secure Fields.' },
           '400': { description: 'Idempotency-Key ausente ou inválida.' },
-          '401': { description: 'Sessão AXION inválida.' },
+          '401': { description: 'API Key ou sessão AXION inválida.' },
+          '403': { description: 'Escopo insuficiente.' },
           '422': { description: 'Merchant ativo não encontrado.' },
           '503': { description: 'Pagamentos por cartão ainda não configurados.' },
         },

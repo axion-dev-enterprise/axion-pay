@@ -33,14 +33,19 @@ import { FlowBillingService } from './services/flow-billing.service.js';
 import { getOnboardingProfile, isOnboardingApproved, listKycApplications, reviewOnboardingProfile, saveOnboardingProfile, submitOnboardingProfile } from './services/onboarding.service.js';
 import { createCustomerPortal, createSubscriptionCheckout, getBillingStatus, ingestStripeWebhook } from './services/stripe-billing.service.js';
 import { getAdminOverview, listAdminTransactions } from './services/admin.service.js';
-import { CardPaymentError, createCardPaymentIntent } from './services/card-payments.service.js';
+import { CardPaymentError, CardPaymentPrincipal, createCardPaymentIntent } from './services/card-payments.service.js';
 import { openapi } from './openapi.js';
 
 const createChargeSchema = z.object({
   amountCents: z.number().int().positive().max(100_000_000),
   comment: z.string().trim().min(1).max(140).optional(),
 });
-const cardPaymentIntentSchema = z.object({ amountCents: z.number().int().min(100).max(100_000_000) });
+const cardPaymentIntentSchema = z.object({
+  amountCents: z.number().int().min(100).max(100_000_000),
+  receiptEmail: z.string().email().optional(),
+  customerEmail: z.string().email().optional(),
+  metadata: z.record(z.string(), z.string()).optional(),
+});
 
 const correlationIdParams = z.object({ correlationId: z.string().uuid() });
 const merchantIdParams = z.object({ merchantId: z.string().uuid() });
@@ -370,15 +375,59 @@ export async function buildApp(dependencies: AppDependencies = {}) {
   });
 
   app.post('/v1/card/payment-intents', async (request, reply) => {
-    const user = await requireDashboardUser(request, reply, database);
-    if (!user) return;
+    const presentedKey = readPresentedApiKey(request.headers);
+    let principal: CardPaymentPrincipal | null = null;
+
+    if (presentedKey) {
+      const merchant = authenticateApiKey(presentedKey, config.apiKeys)
+        ?? await authenticateStoredApiKey(presentedKey, database);
+
+      if (!merchant) {
+        if (presentedKey.startsWith('axp_') || request.headers['x-api-key']) {
+          return reply.code(401).send({ error: 'API key ausente ou inválida.' });
+        }
+      } else {
+        if (!hasScopes(merchant, ['charges:write']) && !hasScopes(merchant, ['card:write'])) {
+          return reply.code(403).send({ error: 'Escopo insuficiente.' });
+        }
+        const window = Math.floor(Date.now() / 60_000);
+        const rateKey = `rate-limit:${merchant.keyFingerprint}:${window}`;
+        try {
+          const current = await cache.incr(rateKey);
+          if (current === 1) await cache.expire(rateKey, 70);
+          if (current > config.RATE_LIMIT_PER_MINUTE) {
+            return reply.code(429).send({ error: 'Limite de requisições excedido.' });
+          }
+        } catch {
+          return reply.code(503).send({ error: 'Serviço temporariamente indisponível.' });
+        }
+        principal = { type: 'merchant', merchantId: merchant.merchantId, keyFingerprint: merchant.keyFingerprint };
+      }
+    }
+
+    if (!principal) {
+      const user = await requireDashboardUser(request, reply, database);
+      if (!user) return;
+      principal = { type: 'user', user };
+    }
+
     const idempotencyKey = String(request.headers['idempotency-key'] ?? '').trim();
     if (!idempotencyKey || idempotencyKey.length > 255) {
       return reply.code(400).send({ error: 'Header Idempotency-Key é obrigatório.' });
     }
-    const { amountCents } = cardPaymentIntentSchema.parse(request.body);
+    const body = cardPaymentIntentSchema.parse(request.body);
+    const receiptEmail = body.receiptEmail || body.customerEmail;
     try {
-      return reply.code(201).send(await createCardPaymentIntent(database, config.STRIPE_SECRET_KEY, user, amountCents, idempotencyKey));
+      return reply.code(201).send(
+        await createCardPaymentIntent(
+          database,
+          config.STRIPE_SECRET_KEY,
+          principal,
+          body.amountCents,
+          idempotencyKey,
+          { receiptEmail, metadata: body.metadata },
+        ),
+      );
     } catch (error) {
       if (error instanceof CardPaymentError) return reply.code(error.statusCode).send({ error: error.message });
       throw error;

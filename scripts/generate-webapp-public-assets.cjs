@@ -231,14 +231,22 @@ async function main() {
     return img
   }
 
-  writePng(path.join(pub, 'icon-192.png'), makeIcon(192, 'AP'))
-  writePng(path.join(pub, 'icon-512.png'), makeIcon(512, 'AP'))
-  writePng(path.join(pub, 'apple-touch-icon.png'), makeIcon(180, 'AP'))
+  if (!fs.existsSync(path.join(pub, 'icon-192.png'))) {
+    writePng(path.join(pub, 'icon-192.png'), makeIcon(192, 'AP'))
+  }
+  if (!fs.existsSync(path.join(pub, 'icon-512.png'))) {
+    writePng(path.join(pub, 'icon-512.png'), makeIcon(512, 'AP'))
+  }
+  if (!fs.existsSync(path.join(pub, 'apple-touch-icon.png'))) {
+    writePng(path.join(pub, 'apple-touch-icon.png'), makeIcon(180, 'AP'))
+  }
 
   // favicon.ico
-  const icoPng = makeIcon(64, 'A')
-  const icoBuf = await pngToIco([pngToBuffer(icoPng)])
-  fs.writeFileSync(path.join(pub, 'favicon.ico'), icoBuf)
+  if (!fs.existsSync(path.join(pub, 'favicon.ico'))) {
+    const icoPng = makeIcon(64, 'A')
+    const icoBuf = await pngToIco([pngToBuffer(icoPng)])
+    fs.writeFileSync(path.join(pub, 'favicon.ico'), icoBuf)
+  }
 
   // OG image 1200x630
   const og = new PNG({ width: 1200, height: 630 })
