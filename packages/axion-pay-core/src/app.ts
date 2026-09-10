@@ -40,6 +40,7 @@ import {
   listMerchantWebhooks,
   deleteMerchantWebhook,
   listMerchantWebhookDeliveries,
+  testMerchantWebhook,
   MerchantWebhookError,
 } from './services/merchant-webhook-dispatcher.service.js';
 import {
@@ -66,6 +67,10 @@ const merchantIdParams = z.object({ merchantId: z.string().uuid() });
 const apiKeyIdParams = z.object({ keyId: z.string().uuid() });
 const subscriptionIdParams = z.object({ id: z.string().uuid() });
 const webhookIdParams = z.object({ id: z.string().uuid() });
+const dashboardMerchantWebhookParams = z.object({
+  merchantId: z.string().uuid(),
+  id: z.string().uuid(),
+});
 
 const createMerchantWebhookSchema = z.object({
   url: z.string().url(),
@@ -639,6 +644,102 @@ export async function buildApp(dependencies: AppDependencies = {}) {
 
     const deliveries = await listMerchantWebhookDeliveries(database, merchant.merchantId);
     return reply.code(200).send({ deliveries });
+  });
+
+  app.post('/v1/merchant/webhooks/:id/test', async (request, reply) => {
+    const merchant = await requireMerchant(request, reply, ['charges:write'], cache, database);
+    if (!merchant) return;
+
+    try {
+      const { id } = webhookIdParams.parse(request.params);
+      const testResult = await testMerchantWebhook(database, merchant.merchantId, id);
+      return reply.code(200).send(testResult);
+    } catch (err) {
+      if (err instanceof MerchantWebhookError) return reply.code(err.statusCode).send({ error: err.message });
+      throw err;
+    }
+  });
+
+  // --- Dashboard Merchant Webhooks Management ---
+  app.get('/v1/dashboard/merchants/:merchantId/webhooks', async (request, reply) => {
+    const user = await requireDashboardUser(request, reply, database);
+    if (!user) return;
+    const { merchantId } = merchantIdParams.parse(request.params);
+    const owned = await database.query<{ id: string }>(
+      `SELECT id FROM merchant_accounts WHERE id = $1 AND owner_auth_user_id = $2 LIMIT 1`,
+      [merchantId, user.id],
+    );
+    if (!owned.rowCount) return reply.code(404).send({ error: 'Operação não encontrada.' });
+    const webhooks = await listMerchantWebhooks(database, merchantId);
+    return reply.code(200).send({ webhooks });
+  });
+
+  app.post('/v1/dashboard/merchants/:merchantId/webhooks', async (request, reply) => {
+    const user = await requireDashboardUser(request, reply, database);
+    if (!user) return;
+    const { merchantId } = merchantIdParams.parse(request.params);
+    const owned = await database.query<{ id: string }>(
+      `SELECT id FROM merchant_accounts WHERE id = $1 AND owner_auth_user_id = $2 LIMIT 1`,
+      [merchantId, user.id],
+    );
+    if (!owned.rowCount) return reply.code(404).send({ error: 'Operação não encontrada.' });
+    try {
+      const body = createMerchantWebhookSchema.parse(request.body);
+      const webhook = await createMerchantWebhook(database, merchantId, body.url, body.events);
+      return reply.code(201).send({ webhook });
+    } catch (err) {
+      if (err instanceof MerchantWebhookError) return reply.code(err.statusCode).send({ error: err.message });
+      throw err;
+    }
+  });
+
+  app.delete('/v1/dashboard/merchants/:merchantId/webhooks/:id', async (request, reply) => {
+    const user = await requireDashboardUser(request, reply, database);
+    if (!user) return;
+    const { merchantId, id } = dashboardMerchantWebhookParams.parse(request.params);
+    const owned = await database.query<{ id: string }>(
+      `SELECT id FROM merchant_accounts WHERE id = $1 AND owner_auth_user_id = $2 LIMIT 1`,
+      [merchantId, user.id],
+    );
+    if (!owned.rowCount) return reply.code(404).send({ error: 'Operação não encontrada.' });
+    try {
+      const result = await deleteMerchantWebhook(database, merchantId, id);
+      return reply.code(200).send(result);
+    } catch (err) {
+      if (err instanceof MerchantWebhookError) return reply.code(err.statusCode).send({ error: err.message });
+      throw err;
+    }
+  });
+
+  app.get('/v1/dashboard/merchants/:merchantId/webhooks/deliveries', async (request, reply) => {
+    const user = await requireDashboardUser(request, reply, database);
+    if (!user) return;
+    const { merchantId } = merchantIdParams.parse(request.params);
+    const owned = await database.query<{ id: string }>(
+      `SELECT id FROM merchant_accounts WHERE id = $1 AND owner_auth_user_id = $2 LIMIT 1`,
+      [merchantId, user.id],
+    );
+    if (!owned.rowCount) return reply.code(404).send({ error: 'Operação não encontrada.' });
+    const deliveries = await listMerchantWebhookDeliveries(database, merchantId);
+    return reply.code(200).send({ deliveries });
+  });
+
+  app.post('/v1/dashboard/merchants/:merchantId/webhooks/:id/test', async (request, reply) => {
+    const user = await requireDashboardUser(request, reply, database);
+    if (!user) return;
+    const { merchantId, id } = dashboardMerchantWebhookParams.parse(request.params);
+    const owned = await database.query<{ id: string }>(
+      `SELECT id FROM merchant_accounts WHERE id = $1 AND owner_auth_user_id = $2 LIMIT 1`,
+      [merchantId, user.id],
+    );
+    if (!owned.rowCount) return reply.code(404).send({ error: 'Operação não encontrada.' });
+    try {
+      const testResult = await testMerchantWebhook(database, merchantId, id);
+      return reply.code(200).send(testResult);
+    } catch (err) {
+      if (err instanceof MerchantWebhookError) return reply.code(err.statusCode).send({ error: err.message });
+      throw err;
+    }
   });
 
   // --- Merchant Recurring Subscriptions API S2S ---

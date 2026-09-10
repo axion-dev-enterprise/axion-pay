@@ -301,11 +301,66 @@ export const openapi = {
         responses: { '200': { description: 'Webhook excluído.' }, '404': { description: 'Não encontrado.' } },
       },
     },
+    '/v1/merchant/webhooks/{id}/test': {
+      post: {
+        summary: 'Dispara um evento de teste para o endpoint de webhook',
+        security: [{ apiKey: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: {
+          '200': { description: 'Disparo de teste realizado e entrega registrada.' },
+          '404': { description: 'Webhook não encontrado.' },
+        },
+      },
+    },
     '/v1/merchant/webhooks/deliveries': {
       get: {
         summary: 'Lista histórico de entregas de webhooks do merchant',
         security: [{ apiKey: [] }],
         responses: { '200': { description: 'Histórico de tentativas e status das entregas.' } },
+      },
+    },
+    '/v1/dashboard/merchants/{merchantId}/webhooks': {
+      get: {
+        summary: 'Lista webhooks cadastrados para o merchant (Painel Dashboard)',
+        security: [{ sessionAuth: [] }],
+        parameters: [{ name: 'merchantId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { '200': { description: 'Lista de webhooks.' } },
+      },
+      post: {
+        summary: 'Cadastra um novo webhook para o merchant via painel',
+        security: [{ sessionAuth: [] }],
+        parameters: [{ name: 'merchantId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { '201': { description: 'Webhook criado com secret retornado.' } },
+      },
+    },
+    '/v1/dashboard/merchants/{merchantId}/webhooks/{id}': {
+      delete: {
+        summary: 'Remove um webhook do merchant via painel',
+        security: [{ sessionAuth: [] }],
+        parameters: [
+          { name: 'merchantId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+          { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { '200': { description: 'Webhook removido com sucesso.' } },
+      },
+    },
+    '/v1/dashboard/merchants/{merchantId}/webhooks/{id}/test': {
+      post: {
+        summary: 'Dispara um webhook de teste a partir do painel',
+        security: [{ sessionAuth: [] }],
+        parameters: [
+          { name: 'merchantId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+          { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { '200': { description: 'Teste enviado com sucesso.' } },
+      },
+    },
+    '/v1/dashboard/merchants/{merchantId}/webhooks/deliveries': {
+      get: {
+        summary: 'Lista histórico de entregas do merchant (Painel Dashboard)',
+        security: [{ sessionAuth: [] }],
+        parameters: [{ name: 'merchantId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { '200': { description: 'Histórico de entregas.' } },
       },
     },
     '/v1/subscriptions': {

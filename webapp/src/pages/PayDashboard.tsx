@@ -42,6 +42,12 @@ import {
   Percent,
   CalendarClock,
   DollarSign,
+  Webhook,
+  Send,
+  Eye,
+  EyeOff,
+  Code2,
+  Play,
 } from "lucide-react";
 
 const AUTH_API = "https://auth.axionenterprise.cloud";
@@ -245,6 +251,7 @@ const VALID_SECTIONS: Record<string, string> = {
   "overview": "overview",
   "merchants": "merchants",
   "api-keys": "api-keys",
+  "webhooks": "webhooks",
   "transactions": "transactions",
   "payouts": "payouts",
   "saques": "payouts",
@@ -280,6 +287,7 @@ export default function PayDashboard() {
       overview: "AXION Pay — Visão Geral",
       merchants: "AXION Pay — Merchants & Operações",
       "api-keys": "AXION Pay — Chaves de API",
+      webhooks: "AXION Pay — Webhooks por Merchant",
       transactions: "AXION Pay — Transações",
       payouts: "AXION Pay — Saques & Saldos",
       onboarding: "AXION Pay — Cadastro & KYC",
@@ -378,6 +386,25 @@ export default function PayDashboard() {
   const [editFeePayout, setEditFeePayout] = useState("2.00");
   const [editSettlementPix, setEditSettlementPix] = useState("0");
   const [editSettlementCard, setEditSettlementCard] = useState("14");
+
+  // Estados de Webhooks por Merchant
+  const [selectedWebhookMerchantId, setSelectedWebhookMerchantId] = useState<string>("");
+  const [webhooks, setWebhooks] = useState<Array<any>>([]);
+  const [webhookDeliveries, setWebhookDeliveries] = useState<Array<any>>([]);
+  const [loadingWebhooks, setLoadingWebhooks] = useState(false);
+  const [webhookModal, setWebhookModal] = useState(false);
+  const [newWebhookUrl, setNewWebhookUrl] = useState("");
+  const [selectedWebhookEvents, setSelectedWebhookEvents] = useState<string[]>([
+    "payment.succeeded",
+    "payment.failed",
+    "subscription.created",
+    "subscription.renewed",
+  ]);
+  const [revealedWebhookSecrets, setRevealedWebhookSecrets] = useState<Record<string, boolean>>({});
+  const [newWebhookSecretModal, setNewWebhookSecretModal] = useState<{ id: string; url: string; secret: string } | null>(null);
+  const [inspectingDelivery, setInspectingDelivery] = useState<any | null>(null);
+  const [testingWebhookId, setTestingWebhookId] = useState<string | null>(null);
+  const [webhookTab, setWebhookTab] = useState<"webhooks" | "endpoints">("webhooks");
 
   const notify = (type: NonNullable<ToastState>["type"], message: string) => {
     setToast({ type, message });
@@ -491,7 +518,10 @@ export default function PayDashboard() {
       const pay = payRes.status === "fulfilled" ? payRes.value : null;
 
       if (ov && !ov.error) setOverview(ov);
-      if (m?.merchants) setMerchants(m.merchants);
+      if (m?.merchants) {
+        setMerchants(m.merchants);
+        setSelectedWebhookMerchantId((prev) => prev || (m.merchants.length > 0 ? m.merchants[0].id : ""));
+      }
       if (k?.keys) setApiKeys(k.keys);
       if (tx?.transactions) setTransactions(tx.transactions);
       if (bal?.balance) setBalances(bal.balance);
@@ -854,6 +884,137 @@ export default function PayDashboard() {
     }
   };
 
+  const AVAILABLE_WEBHOOK_EVENTS = [
+    { id: "payment.succeeded", label: "Pagamento Aprovado", desc: "Disparado na confirmação de pagamento PIX ou Cartão" },
+    { id: "payment.failed", label: "Pagamento Recusado / Expirado", desc: "Cobrança cancelada, recusada ou expirada" },
+    { id: "subscription.created", label: "Nova Assinatura Recorrente", desc: "Cliente aderiu a um plano de assinatura recorrente" },
+    { id: "subscription.renewed", label: "Assinatura Renovada", desc: "Cobrança de ciclo recorrente processada com sucesso" },
+    { id: "subscription.past_due", label: "Tentativa de Cobrança Falhou", desc: "Cartão recusado ou sem saldo no ciclo recorrente" },
+    { id: "subscription.canceled", label: "Assinatura Cancelada", desc: "Cancelamento efetuado na assinatura recorrente" },
+  ];
+
+  const loadWebhooks = async (merchantId: string) => {
+    if (!merchantId) return;
+    setLoadingWebhooks(true);
+    try {
+      const [whRes, delRes] = await Promise.allSettled([
+        apiFetch(`/v1/dashboard/merchants/${merchantId}/webhooks`),
+        apiFetch(`/v1/dashboard/merchants/${merchantId}/webhooks/deliveries`),
+      ]);
+      if (whRes.status === "fulfilled" && whRes.value?.webhooks) {
+        setWebhooks(whRes.value.webhooks);
+      }
+      if (delRes.status === "fulfilled" && delRes.value?.deliveries) {
+        setWebhookDeliveries(delRes.value.deliveries);
+      }
+    } catch {
+      // Ignora falhas de polling
+    } finally {
+      setLoadingWebhooks(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedWebhookMerchantId && (activeSection === "webhooks" || activeSection === "integrations")) {
+      loadWebhooks(selectedWebhookMerchantId);
+    }
+  }, [selectedWebhookMerchantId, activeSection]);
+
+  const handleCreateWebhook = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedWebhookMerchantId) {
+      notify("error", "Selecione uma operação / merchant para cadastrar o webhook.");
+      return;
+    }
+    const cleanUrl = newWebhookUrl.trim();
+    if (!cleanUrl.startsWith("http://") && !cleanUrl.startsWith("https://")) {
+      notify("error", "A URL de callback deve começar com https:// ou http://.");
+      return;
+    }
+    if (!selectedWebhookEvents.length) {
+      notify("error", "Selecione ao menos um evento para o webhook monitorar.");
+      return;
+    }
+    setSubmittingAction("create-webhook");
+    try {
+      const res = await apiFetch(`/v1/dashboard/merchants/${selectedWebhookMerchantId}/webhooks`, {
+        method: "POST",
+        body: JSON.stringify({
+          url: cleanUrl,
+          events: selectedWebhookEvents,
+        }),
+      });
+      if (res?.webhook) {
+        notify("success", "Endpoint de webhook registrado com sucesso!");
+        setNewWebhookSecretModal({
+          id: res.webhook.id,
+          url: res.webhook.url,
+          secret: res.webhook.secret,
+        });
+        setWebhookModal(false);
+        setNewWebhookUrl("");
+        await loadWebhooks(selectedWebhookMerchantId);
+      } else {
+        notify("error", res?.error || "Erro ao cadastrar webhook.");
+      }
+    } catch {
+      notify("error", "Falha de rede ao registrar webhook.");
+    } finally {
+      setSubmittingAction(null);
+    }
+  };
+
+  const handleDeleteWebhook = async (webhookId: string) => {
+    if (!selectedWebhookMerchantId) return;
+    setSubmittingAction(`del-webhook-${webhookId}`);
+    try {
+      const res = await apiFetch(`/v1/dashboard/merchants/${selectedWebhookMerchantId}/webhooks/${webhookId}`, {
+        method: "DELETE",
+      });
+      if (res?.deleted) {
+        notify("success", "Endpoint de webhook removido com sucesso.");
+        setWebhooks((prev) => prev.filter((w) => w.id !== webhookId));
+        await loadWebhooks(selectedWebhookMerchantId);
+      } else {
+        notify("error", res?.error || "Erro ao excluir webhook.");
+      }
+    } catch {
+      notify("error", "Falha de comunicação com o gateway.");
+    } finally {
+      setSubmittingAction(null);
+    }
+  };
+
+  const handleTestWebhook = async (webhookId: string) => {
+    if (!selectedWebhookMerchantId) return;
+    setTestingWebhookId(webhookId);
+    try {
+      const res = await apiFetch(`/v1/dashboard/merchants/${selectedWebhookMerchantId}/webhooks/${webhookId}/test`, {
+        method: "POST",
+      });
+      if (res?.success) {
+        notify("success", `Disparo de teste entregue com sucesso (HTTP ${res.statusCode || 200})!`);
+      } else {
+        notify("info", `Disparo realizado com aviso: ${res?.error || `HTTP ${res?.statusCode || 'indisponível'}`}`);
+      }
+      await loadWebhooks(selectedWebhookMerchantId);
+    } catch {
+      notify("error", "Erro ao conectar com o endpoint de teste.");
+    } finally {
+      setTestingWebhookId(null);
+    }
+  };
+
+  const toggleWebhookEvent = (eventName: string) => {
+    setSelectedWebhookEvents((prev) =>
+      prev.includes(eventName) ? prev.filter((e) => e !== eventName) : [...prev, eventName]
+    );
+  };
+
+  const toggleRevealSecret = (id: string) => {
+    setRevealedWebhookSecrets((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
   // Se carregando autenticação
   if (authLoading) {
     return (
@@ -897,6 +1058,7 @@ export default function PayDashboard() {
     { id: "overview", label: "Visão Geral", icon: BarChart3, path: "/dashboard" },
     { id: "merchants", label: "Merchants & Operações", icon: Building2, path: "/dashboard/merchants" },
     { id: "api-keys", label: "Chaves de API", icon: Key, path: "/dashboard/api-keys" },
+    { id: "webhooks", label: "Webhooks", icon: Webhook, path: "/dashboard/webhooks" },
     { id: "transactions", label: "Transações", icon: Wallet, path: "/dashboard/transactions" },
     { id: "payouts", label: "Saques & Saldos", icon: Banknote, path: "/dashboard/payouts" },
     { id: "onboarding", label: "Cadastro & KYC", icon: FileCheck2, path: "/dashboard/onboarding" },
@@ -1703,57 +1865,468 @@ export default function PayDashboard() {
             </div>
           )}
 
-          {/* TAB 7: INTEGRAÇÕES */}
-          {activeSection === "integrations" && (
+          {/* TAB 7: INTEGRAÇÕES & WEBHOOKS */}
+          {(activeSection === "integrations" || activeSection === "webhooks") && (
             <div className="space-y-6 animate-fadeIn">
-              <div>
-                <h1 className="text-xl font-bold text-white tracking-tight">Integrações & Endpoints</h1>
-                <p className="text-xs text-[#a1b0a6] mt-0.5">Parâmetros de conexão do gateway industrial</p>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h1 className="text-xl font-bold text-white tracking-tight">
+                    {activeSection === "webhooks" ? "Webhooks por Merchant" : "Integrações & Webhooks"}
+                  </h1>
+                  <p className="text-xs text-[#a1b0a6] mt-0.5">
+                    Notificações em tempo real com assinatura HMAC-SHA256 e parâmetros de conexão industrial
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (selectedWebhookMerchantId) loadWebhooks(selectedWebhookMerchantId);
+                    }}
+                    disabled={loadingWebhooks}
+                    className="inline-flex items-center gap-2 rounded-xl border border-[#213428] bg-[#09120d] px-3.5 py-2.5 text-xs font-semibold text-[#a1b0a6] hover:text-white transition hover:border-[#30513d] disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${loadingWebhooks ? "animate-spin text-[#00e66b]" : ""}`} />
+                    Atualizar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!merchants.length) {
+                        notify("info", "Cadastre um merchant antes de adicionar webhooks.");
+                        return;
+                      }
+                      setWebhookModal(true);
+                    }}
+                    className="inline-flex items-center gap-2 rounded-xl bg-[#00e66b] px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-black transition hover:bg-[#69f0ae] shadow-lg shadow-emerald-500/10 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Novo Webhook
+                  </button>
+                </div>
               </div>
 
-              <div className={`rounded-2xl border p-5 ${integrations?.paymentsEnabled ? "border-emerald-500/30 bg-emerald-500/10" : "border-amber-500/30 bg-amber-500/10"}`}>
-                <div className="flex items-start gap-3">
-                  {integrations?.paymentsEnabled ? <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" /> : <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />}
-                  <div>
-                    <p className="text-sm font-bold text-white">{integrations?.paymentsEnabled ? "PIX operacional" : "PIX aguardando ativação"}</p>
-                    <p className="mt-1 text-xs leading-5 text-[#b5c6bb]">
-                      {integrations?.paymentsEnabled
-                        ? "Infraestrutura AXION Pay ativa. As cobranças podem ser criadas pela API autenticada."
-                        : "A criação de cobranças ficará disponível após a ativação segura da operação PIX AXION Pay."}
+              {/* Subtabs de Navegação */}
+              {activeSection === "integrations" && (
+                <div className="flex border-b border-[#213428] gap-6">
+                  <button
+                    type="button"
+                    onClick={() => setWebhookTab("webhooks")}
+                    className={`pb-3 text-xs font-bold transition relative flex items-center gap-2 cursor-pointer ${
+                      webhookTab === "webhooks"
+                        ? "text-[#00e66b] border-b-2 border-[#00e66b]"
+                        : "text-[#a1b0a6] hover:text-white"
+                    }`}
+                  >
+                    <Webhook className="w-4 h-4" />
+                    Webhooks por Merchant
+                    {webhooks.length > 0 && (
+                      <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-emerald-500/20 text-emerald-300 font-mono">
+                        {webhooks.length}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWebhookTab("endpoints")}
+                    className={`pb-3 text-xs font-bold transition relative flex items-center gap-2 cursor-pointer ${
+                      webhookTab === "endpoints"
+                        ? "text-[#00e66b] border-b-2 border-[#00e66b]"
+                        : "text-[#a1b0a6] hover:text-white"
+                    }`}
+                  >
+                    <Globe className="w-4 h-4" />
+                    Endpoints da API & Status
+                  </button>
+                </div>
+              )}
+
+              {/* CONTEÚDO 1: WEBHOOKS POR MERCHANT */}
+              {(activeSection === "webhooks" || webhookTab === "webhooks") && (
+                <div className="space-y-6">
+                  {/* Seletor de Merchant / Operação Ativa */}
+                  <div className="p-4 rounded-2xl bg-[#09120d] border border-[#213428] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                        <Building2 className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-mono uppercase tracking-wider text-[#8b9f93] block">
+                          Operação / Merchant Ativo
+                        </span>
+                        {merchants.length > 0 ? (
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <select
+                              value={selectedWebhookMerchantId}
+                              onChange={(e) => setSelectedWebhookMerchantId(e.target.value)}
+                              className="bg-[#050c08] border border-[#213428] rounded-lg px-3 py-1.5 text-xs text-white font-semibold focus:border-[#00e66b] focus:outline-none cursor-pointer"
+                            >
+                              {merchants.map((m) => (
+                                <option key={m.id} value={m.id}>
+                                  {m.name} {m.document ? `• ${m.document}` : ""}
+                                </option>
+                              ))}
+                            </select>
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono border border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                              Ativo
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-amber-300">Nenhum merchant cadastrado</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 text-xs text-[#a1b0a6]">
+                      <span className="flex items-center gap-1.5 font-mono">
+                        <Lock className="w-3.5 h-3.5 text-emerald-400" />
+                        HMAC-SHA256
+                      </span>
+                      <span className="text-[#213428]">•</span>
+                      <span className="font-mono">Timeout: 8s</span>
+                      <span className="text-[#213428]">•</span>
+                      <span className="font-mono">Zero Mock</span>
+                    </div>
+                  </div>
+
+                  {/* LISTAGEM DE WEBHOOKS ATIVOS */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-sm font-bold text-white uppercase tracking-wider font-mono flex items-center gap-2">
+                        <Webhook className="w-4 h-4 text-[#00e66b]" />
+                        Endpoints Cadastrados ({webhooks.length})
+                      </h2>
+                    </div>
+
+                    {loadingWebhooks && webhooks.length === 0 ? (
+                      <div className="p-8 rounded-2xl bg-[#09120d] border border-[#213428] flex items-center justify-center gap-3 text-xs text-[#a1b0a6]">
+                        <Loader2 className="w-5 h-5 animate-spin text-[#00e66b]" />
+                        Carregando webhooks do merchant...
+                      </div>
+                    ) : webhooks.length === 0 ? (
+                      <div className="p-8 rounded-2xl bg-[#09120d] border border-[#213428]/80 text-center space-y-4">
+                        <div className="w-12 h-12 rounded-2xl bg-[#00e66b]/10 border border-[#00e66b]/20 flex items-center justify-center mx-auto text-[#00e66b]">
+                          <Webhook className="w-6 h-6" />
+                        </div>
+                        <div className="space-y-1">
+                          <h3 className="text-sm font-bold text-white">Nenhum webhook cadastrado</h3>
+                          <p className="text-xs text-[#a1b0a6] max-w-md mx-auto">
+                            Cadastre a URL do seu servidor para receber avisos instantâneos de aprovação de cobranças, cancelamentos e renovações.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!merchants.length) {
+                              notify("info", "Cadastre um merchant antes de adicionar webhooks.");
+                              return;
+                            }
+                            setWebhookModal(true);
+                          }}
+                          className="inline-flex items-center gap-2 rounded-xl bg-[#00e66b] px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-black transition hover:bg-[#69f0ae] cursor-pointer"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Cadastrar Primeiro Webhook
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="grid gap-4">
+                        {webhooks.map((w) => (
+                          <div
+                            key={w.id}
+                            className="p-5 rounded-2xl bg-[#09120d] border border-[#213428]/80 hover:border-[#30513d] transition space-y-4"
+                          >
+                            {/* Linha superior: URL, Status e Ações */}
+                            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                              <div className="flex items-center gap-2.5 flex-wrap">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                                  ATIVO
+                                </span>
+                                <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase bg-[#050c08] border border-[#213428] text-[#a1b0a6]">
+                                  {w.url.startsWith("https://") ? "HTTPS" : "HTTP"}
+                                </span>
+                                <code className="text-xs font-mono text-[#00e66b] bg-[#050c08] px-3 py-1.5 rounded-lg border border-[#213428] select-all break-all">
+                                  {w.url}
+                                </code>
+                              </div>
+
+                              <div className="flex items-center gap-2 self-end lg:self-auto">
+                                <button
+                                  type="button"
+                                  onClick={() => handleTestWebhook(w.id)}
+                                  disabled={testingWebhookId === w.id}
+                                  title="Disparar payload de teste para este webhook"
+                                  className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-bold text-emerald-300 transition hover:bg-emerald-500/20 disabled:opacity-50 cursor-pointer"
+                                >
+                                  {testingWebhookId === w.id ? (
+                                    <>
+                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                      Enviando…
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Play className="w-3.5 h-3.5 fill-current" />
+                                      Testar Disparo
+                                    </>
+                                  )}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteWebhook(w.id)}
+                                  disabled={submittingAction === `del-webhook-${w.id}`}
+                                  title="Excluir endpoint"
+                                  className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs font-bold text-rose-300 transition hover:bg-rose-500/20 disabled:opacity-50 cursor-pointer"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  {submittingAction === `del-webhook-${w.id}` ? "Removendo…" : "Excluir"}
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Linha do Secret */}
+                            <div className="p-3.5 rounded-xl bg-[#050c08] border border-[#213428] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                              <div className="space-y-0.5">
+                                <span className="text-[10px] font-mono uppercase tracking-wider text-[#8b9f93] block">
+                                  Chave de Assinatura HMAC (Secret)
+                                </span>
+                                <code className="text-xs font-mono text-white select-all">
+                                  {revealedWebhookSecrets[w.id]
+                                    ? w.secret
+                                    : w.secret
+                                    ? `${w.secret.slice(0, 10)}••••••••••••••••••••••••`
+                                    : "whsec_••••••••••••"}
+                                </code>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => toggleRevealSecret(w.id)}
+                                  className="inline-flex items-center gap-1.5 text-xs text-[#a1b0a6] hover:text-white px-2.5 py-1 rounded-lg bg-[#09120d] border border-[#213428] transition cursor-pointer"
+                                >
+                                  {revealedWebhookSecrets[w.id] ? (
+                                    <>
+                                      <EyeOff className="w-3.5 h-3.5" /> Ocultar
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Eye className="w-3.5 h-3.5" /> Revelar
+                                    </>
+                                  )}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(w.secret);
+                                    notify("success", "Chave secreta copiada para a área de transferência!");
+                                  }}
+                                  className="inline-flex items-center gap-1.5 text-xs font-bold text-[#00e66b] px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 transition hover:bg-emerald-500/20 cursor-pointer"
+                                >
+                                  <Copy className="w-3.5 h-3.5" /> Copiar Secret
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Eventos inscritos */}
+                            <div className="space-y-1.5">
+                              <span className="text-[10px] font-mono uppercase tracking-wider text-[#8b9f93] block">
+                                Eventos Inscritos ({w.events?.length || 0}):
+                              </span>
+                              <div className="flex flex-wrap gap-1.5">
+                                {w.events?.map((ev: string) => {
+                                  const isSuccess = ev.includes("succeeded") || ev.includes("created") || ev.includes("renewed");
+                                  return (
+                                    <span
+                                      key={ev}
+                                      className={`px-2.5 py-1 rounded-lg text-[11px] font-mono border ${
+                                        isSuccess
+                                          ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-300"
+                                          : "bg-[#050c08] border-[#213428] text-[#a1b0a6]"
+                                      }`}
+                                    >
+                                      {ev}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            <div className="text-[10px] text-[#6b7d72] font-mono border-t border-[#213428]/60 pt-2 flex items-center justify-between">
+                              <span>ID: {w.id}</span>
+                              <span>Cadastrado em {new Date(w.createdAt).toLocaleString("pt-BR")}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* TRILHA DE AUDITORIA E ENTREGAS RECENTES */}
+                  <div className="space-y-3 pt-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h2 className="text-sm font-bold text-white uppercase tracking-wider font-mono flex items-center gap-2">
+                          <Activity className="w-4 h-4 text-emerald-400" />
+                          Trilha de Auditoria & Entregas Recentes
+                        </h2>
+                        <p className="text-xs text-[#a1b0a6] mt-0.5">
+                          Histórico em tempo real das notificações enviadas com status de recepção do seu servidor.
+                        </p>
+                      </div>
+                    </div>
+
+                    {webhookDeliveries.length === 0 ? (
+                      <div className="p-6 rounded-2xl bg-[#09120d] border border-[#213428] text-center text-xs text-[#a1b0a6]">
+                        Nenhuma entrega registrada ainda para este merchant. Realize uma transação ou clique em "Testar Disparo" para auditar.
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto rounded-2xl border border-[#213428] bg-[#09120d]">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-[#050c08] text-[10px] font-mono uppercase text-[#8b9f93] border-b border-[#213428]">
+                            <tr>
+                              <th className="px-4 py-3">Status</th>
+                              <th className="px-4 py-3">Evento</th>
+                              <th className="px-4 py-3">Tentativas</th>
+                              <th className="px-4 py-3">Data / Hora</th>
+                              <th className="px-4 py-3 text-right">Ação</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-[#213428]">
+                            {webhookDeliveries.slice(0, 15).map((d) => {
+                              const is2xx = d.statusCode && d.statusCode >= 200 && d.statusCode < 300;
+                              const isErr = d.statusCode && d.statusCode >= 400;
+                              return (
+                                <tr key={d.id} className="hover:bg-[#101d14]/40 transition">
+                                  <td className="px-4 py-3">
+                                    {is2xx ? (
+                                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                                        <CheckCircle2 className="w-3 h-3" />
+                                        {d.statusCode} OK
+                                      </span>
+                                    ) : isErr ? (
+                                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30">
+                                        <AlertCircle className="w-3 h-3" />
+                                        HTTP {d.statusCode}
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                                        <Clock className="w-3 h-3" />
+                                        {d.error ? "Falha" : "Enviando"}
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <span className="font-mono text-xs font-semibold text-white">
+                                      {d.eventType}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3 font-mono text-[#a1b0a6]">
+                                    {d.attempts}ª tentativa
+                                  </td>
+                                  <td className="px-4 py-3 font-mono text-[#a1b0a6]">
+                                    {new Date(d.createdAt).toLocaleString("pt-BR")}
+                                  </td>
+                                  <td className="px-4 py-3 text-right">
+                                    <button
+                                      type="button"
+                                      onClick={() => setInspectingDelivery(d)}
+                                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#050c08] border border-[#213428] text-xs font-mono text-[#00e66b] hover:border-[#00e66b] transition cursor-pointer"
+                                    >
+                                      <Code2 className="w-3.5 h-3.5" />
+                                      Ver Payload
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* GUIA DE ASSINATURA CRIPTOGRÁFICA */}
+                  <div className="p-6 rounded-2xl bg-[#09120d] border border-[#213428] space-y-4">
+                    <div className="flex items-center gap-3">
+                      <Shield className="w-5 h-5 text-[#00e66b]" />
+                      <h3 className="text-sm font-bold text-white">
+                        Como Validar a Assinatura Criptográfica HMAC-SHA256
+                      </h3>
+                    </div>
+                    <p className="text-xs text-[#a1b0a6] leading-relaxed">
+                      Cada disparo de webhook inclui o cabeçalho <code className="text-[#00e66b] font-mono">X-Axion-Signature: t=17890...,v1=6a7b...</code>. Para prevenir ataques de repetição e falsificação, compute o HMAC-SHA256 do corpo bruto (<code className="text-white font-mono">rawBody</code>) precedido pelo timestamp.
                     </p>
-                  </div>
-                </div>
-              </div>
+                    <div className="p-4 rounded-xl bg-[#050c08] border border-[#213428] font-mono text-xs text-[#a1b0a6] space-y-2 overflow-x-auto">
+                      <p className="text-emerald-400 font-bold">// Exemplo em Node.js / TypeScript:</p>
+                      <pre className="text-white select-all">{`import crypto from 'crypto';
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-6 rounded-2xl bg-[#09120d] border border-[#213428]/80 space-y-4">
-                  <div className="flex items-center gap-3">
-                    <Globe className="w-5 h-5 text-[#00e66b]" />
-                    <h3 className="text-sm font-bold text-white">Endpoint de Criação de Cobranças</h3>
-                  </div>
-                  <code className="block p-3 rounded-xl bg-[#050c08] border border-[#213428] text-xs font-mono text-[#00e66b] select-all">
-                    POST https://api.axionenterprise.cloud/v1/charges
-                  </code>
-                  <div className="space-y-2 text-xs text-[#a1b0a6] font-mono">
-                    <p>Header: <span className="text-white">Idempotency-Key: &lt;uuid&gt;</span></p>
-                    <p>Header: <span className="text-white">Authorization: Bearer axp_live_...</span></p>
-                  </div>
-                </div>
+function verifyAxionWebhook(rawBody: string, signatureHeader: string, secret: string): boolean {
+  const [tPart, v1Part] = signatureHeader.split(',');
+  const timestamp = tPart?.replace('t=', '');
+  const expectedHash = v1Part?.replace('v1=', '');
+  if (!timestamp || !expectedHash) return false;
 
-                <div className="p-6 rounded-2xl bg-[#09120d] border border-[#213428]/80 space-y-4">
-                  <div className="flex items-center gap-3">
-                    <Zap className="w-5 h-5 text-emerald-400" />
-                    <h3 className="text-sm font-bold text-white">Endpoint de Consulta de Cobrança</h3>
-                  </div>
-                  <code className="block p-3 rounded-xl bg-[#050c08] border border-[#213428] text-xs font-mono text-emerald-400 select-all">
-                    GET https://api.axionenterprise.cloud/v1/charges/&#123;correlationId&#125;
-                  </code>
-                  <div className="space-y-2 text-xs text-[#a1b0a6] font-mono">
-                    <p>Header: <span className="text-white">Authorization: Bearer axp_live_...</span></p>
-                    <p>Resposta: <span className="text-white">Status conciliado em tempo real</span></p>
+  const computedHash = crypto
+    .createHmac('sha256', secret)
+    .update(\`\${timestamp}.\${rawBody}\`)
+    .digest('hex');
+
+  return crypto.timingSafeEqual(Buffer.from(computedHash), Buffer.from(expectedHash));
+}`}</pre>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
+
+              {/* CONTEÚDO 2: ENDPOINTS DA API & PARÂMETROS */}
+              {activeSection === "integrations" && webhookTab === "endpoints" && (
+                <div className="space-y-6">
+                  <div className={`rounded-2xl border p-5 ${integrations?.paymentsEnabled ? "border-emerald-500/30 bg-emerald-500/10" : "border-amber-500/30 bg-amber-500/10"}`}>
+                    <div className="flex items-start gap-3">
+                      {integrations?.paymentsEnabled ? <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" /> : <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />}
+                      <div>
+                        <p className="text-sm font-bold text-white">{integrations?.paymentsEnabled ? "PIX operacional" : "PIX aguardando ativação"}</p>
+                        <p className="mt-1 text-xs leading-5 text-[#b5c6bb]">
+                          {integrations?.paymentsEnabled
+                            ? "Infraestrutura AXION Pay ativa. As cobranças podem ser criadas pela API autenticada."
+                            : "A criação de cobranças ficará disponível após a ativação segura da operação PIX AXION Pay."}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-6 rounded-2xl bg-[#09120d] border border-[#213428]/80 space-y-4">
+                      <div className="flex items-center gap-3">
+                        <Globe className="w-5 h-5 text-[#00e66b]" />
+                        <h3 className="text-sm font-bold text-white">Endpoint de Criação de Cobranças</h3>
+                      </div>
+                      <code className="block p-3 rounded-xl bg-[#050c08] border border-[#213428] text-xs font-mono text-[#00e66b] select-all">
+                        POST https://api.axionenterprise.cloud/v1/charges
+                      </code>
+                      <div className="space-y-2 text-xs text-[#a1b0a6] font-mono">
+                        <p>Header: <span className="text-white">Idempotency-Key: &lt;uuid&gt;</span></p>
+                        <p>Header: <span className="text-white">Authorization: Bearer axp_live_...</span></p>
+                      </div>
+                    </div>
+
+                    <div className="p-6 rounded-2xl bg-[#09120d] border border-[#213428]/80 space-y-4">
+                      <div className="flex items-center gap-3">
+                        <Zap className="w-5 h-5 text-emerald-400" />
+                        <h3 className="text-sm font-bold text-white">Endpoint de Consulta de Cobrança</h3>
+                      </div>
+                      <code className="block p-3 rounded-xl bg-[#050c08] border border-[#213428] text-xs font-mono text-emerald-400 select-all">
+                        GET https://api.axionenterprise.cloud/v1/charges/&#123;correlationId&#125;
+                      </code>
+                      <div className="space-y-2 text-xs text-[#a1b0a6] font-mono">
+                        <p>Header: <span className="text-white">Authorization: Bearer axp_live_...</span></p>
+                        <p>Resposta: <span className="text-white">Status conciliado em tempo real</span></p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -2360,6 +2933,248 @@ export default function PayDashboard() {
                 {submittingAction === "rates" ? "Atualizando Taxas…" : "Salvar Novas Taxas da Operação"}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CADASTRAR NOVO WEBHOOK */}
+      {webhookModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-lg bg-[#09120d] border border-[#213428] rounded-3xl p-6 space-y-5 shadow-2xl">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-[#00e66b]">
+                  <Webhook className="w-4 h-4" />
+                </div>
+                <h3 className="text-base font-bold text-white">Cadastrar Endpoint de Webhook</h3>
+              </div>
+              <button
+                onClick={() => setWebhookModal(false)}
+                className="text-[#a1b0a6] hover:text-white transition cursor-pointer"
+                aria-label="Fechar"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateWebhook} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-[#b5c6bb] mb-1.5">
+                  Operação / Merchant
+                </label>
+                <select
+                  value={selectedWebhookMerchantId}
+                  onChange={(e) => setSelectedWebhookMerchantId(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-[#050c08] border border-[#213428] rounded-xl text-sm text-white focus:border-[#00e66b] focus:outline-none cursor-pointer"
+                >
+                  {merchants.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name} {m.document ? `• ${m.document}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-[#b5c6bb] mb-1.5">
+                  URL de Callback (Endpoint HTTPS)
+                </label>
+                <input
+                  type="url"
+                  required
+                  placeholder="https://sua-empresa.com/api/webhooks/axion-pay"
+                  value={newWebhookUrl}
+                  onChange={(e) => setNewWebhookUrl(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-[#050c08] border border-[#213428] rounded-xl text-sm font-mono text-white focus:border-[#00e66b] focus:outline-none"
+                />
+                <span className="text-[11px] text-[#8b9f93] mt-1 block">
+                  Seu servidor deve responder com status HTTP 2xx em até 8 segundos.
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-[#b5c6bb]">
+                    Eventos a Monitorar
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (selectedWebhookEvents.length === AVAILABLE_WEBHOOK_EVENTS.length) {
+                        setSelectedWebhookEvents([]);
+                      } else {
+                        setSelectedWebhookEvents(AVAILABLE_WEBHOOK_EVENTS.map((e) => e.id));
+                      }
+                    }}
+                    className="text-[11px] font-bold text-[#00e66b] hover:underline cursor-pointer"
+                  >
+                    {selectedWebhookEvents.length === AVAILABLE_WEBHOOK_EVENTS.length ? "Desmarcar todos" : "Selecionar todos"}
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto pr-1">
+                  {AVAILABLE_WEBHOOK_EVENTS.map((ev) => {
+                    const checked = selectedWebhookEvents.includes(ev.id);
+                    return (
+                      <label
+                        key={ev.id}
+                        className={`flex items-start gap-3 p-2.5 rounded-xl border transition cursor-pointer ${
+                          checked
+                            ? "bg-emerald-500/10 border-emerald-500/30"
+                            : "bg-[#050c08] border-[#213428] opacity-75 hover:opacity-100"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleWebhookEvent(ev.id)}
+                          className="mt-0.5 accent-[#00e66b] cursor-pointer"
+                        />
+                        <div className="space-y-0.5">
+                          <span className="text-xs font-bold text-white block">{ev.label}</span>
+                          <span className="text-[10px] font-mono text-emerald-400 block">{ev.id}</span>
+                          <span className="text-[10px] text-[#8b9f93] block">{ev.desc}</span>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={submittingAction === "create-webhook"}
+                className="w-full py-3 bg-[#00e66b] hover:bg-[#69f0ae] text-black font-semibold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-emerald-500/10 cursor-pointer disabled:opacity-50"
+              >
+                {submittingAction === "create-webhook" ? "Registrando Endpoint…" : "Salvar Endpoint de Webhook"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL EXIBIÇÃO DE SECRET GERADO */}
+      {newWebhookSecretModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-md bg-[#09120d] border border-[#213428] rounded-3xl p-6 space-y-5 shadow-2xl">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[#00e66b]/10 border border-[#00e66b]/30 flex items-center justify-center text-[#00e66b]">
+                <CheckCircle2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">Chave Secreta de Assinatura</h3>
+                <p className="text-xs text-[#a1b0a6]">Endpoint cadastrado com sucesso</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-[#b5c6bb] leading-relaxed">
+              Armazene esta chave de forma segura no seu servidor. Ela é utilizada para assinar cada requisição enviada ao seu webhook via cabeçalho <code className="text-white font-mono">X-Axion-Signature</code>.
+            </p>
+
+            <div className="p-4 rounded-xl bg-[#050c08] border border-[#213428] space-y-2">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-[#8b9f93] block">
+                Webhook Secret:
+              </span>
+              <code className="text-xs font-mono text-[#00e66b] break-all select-all block">
+                {newWebhookSecretModal.secret}
+              </code>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(newWebhookSecretModal.secret);
+                  notify("success", "Chave secreta copiada!");
+                }}
+                className="flex-1 py-3 bg-[#00e66b] hover:bg-[#69f0ae] text-black font-semibold text-xs uppercase tracking-wider rounded-xl transition cursor-pointer flex items-center justify-center gap-2"
+              >
+                <Copy className="w-4 h-4" />
+                Copiar Secret
+              </button>
+              <button
+                type="button"
+                onClick={() => setNewWebhookSecretModal(null)}
+                className="px-5 py-3 bg-[#101d14] hover:bg-[#182b20] border border-[#30513d] text-white font-bold text-xs rounded-xl transition cursor-pointer"
+              >
+                Concluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL AUDITORIA DE ENTREGA / INSPEÇÃO DE PAYLOAD */}
+      {inspectingDelivery && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-2xl bg-[#09120d] border border-[#213428] rounded-3xl p-6 space-y-5 shadow-2xl">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <Code2 className="w-5 h-5 text-emerald-400" />
+                <div>
+                  <h3 className="text-base font-bold text-white">Inspeção de Payload & Entrega</h3>
+                  <p className="text-xs text-[#a1b0a6] font-mono">
+                    Evento: <span className="text-white">{inspectingDelivery.eventType}</span> • Status: {inspectingDelivery.statusCode || "Timeout"}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setInspectingDelivery(null)}
+                className="text-[#a1b0a6] hover:text-white transition cursor-pointer"
+                aria-label="Fechar"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3 text-xs font-mono">
+                <div className="p-3 rounded-xl bg-[#050c08] border border-[#213428]">
+                  <span className="text-[10px] text-[#8b9f93] block">ID da Entrega</span>
+                  <span className="text-white truncate block">{inspectingDelivery.id}</span>
+                </div>
+                <div className="p-3 rounded-xl bg-[#050c08] border border-[#213428]">
+                  <span className="text-[10px] text-[#8b9f93] block">Horário da Tentativa</span>
+                  <span className="text-white block">{new Date(inspectingDelivery.createdAt).toLocaleString("pt-BR")}</span>
+                </div>
+              </div>
+
+              {inspectingDelivery.error && (
+                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-mono">
+                  <span className="font-bold block">Erro retornado:</span>
+                  {inspectingDelivery.error}
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-white font-mono">Payload JSON Enviado:</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(JSON.stringify(inspectingDelivery.payload, null, 2));
+                      notify("success", "Payload copiado para a área de transferência!");
+                    }}
+                    className="text-xs text-[#00e66b] font-bold flex items-center gap-1 hover:underline cursor-pointer"
+                  >
+                    <Copy className="w-3.5 h-3.5" /> Copiar JSON
+                  </button>
+                </div>
+                <pre className="p-4 rounded-xl bg-[#050c08] border border-[#213428] font-mono text-xs text-[#00e66b] overflow-x-auto max-h-64 select-all">
+                  {JSON.stringify(inspectingDelivery.payload, null, 2)}
+                </pre>
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setInspectingDelivery(null)}
+                className="px-5 py-2.5 bg-[#101d14] hover:bg-[#182b20] border border-[#30513d] text-white font-bold text-xs rounded-xl transition cursor-pointer"
+              >
+                Fechar
+              </button>
+            </div>
           </div>
         </div>
       )}

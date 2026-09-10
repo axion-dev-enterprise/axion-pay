@@ -281,3 +281,101 @@ export async function dispatchMerchantEvent(
     }
   }
 }
+
+export async function testMerchantWebhook(
+  database: Database,
+  merchantId: string,
+  webhookId: string,
+): Promise<{ success: boolean; statusCode: number | null; error: string | null; eventId: string }> {
+  const result = await database.query<{
+    id: string;
+    url: string;
+    secret: string;
+    events: string[];
+  }>(
+    `SELECT id, url, secret, events
+     FROM merchant_webhooks
+     WHERE id = $1 AND merchant_id = $2 AND status = 'ACTIVE'`,
+    [webhookId, merchantId],
+  );
+  if (!result.rowCount) {
+    throw new MerchantWebhookError('Webhook não encontrado ou inativo.', 404);
+  }
+  const webhook = result.rows[0];
+  const eventId = crypto.randomUUID();
+  const timestamp = Math.floor(Date.now() / 1_000);
+  const payload = {
+    id: eventId,
+    event: 'payment.succeeded',
+    timestamp,
+    data: {
+      test: true,
+      chargeId: `ch_test_${crypto.randomBytes(6).toString('hex')}`,
+      amountCents: 9900,
+      currency: 'BRL',
+      status: 'PAID',
+      paymentMethod: 'PIX',
+      description: 'Webhook de teste disparado pelo painel AXION Pay',
+      customer: {
+        name: 'Cliente Teste AXION',
+        email: 'sandbox@axionenterprise.cloud',
+      },
+    },
+  };
+  const rawBody = JSON.stringify(payload);
+  const signature = signWebhookPayload(rawBody, webhook.secret, timestamp);
+  let statusCode: number | null = null;
+  let responseBody: string | null = null;
+  let errorMessage: string | null = null;
+  let deliveredAt: Date | null = null;
+
+  try {
+    const res = await fetch(webhook.url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'AXION-Pay-Webhook/1.0',
+        'X-Axion-Signature': signature,
+        'X-Axion-Event-Id': eventId,
+      },
+      body: rawBody,
+      signal: AbortSignal.timeout(8_000),
+    });
+    statusCode = res.status;
+    responseBody = await res.text().catch(() => null);
+    if (responseBody && responseBody.length > 1000) {
+      responseBody = `${responseBody.slice(0, 1000)}...[truncated]`;
+    }
+    if (res.ok) {
+      deliveredAt = new Date();
+    } else {
+      errorMessage = `HTTP ${res.status}: ${responseBody || 'Sem resposta'}`;
+    }
+  } catch (err: any) {
+    errorMessage = err.name === 'TimeoutError' ? 'Timeout após 8 segundos' : (err.message || 'Falha de conexão com o endpoint');
+  }
+
+  await database.query(
+    `INSERT INTO merchant_webhook_deliveries
+       (merchant_id, webhook_id, event_type, payload, status_code, response_body, attempts, delivered_at, error)
+     VALUES ($1, $2, $3, $4, $5, $6, 1, $7, $8)`,
+    [
+      merchantId,
+      webhook.id,
+      'payment.succeeded',
+      payload,
+      statusCode,
+      responseBody,
+      deliveredAt,
+      errorMessage,
+    ],
+  );
+
+  return {
+    success: statusCode !== null && statusCode >= 200 && statusCode < 300,
+    statusCode,
+    error: errorMessage,
+    eventId,
+  };
+}
+
