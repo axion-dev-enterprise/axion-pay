@@ -12,7 +12,7 @@ const endpoints: Endpoint[] = [
   { method: "POST", path: "/v1/charges", title: "Criar cobrança PIX", auth: "API key · charges:write", description: "Cria uma cobrança idempotente para um merchant de produção. A chave pública sandbox não possui este escopo." },
   { method: "GET", path: "/v1/charges/{correlationId}", title: "Consultar cobrança", auth: "API key · charges:read", description: "Consulta uma cobrança pertencente ao merchant autenticado." },
   { method: "GET", path: "/v1/card/config", title: "Configuração do cartão", auth: "Público", description: "Retorna a configuração pública dos campos seguros AXION Pay." },
-  { method: "POST", path: "/v1/card/payment-intents", title: "Criar pagamento por cartão", auth: "Sessão AXION", description: "Cria uma intenção idempotente; dados sensíveis permanecem nos campos seguros." },
+  { method: "POST", path: "/v1/card/payment-intents", title: "Criar pagamento por cartão", auth: "API key (charges:write) · Sessão AXION", description: "Cria uma intenção idempotente para cobrança com cartão via API Key de merchant ou sessão web; dados sensíveis permanecem nos campos seguros." },
   { method: "GET", path: "/v1/dashboard/billing", title: "Status da assinatura", auth: "Sessão AXION", description: "Consulta plano, status e período de trial do merchant." },
   { method: "POST", path: "/v1/dashboard/billing/checkout", title: "Checkout de assinatura", auth: "Sessão AXION", description: "Abre o checkout seguro para a assinatura mensal." },
   { method: "POST", path: "/v1/flow/billing/checkout", title: "Plano AXION Flow + trial", auth: "Sessão AXION", description: "Inicia uma assinatura AXION Flow com o trial correspondente ao plano." },
@@ -25,6 +25,9 @@ function snippet(endpoint: Endpoint, language: "curl" | "node") {
     ? `curl -sS ${url} \\\n  -H "Authorization: Bearer ${SANDBOX_KEY}"`
     : `const response = await fetch("${url}", {\n  headers: { Authorization: "Bearer ${SANDBOX_KEY}" }\n});\nconsole.log(response.status, await response.json());`;
   if (endpoint.path === "/v1/card/config") return language === "curl" ? `curl -sS ${url}` : `const config = await fetch("${url}").then(r => r.json());`;
+  if (endpoint.path === "/v1/card/payment-intents") return language === "curl"
+    ? `curl -X POST ${url} \\\n  -H "Authorization: Bearer $AXION_API_KEY" \\\n  -H "Idempotency-Key: pedido-001" \\\n  -H "Content-Type: application/json" \\\n  -d '{"amountCents":1990,"customerEmail":"cliente@email.com","metadata":{"orderId":"001"}}'`
+    : `const response = await fetch("${url}", {\n  method: "POST",\n  headers: {\n    Authorization: \`Bearer \${process.env.AXION_API_KEY}\`,\n    "Idempotency-Key": "pedido-001",\n    "Content-Type": "application/json"\n  },\n  body: JSON.stringify({\n    amountCents: 1990,\n    customerEmail: "cliente@email.com",\n    metadata: { orderId: "001" }\n  })\n});\nconst { paymentIntentId, clientSecret } = await response.json();`;
   if (endpoint.path.includes("billing")) return language === "curl" ? `curl -X ${endpoint.method} ${url} \\\n  -H "Authorization: Bearer $AXION_SESSION_TOKEN"` : `const response = await fetch("${url}", { method: "${endpoint.method}", credentials: "include" });`;
   if (endpoint.method === "POST") return language === "curl"
     ? `curl -X POST ${url} \\\n  -H "Authorization: Bearer $AXION_API_KEY" \\\n  -H "Idempotency-Key: pedido-001" \\\n  -H "Content-Type: application/json" \\\n  -d '{"amountCents":1990,"comment":"Pedido 001"}'`
@@ -40,7 +43,7 @@ export default function ApiDocs() {
   const [result, setResult] = useState<{ status: number; elapsed: number; trace: string; body: unknown } | null>(null);
   const endpoint = endpoints[selected];
   const code = useMemo(() => snippet(endpoint, language), [endpoint, language]);
-  const agentInstructions = `Integre a aplicação à AXION Pay usando ${API_BASE}. Ambiente obrigatório para validação: sandbox. Use Authorization: Bearer ${SANDBOX_KEY}. Primeiro execute GET /health; depois GET /v1/sandbox/validate e confirme environment=sandbox, isolated=true e livePaymentsAllowed=false. Nunca substitua a chave sandbox por credenciais live. Em produção, carregue a chave privada do merchant somente no servidor, use Idempotency-Key único em toda mutação, não envie body em GET e só defina Content-Type: application/json quando houver JSON. Consulte o contrato em ${API_BASE}/openapi.json.`;
+  const agentInstructions = `Integre a aplicação à AXION Pay usando ${API_BASE}. Ambiente obrigatório para validação: sandbox. Use Authorization: Bearer ${SANDBOX_KEY}. Primeiro execute GET /health; depois GET /v1/sandbox/validate e confirme environment=sandbox, isolated=true e livePaymentsAllowed=false. Em produção, use Authorization: Bearer <AXION_API_KEY> (escopos charges:write e card:write) para emitir cobranças PIX em POST /v1/charges ou gerar Payment Intents de cartão em POST /v1/card/payment-intents. Sempre envie o cabeçalho Idempotency-Key único em toda mutação POST. Não envie body em requisições GET. Consulte o contrato OpenAPI formal em ${API_BASE}/openapi.json.`;
 
   async function copy(value: string, kind: "code" | "key" | "agent") {
     await navigator.clipboard.writeText(value); setCopied(kind); window.setTimeout(() => setCopied(null), 1800);
