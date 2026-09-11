@@ -49,6 +49,14 @@ import {
   cancelMerchantSubscription,
   MerchantSubscriptionError,
 } from './services/merchant-subscriptions.service.js';
+import {
+  createPaymentLink,
+  listMerchantPaymentLinks,
+  deletePaymentLink,
+  getPublicPaymentLink,
+  processPaymentLinkPayment,
+  PaymentLinkError,
+} from './services/payment-links.service.js';
 import { openapi } from './openapi.js';
 
 const createChargeSchema = z.object({
@@ -70,6 +78,30 @@ const webhookIdParams = z.object({ id: z.string().uuid() });
 const dashboardMerchantWebhookParams = z.object({
   merchantId: z.string().uuid(),
   id: z.string().uuid(),
+});
+const paymentLinkIdParams = z.object({ id: z.string().uuid() });
+const dashboardPaymentLinkParams = z.object({
+  merchantId: z.string().uuid(),
+  id: z.string().uuid(),
+});
+
+const createPaymentLinkSchema = z.object({
+  title: z.string().trim().min(1).max(120),
+  description: z.string().trim().max(500).optional(),
+  amountCents: z.number().int().min(100).max(100_000_000).optional(),
+  allowCustomAmount: z.boolean().optional(),
+  acceptedMethods: z.array(z.string()).optional(),
+  expiresAt: z.string().optional(),
+  maxUses: z.number().int().positive().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+const payPaymentLinkSchema = z.object({
+  paymentMethod: z.enum(['PIX', 'CARD']),
+  amountCents: z.number().int().min(100).max(100_000_000).optional(),
+  customerName: z.string().trim().max(120).optional(),
+  customerEmail: z.string().trim().email().optional(),
+  customerDocument: z.string().trim().max(32).optional(),
 });
 
 const createMerchantWebhookSchema = z.object({
@@ -800,6 +832,125 @@ export async function buildApp(dependencies: AppDependencies = {}) {
       return reply.code(200).send(subscription);
     } catch (err) {
       if (err instanceof MerchantSubscriptionError) return reply.code(err.statusCode).send({ error: err.message });
+      throw err;
+    }
+  });
+
+  // --- Payment Links Public Endpoints ---
+  app.get('/v1/payment-links/:id', async (request, reply) => {
+    try {
+      const { id } = paymentLinkIdParams.parse(request.params);
+      const link = await getPublicPaymentLink(database, id);
+      return reply.code(200).send(link);
+    } catch (err) {
+      if (err instanceof PaymentLinkError) return reply.code(err.statusCode).send({ error: err.message });
+      throw err;
+    }
+  });
+
+  app.post('/v1/payment-links/:id/pay', async (request, reply) => {
+    try {
+      const { id } = paymentLinkIdParams.parse(request.params);
+      const body = payPaymentLinkSchema.parse(request.body);
+      const result = await processPaymentLinkPayment(
+        database,
+        orchestrator,
+        config.STRIPE_SECRET_KEY,
+        id,
+        body,
+      );
+      return reply.code(201).send(result);
+    } catch (err) {
+      if (err instanceof PaymentLinkError) return reply.code(err.statusCode).send({ error: err.message });
+      throw err;
+    }
+  });
+
+  // --- Payment Links Dashboard Management ---
+  app.get('/v1/dashboard/merchants/:merchantId/payment-links', async (request, reply) => {
+    const user = await requireDashboardUser(request, reply, database);
+    if (!user) return;
+    const { merchantId } = merchantIdParams.parse(request.params);
+    const owned = await database.query<{ id: string }>(
+      `SELECT id FROM merchant_accounts WHERE id = $1 AND owner_auth_user_id = $2 LIMIT 1`,
+      [merchantId, user.id],
+    );
+    if (!owned.rowCount) return reply.code(404).send({ error: 'Operação não encontrada.' });
+    const links = await listMerchantPaymentLinks(database, merchantId);
+    return reply.code(200).send({ links });
+  });
+
+  app.post('/v1/dashboard/merchants/:merchantId/payment-links', async (request, reply) => {
+    const user = await requireDashboardUser(request, reply, database);
+    if (!user) return;
+    const { merchantId } = merchantIdParams.parse(request.params);
+    const owned = await database.query<{ id: string }>(
+      `SELECT id FROM merchant_accounts WHERE id = $1 AND owner_auth_user_id = $2 LIMIT 1`,
+      [merchantId, user.id],
+    );
+    if (!owned.rowCount) return reply.code(404).send({ error: 'Operação não encontrada.' });
+
+    try {
+      const body = createPaymentLinkSchema.parse(request.body);
+      const link = await createPaymentLink(database, merchantId, body);
+      return reply.code(201).send({ link });
+    } catch (err) {
+      if (err instanceof PaymentLinkError) return reply.code(err.statusCode).send({ error: err.message });
+      throw err;
+    }
+  });
+
+  app.delete('/v1/dashboard/merchants/:merchantId/payment-links/:id', async (request, reply) => {
+    const user = await requireDashboardUser(request, reply, database);
+    if (!user) return;
+    const { merchantId, id } = dashboardPaymentLinkParams.parse(request.params);
+    const owned = await database.query<{ id: string }>(
+      `SELECT id FROM merchant_accounts WHERE id = $1 AND owner_auth_user_id = $2 LIMIT 1`,
+      [merchantId, user.id],
+    );
+    if (!owned.rowCount) return reply.code(404).send({ error: 'Operação não encontrada.' });
+
+    try {
+      const result = await deletePaymentLink(database, merchantId, id);
+      return reply.code(200).send(result);
+    } catch (err) {
+      if (err instanceof PaymentLinkError) return reply.code(err.statusCode).send({ error: err.message });
+      throw err;
+    }
+  });
+
+  // --- Payment Links S2S API ---
+  app.get('/v1/payment-links', async (request, reply) => {
+    const merchant = await requireMerchant(request, reply, ['charges:read'], cache, database);
+    if (!merchant) return;
+    const links = await listMerchantPaymentLinks(database, merchant.merchantId);
+    return reply.code(200).send({ links });
+  });
+
+  app.post('/v1/payment-links', async (request, reply) => {
+    const merchant = await requireMerchant(request, reply, ['charges:write'], cache, database);
+    if (!merchant) return;
+
+    try {
+      const body = createPaymentLinkSchema.parse(request.body);
+      const link = await createPaymentLink(database, merchant.merchantId, body);
+      return reply.code(201).send({ link });
+    } catch (err) {
+      if (err instanceof PaymentLinkError) return reply.code(err.statusCode).send({ error: err.message });
+      throw err;
+    }
+  });
+
+  app.delete('/v1/payment-links/:id', async (request, reply) => {
+    const merchant = await requireMerchant(request, reply, ['charges:write'], cache, database);
+    if (!merchant) return;
+
+    try {
+      const { id } = paymentLinkIdParams.parse(request.params);
+      const result = await deletePaymentLink(database, merchant.merchantId, id);
+      return reply.code(200).send(result);
+    } catch (err) {
+      if (err instanceof PaymentLinkError) return reply.code(err.statusCode).send({ error: err.message });
       throw err;
     }
   });

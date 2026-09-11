@@ -48,6 +48,8 @@ import {
   EyeOff,
   Code2,
   Play,
+  Link2,
+  Share2,
 } from "lucide-react";
 
 const AUTH_API = "https://auth.axionenterprise.cloud";
@@ -260,6 +262,7 @@ const VALID_SECTIONS: Record<string, string> = {
   "kyc-review": "kyc-review",
   "kyc-applications": "kyc-review",
   "billing": "billing",
+  "payment-links": "payment-links",
   "integrations": "integrations",
   "settings": "settings",
 };
@@ -288,6 +291,7 @@ export default function PayDashboard() {
       merchants: "AXION Pay — Merchants & Operações",
       "api-keys": "AXION Pay — Chaves de API",
       webhooks: "AXION Pay — Webhooks por Merchant",
+      "payment-links": "AXION Pay — Links de Pagamento",
       transactions: "AXION Pay — Transações",
       payouts: "AXION Pay — Saques & Saldos",
       onboarding: "AXION Pay — Cadastro & KYC",
@@ -405,6 +409,20 @@ export default function PayDashboard() {
   const [inspectingDelivery, setInspectingDelivery] = useState<any | null>(null);
   const [testingWebhookId, setTestingWebhookId] = useState<string | null>(null);
   const [webhookTab, setWebhookTab] = useState<"webhooks" | "endpoints">("webhooks");
+
+  // Estados de Links de Pagamento Autônomos
+  const [selectedPaymentLinkMerchantId, setSelectedPaymentLinkMerchantId] = useState<string>("");
+  const [paymentLinks, setPaymentLinks] = useState<Array<any>>([]);
+  const [loadingPaymentLinks, setLoadingPaymentLinks] = useState(false);
+  const [paymentLinkModal, setPaymentLinkModal] = useState(false);
+  const [newPaymentLinkTitle, setNewPaymentLinkTitle] = useState("");
+  const [newPaymentLinkDesc, setNewPaymentLinkDesc] = useState("");
+  const [newPaymentLinkAmount, setNewPaymentLinkAmount] = useState("");
+  const [newPaymentLinkCustom, setNewPaymentLinkCustom] = useState(false);
+  const [newPaymentLinkMethods, setNewPaymentLinkMethods] = useState<string[]>(["PIX", "CARD"]);
+  const [newPaymentLinkExpiresAt, setNewPaymentLinkExpiresAt] = useState("");
+  const [newPaymentLinkMaxUses, setNewPaymentLinkMaxUses] = useState("");
+  const [createdLinkUrlModal, setCreatedLinkUrlModal] = useState<{ id: string; url: string; title: string } | null>(null);
 
   const notify = (type: NonNullable<ToastState>["type"], message: string) => {
     setToast({ type, message });
@@ -1015,6 +1033,110 @@ export default function PayDashboard() {
     setRevealedWebhookSecrets((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const loadPaymentLinks = async (merchantId: string) => {
+    if (!merchantId) return;
+    setLoadingPaymentLinks(true);
+    try {
+      const res = await apiFetch(`/v1/dashboard/merchants/${merchantId}/payment-links`);
+      if (res?.links) setPaymentLinks(res.links);
+    } catch {
+      // Ignora falhas transitórias
+    } finally {
+      setLoadingPaymentLinks(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedPaymentLinkMerchantId && merchants.length > 0) {
+      setSelectedPaymentLinkMerchantId(merchants[0].id);
+    }
+  }, [merchants, selectedPaymentLinkMerchantId]);
+
+  useEffect(() => {
+    if (selectedPaymentLinkMerchantId && activeSection === "payment-links") {
+      loadPaymentLinks(selectedPaymentLinkMerchantId);
+    }
+  }, [selectedPaymentLinkMerchantId, activeSection]);
+
+  const handleCreatePaymentLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPaymentLinkMerchantId) {
+      notify("error", "Selecione uma operação / merchant para criar o link.");
+      return;
+    }
+    const cleanTitle = newPaymentLinkTitle.trim();
+    if (!cleanTitle) {
+      notify("error", "Informe um título para o link de pagamento.");
+      return;
+    }
+    let amountCents: number | undefined = undefined;
+    if (!newPaymentLinkCustom) {
+      const cleanAmt = newPaymentLinkAmount.replace(/\./g, "").replace(",", ".").trim();
+      const num = parseFloat(cleanAmt);
+      if (isNaN(num) || num < 1) {
+        notify("error", "O valor fixo deve ser de no mínimo R$ 1,00.");
+        return;
+      }
+      amountCents = Math.round(num * 100);
+    }
+    if (!newPaymentLinkMethods.length) {
+      notify("error", "Selecione ao menos uma forma de pagamento aceita.");
+      return;
+    }
+
+    setSubmittingAction("create-payment-link");
+    try {
+      const res = await apiFetch(`/v1/dashboard/merchants/${selectedPaymentLinkMerchantId}/payment-links`, {
+        method: "POST",
+        body: JSON.stringify({
+          title: cleanTitle,
+          description: newPaymentLinkDesc.trim() || undefined,
+          amountCents,
+          allowCustomAmount: newPaymentLinkCustom,
+          acceptedMethods: newPaymentLinkMethods,
+          expiresAt: newPaymentLinkExpiresAt ? new Date(newPaymentLinkExpiresAt).toISOString() : undefined,
+          maxUses: newPaymentLinkMaxUses ? parseInt(newPaymentLinkMaxUses, 10) : undefined,
+        }),
+      });
+
+      if (res?.link) {
+        notify("success", "Link de pagamento autônomo gerado com sucesso!");
+        setPaymentLinkModal(false);
+        setNewPaymentLinkTitle("");
+        setNewPaymentLinkDesc("");
+        setNewPaymentLinkAmount("");
+        setNewPaymentLinkCustom(false);
+        setNewPaymentLinkExpiresAt("");
+        setNewPaymentLinkMaxUses("");
+        const publicUrl = `https://pay.axionenterprise.cloud/p/${res.link.id}`;
+        setCreatedLinkUrlModal({ id: res.link.id, url: publicUrl, title: res.link.title });
+        await loadPaymentLinks(selectedPaymentLinkMerchantId);
+      } else {
+        notify("error", res?.error || "Não foi possível criar o link de pagamento.");
+      }
+    } finally {
+      setSubmittingAction(null);
+    }
+  };
+
+  const handleDeletePaymentLink = async (linkId: string) => {
+    if (!selectedPaymentLinkMerchantId) return;
+    setSubmittingAction(`delete-link-${linkId}`);
+    try {
+      const res = await apiFetch(`/v1/dashboard/merchants/${selectedPaymentLinkMerchantId}/payment-links/${linkId}`, {
+        method: "DELETE",
+      });
+      if (res?.success) {
+        notify("success", "Link de pagamento removido com sucesso.");
+        setPaymentLinks((prev) => prev.filter((l) => l.id !== linkId));
+      } else {
+        notify("error", res?.error || "Erro ao excluir o link.");
+      }
+    } finally {
+      setSubmittingAction(null);
+    }
+  };
+
   // Se carregando autenticação
   if (authLoading) {
     return (
@@ -1059,6 +1181,7 @@ export default function PayDashboard() {
     { id: "merchants", label: "Merchants & Operações", icon: Building2, path: "/dashboard/merchants" },
     { id: "api-keys", label: "Chaves de API", icon: Key, path: "/dashboard/api-keys" },
     { id: "webhooks", label: "Webhooks", icon: Webhook, path: "/dashboard/webhooks" },
+    { id: "payment-links", label: "Links de Pagamento", icon: Link2, path: "/dashboard/payment-links" },
     { id: "transactions", label: "Transações", icon: Wallet, path: "/dashboard/transactions" },
     { id: "payouts", label: "Saques & Saldos", icon: Banknote, path: "/dashboard/payouts" },
     { id: "onboarding", label: "Cadastro & KYC", icon: FileCheck2, path: "/dashboard/onboarding" },
@@ -2330,6 +2453,221 @@ function verifyAxionWebhook(rawBody: string, signatureHeader: string, secret: st
             </div>
           )}
 
+          
+          {/* TAB: LINKS DE PAGAMENTO AUTÔNOMOS */}
+          {activeSection === "payment-links" && (
+            <div className="space-y-6 animate-fadeIn">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2.5">
+                    <Link2 className="w-6 h-6 text-[#00e66b]" />
+                    <span>Links de Pagamento Autônomos</span>
+                  </h1>
+                  <p className="text-xs text-[#a1b0a6] mt-1">
+                    Gere links públicos compartilháveis para vender sem precisar de site ou plataforma própria.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  {merchants.length > 1 && (
+                    <div className="flex items-center gap-2 bg-[#09120d] border border-[#213428] rounded-xl px-3 py-1.5 text-xs">
+                      <Building2 className="w-3.5 h-3.5 text-[#00e66b]" />
+                      <select
+                        value={selectedPaymentLinkMerchantId}
+                        onChange={(e) => setSelectedPaymentLinkMerchantId(e.target.value)}
+                        className="bg-transparent text-white font-medium focus:outline-none cursor-pointer"
+                      >
+                        {merchants.map((m) => (
+                          <option key={m.id} value={m.id} className="bg-[#09120d] text-white">
+                            {m.tradingName || m.legalName}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!merchants.length) {
+                        notify("info", "Cadastre um merchant antes de gerar links de pagamento.");
+                        return;
+                      }
+                      setPaymentLinkModal(true);
+                    }}
+                    className="inline-flex items-center gap-2 rounded-xl bg-[#00e66b] px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-black transition hover:bg-[#69f0ae] shadow-lg shadow-emerald-500/10 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Novo Link de Pagamento
+                  </button>
+                </div>
+              </div>
+
+              {/* Cards de Métricas Rápidas */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="p-5 rounded-2xl bg-[#09120d] border border-[#213428]/80 space-y-1">
+                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#8b9f93]">Total de Links</span>
+                  <div className="text-2xl font-bold text-white">{paymentLinks.length}</div>
+                  <p className="text-[11px] text-[#a1b0a6]">Criados na sua conta</p>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-[#09120d] border border-[#213428]/80 space-y-1">
+                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#8b9f93]">Links Ativos</span>
+                  <div className="text-2xl font-bold text-[#00e66b]">
+                    {paymentLinks.filter((l) => l.status === "ACTIVE").length}
+                  </div>
+                  <p className="text-[11px] text-[#a1b0a6]">Disponíveis para checkout</p>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-[#09120d] border border-[#213428]/80 space-y-1">
+                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#8b9f93]">Conversões / Pagamentos</span>
+                  <div className="text-2xl font-bold text-emerald-400 font-mono">
+                    {paymentLinks.reduce((acc, l) => acc + (l.timesUsed || 0), 0)}
+                  </div>
+                  <p className="text-[11px] text-[#a1b0a6]">Transações iniciadas</p>
+                </div>
+              </div>
+
+              {/* Lista de Links de Pagamento */}
+              {loadingPaymentLinks ? (
+                <div className="p-12 text-center rounded-2xl bg-[#09120d] border border-[#213428]">
+                  <Loader2 className="w-6 h-6 text-[#00e66b] animate-spin mx-auto mb-2" />
+                  <span className="text-xs text-[#a1b0a6] font-mono">Carregando links de pagamento…</span>
+                </div>
+              ) : paymentLinks.length === 0 ? (
+                <div className="p-12 text-center rounded-3xl bg-[#09120d] border border-[#213428] space-y-4">
+                  <div className="w-14 h-14 rounded-2xl bg-[#00e66b]/10 border border-[#00e66b]/20 flex items-center justify-center text-[#00e66b] mx-auto">
+                    <Link2 className="w-7 h-7" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white">Nenhum Link de Pagamento Gerado</h3>
+                    <p className="text-xs text-[#a1b0a6] mt-1 max-w-sm mx-auto">
+                      Crie seu primeiro link de pagamento autônomo para compartilhar no WhatsApp, Instagram ou enviar para seus clientes.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!merchants.length) {
+                        notify("info", "Cadastre um merchant antes de gerar links de pagamento.");
+                        return;
+                      }
+                      setPaymentLinkModal(true);
+                    }}
+                    className="inline-flex items-center gap-2 rounded-xl bg-[#00e66b] px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-black transition hover:bg-[#69f0ae] shadow-md shadow-emerald-500/10 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Gerar Primeiro Link
+                  </button>
+                </div>
+              ) : (
+                <div className="grid gap-4">
+                  {paymentLinks.map((link) => {
+                    const publicUrl = `https://pay.axionenterprise.cloud/p/${link.id}`;
+                    return (
+                      <div
+                        key={link.id}
+                        className="p-5 rounded-2xl bg-[#09120d] border border-[#213428]/80 hover:border-[#30513d] transition space-y-4"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <div className="space-y-1 min-w-0">
+                            <div className="flex items-center gap-2.5 flex-wrap">
+                              <span
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
+                                  link.status === "ACTIVE"
+                                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                                    : "bg-red-500/10 text-red-400 border-red-500/30"
+                                }`}
+                              >
+                                <span className={`w-1.5 h-1.5 rounded-full ${link.status === "ACTIVE" ? "bg-emerald-400" : "bg-red-400"}`} />
+                                {link.status === "ACTIVE" ? "ATIVO" : link.status}
+                              </span>
+
+                              <h3 className="text-base font-bold text-white truncate">{link.title}</h3>
+                            </div>
+
+                            {link.description && (
+                              <p className="text-xs text-[#a1b0a6] line-clamp-1">{link.description}</p>
+                            )}
+                          </div>
+
+                          <div className="flex items-baseline gap-2 shrink-0">
+                            {link.allowCustomAmount ? (
+                              <span className="text-xs font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-lg">
+                                Valor Aberto / Livre
+                              </span>
+                            ) : (
+                              <span className="text-lg font-mono font-bold text-[#00e66b]">
+                                R$ {((link.amountCents || 0) / 100).toFixed(2).replace(".", ",")}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Linha de Metadados e URL */}
+                        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pt-3 border-t border-[#213428]/80 text-xs">
+                          <div className="flex items-center gap-4 flex-wrap text-[11px] text-[#8b9f93] font-mono">
+                            <div className="flex items-center gap-1.5">
+                              <span>Métodos:</span>
+                              {link.acceptedMethods?.includes("PIX") && (
+                                <span className="inline-flex items-center gap-1 bg-[#101d14] px-2 py-0.5 rounded text-white border border-[#213428]">
+                                  <QrCode className="w-3 h-3 text-[#00e66b]" /> PIX
+                                </span>
+                              )}
+                              {link.acceptedMethods?.includes("CARD") && (
+                                <span className="inline-flex items-center gap-1 bg-[#101d14] px-2 py-0.5 rounded text-white border border-[#213428]">
+                                  <CreditCard className="w-3 h-3 text-[#00e66b]" /> Cartão
+                                </span>
+                              )}
+                            </div>
+
+                            <div>
+                              Usos: <strong className="text-white">{link.timesUsed || 0}</strong>
+                              {link.maxUses ? ` / ${link.maxUses}` : ""}
+                            </div>
+
+                            {link.expiresAt && (
+                              <div>
+                                Expira: {new Date(link.expiresAt).toLocaleDateString("pt-BR")}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Ações: Copiar Link, Abrir e Excluir */}
+                          <div className="flex items-center gap-2 self-end lg:self-auto">
+                            <CopyBtn text={publicUrl} />
+
+                            <a
+                              href={publicUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              title="Abrir página de checkout pública"
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#182b20] hover:bg-[#294333] text-xs font-mono text-[#b5c6bb] transition-all border border-[#30513d]"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                              <span>Abrir</span>
+                            </a>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeletePaymentLink(link.id)}
+                              disabled={submittingAction === `delete-link-${link.id}`}
+                              title="Excluir link de pagamento"
+                              className="p-1.5 rounded-lg text-[#8b9f93] hover:text-red-400 hover:bg-red-500/10 transition"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* TAB 7: CONFIGURAÇÕES */}
           {activeSection === "settings" && (
             <div className="space-y-6 animate-fadeIn max-w-2xl">
@@ -2483,6 +2821,264 @@ function verifyAxionWebhook(rawBody: string, signatureHeader: string, secret: st
           )}
         </main>
       </div>
+
+      
+      {/* MODAL CRIAR LINK DE PAGAMENTO */}
+      {paymentLinkModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-[#09120d] border border-[#213428] rounded-3xl p-6 space-y-5">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                  <Link2 className="w-4 h-4" />
+                </div>
+                <h3 className="text-base font-bold text-white">Criar Link de Pagamento</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPaymentLinkModal(false)}
+                className="text-[#a1b0a6] hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreatePaymentLink} className="space-y-4 text-xs">
+              {merchants.length > 1 && (
+                <div>
+                  <label className="block text-[11px] font-mono text-[#8b9f93] uppercase mb-1">
+                    Operação (Merchant)
+                  </label>
+                  <select
+                    value={selectedPaymentLinkMerchantId}
+                    onChange={(e) => setSelectedPaymentLinkMerchantId(e.target.value)}
+                    className="w-full bg-[#050c08] border border-[#213428] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00e66b]"
+                  >
+                    {merchants.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.tradingName || m.legalName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-[11px] font-mono text-[#8b9f93] uppercase mb-1">
+                  Título do Produto ou Cobrança *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newPaymentLinkTitle}
+                  onChange={(e) => setNewPaymentLinkTitle(e.target.value)}
+                  placeholder="Ex: Consultoria de Tráfego Pago, E-book, Ingresso"
+                  className="w-full bg-[#050c08] border border-[#213428] rounded-xl px-3.5 py-2.5 text-white placeholder-[#506657] focus:outline-none focus:border-[#00e66b]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-mono text-[#8b9f93] uppercase mb-1">
+                  Descrição Exibida no Checkout
+                </label>
+                <textarea
+                  value={newPaymentLinkDesc}
+                  onChange={(e) => setNewPaymentLinkDesc(e.target.value)}
+                  rows={2}
+                  placeholder="Descreva detalhes, garantia ou instruções para o comprador…"
+                  className="w-full bg-[#050c08] border border-[#213428] rounded-xl px-3.5 py-2 text-white placeholder-[#506657] focus:outline-none focus:border-[#00e66b]"
+                />
+              </div>
+
+              {/* Configuração de Valor */}
+              <div className="space-y-2 p-3.5 rounded-2xl bg-[#050c08] border border-[#213428]">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-white">Tipo de Valor</span>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={newPaymentLinkCustom}
+                      onChange={(e) => setNewPaymentLinkCustom(e.target.checked)}
+                      className="rounded accent-[#00e66b]"
+                    />
+                    <span className="text-[11px] text-[#a1b0a6]">Permitir valor aberto (doação / cliente escolhe)</span>
+                  </label>
+                </div>
+
+                {!newPaymentLinkCustom && (
+                  <div className="pt-2">
+                    <label className="block text-[11px] font-mono text-[#8b9f93] uppercase mb-1">
+                      Valor Fixo em R$ *
+                    </label>
+                    <div className="flex items-center gap-2 bg-[#09120d] border border-[#213428] rounded-xl px-3.5 py-2">
+                      <span className="font-mono text-[#00e66b] font-bold">R$</span>
+                      <input
+                        type="text"
+                        required={!newPaymentLinkCustom}
+                        value={newPaymentLinkAmount}
+                        onChange={(e) => setNewPaymentLinkAmount(e.target.value)}
+                        placeholder="49,90"
+                        className="bg-transparent text-white font-mono font-bold focus:outline-none w-full"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Formas de Pagamento Aceitas */}
+              <div>
+                <label className="block text-[11px] font-mono text-[#8b9f93] uppercase mb-2">
+                  Formas de Pagamento Aceitas *
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <label
+                    className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition ${
+                      newPaymentLinkMethods.includes("PIX")
+                        ? "border-[#00e66b]/60 bg-[#00e66b]/10 text-white"
+                        : "border-[#213428] bg-[#050c08] text-[#a1b0a6]"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={newPaymentLinkMethods.includes("PIX")}
+                      onChange={(e) => {
+                        if (e.target.checked) setNewPaymentLinkMethods((prev) => [...prev, "PIX"]);
+                        else setNewPaymentLinkMethods((prev) => prev.filter((m) => m !== "PIX"));
+                      }}
+                      className="rounded accent-[#00e66b]"
+                    />
+                    <QrCode className="w-4 h-4 text-[#00e66b]" />
+                    <span className="font-semibold text-xs">PIX Instantâneo</span>
+                  </label>
+
+                  <label
+                    className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition ${
+                      newPaymentLinkMethods.includes("CARD")
+                        ? "border-[#00e66b]/60 bg-[#00e66b]/10 text-white"
+                        : "border-[#213428] bg-[#050c08] text-[#a1b0a6]"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={newPaymentLinkMethods.includes("CARD")}
+                      onChange={(e) => {
+                        if (e.target.checked) setNewPaymentLinkMethods((prev) => [...prev, "CARD"]);
+                        else setNewPaymentLinkMethods((prev) => prev.filter((m) => m !== "CARD"));
+                      }}
+                      className="rounded accent-[#00e66b]"
+                    />
+                    <CreditCard className="w-4 h-4 text-[#00e66b]" />
+                    <span className="font-semibold text-xs">Cartão de Crédito</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Parâmetros Opcionais: Expiração e Limite de Usos */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div>
+                  <label className="block text-[11px] font-mono text-[#8b9f93] uppercase mb-1">
+                    Expiração (Opcional)
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={newPaymentLinkExpiresAt}
+                    onChange={(e) => setNewPaymentLinkExpiresAt(e.target.value)}
+                    className="w-full bg-[#050c08] border border-[#213428] rounded-xl px-3 py-2 text-white focus:outline-none focus:border-[#00e66b]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-mono text-[#8b9f93] uppercase mb-1">
+                    Limite de Vendas (Opcional)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={newPaymentLinkMaxUses}
+                    onChange={(e) => setNewPaymentLinkMaxUses(e.target.value)}
+                    placeholder="Ex: 50"
+                    className="w-full bg-[#050c08] border border-[#213428] rounded-xl px-3 py-2 text-white focus:outline-none focus:border-[#00e66b]"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setPaymentLinkModal(false)}
+                  className="px-4 py-2.5 rounded-xl border border-[#213428] text-xs font-semibold text-[#a1b0a6] hover:text-white"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingAction === "create-payment-link"}
+                  className="px-5 py-2.5 rounded-xl bg-[#00e66b] hover:bg-[#69f0ae] text-black text-xs font-bold uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-emerald-500/10 disabled:opacity-50 cursor-pointer"
+                >
+                  {submittingAction === "create-payment-link" ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      Gerando…
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-3.5 h-3.5" />
+                      Gerar Link
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL LINK GERADO COM SUCESSO */}
+      {createdLinkUrlModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-[#09120d] border border-[#00e66b]/40 rounded-3xl p-6 text-center space-y-4 shadow-2xl">
+            <div className="w-14 h-14 rounded-full bg-[#00e66b]/20 border border-[#00e66b] flex items-center justify-center text-[#00e66b] mx-auto">
+              <CheckCircle2 className="w-8 h-8" />
+            </div>
+
+            <div>
+              <h3 className="text-lg font-bold text-white">Link de Pagamento Criado!</h3>
+              <p className="text-xs text-[#a1b0a6] mt-1">{createdLinkUrlModal.title}</p>
+            </div>
+
+            <div className="p-3 bg-[#050c08] border border-[#213428] rounded-xl text-left">
+              <span className="block text-[10px] font-mono text-[#8b9f93] uppercase mb-1">Link Compartilhável</span>
+              <input
+                type="text"
+                readOnly
+                value={createdLinkUrlModal.url}
+                className="w-full bg-transparent text-xs font-mono text-[#00e66b] select-all focus:outline-none"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 pt-2">
+              <div className="flex-1">
+                <CopyBtn text={createdLinkUrlModal.url} />
+              </div>
+              <a
+                href={createdLinkUrlModal.url}
+                target="_blank"
+                rel="noreferrer"
+                className="px-4 py-2 rounded-xl bg-[#00e66b] hover:bg-[#69f0ae] text-black text-xs font-bold inline-flex items-center gap-1.5 transition"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>Testar</span>
+              </a>
+              <button
+                type="button"
+                onClick={() => setCreatedLinkUrlModal(null)}
+                className="px-4 py-2 rounded-xl bg-[#101d14] hover:bg-[#182b20] border border-[#213428] text-xs font-semibold text-white transition"
+              >
+                Concluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {toast && (
         <div className="fixed bottom-5 right-5 z-[70] w-[min(24rem,calc(100vw-2.5rem))] rounded-2xl border border-[#30513d] bg-[#18181f]/95 p-4 shadow-2xl backdrop-blur" role="status" aria-live="polite">

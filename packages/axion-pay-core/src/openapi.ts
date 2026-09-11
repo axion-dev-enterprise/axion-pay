@@ -424,5 +424,76 @@ export const openapi = {
         responses: { '200': { description: 'Assinatura cancelada.' }, '404': { description: 'Não encontrada.' } },
       },
     },
+    '/v1/payment-links': {
+      get: {
+        summary: 'Lista todos os links de pagamento do merchant autenticado',
+        security: [{ apiKey: [] }],
+        responses: { '200': { description: 'Lista de links de pagamento.' } },
+      },
+      post: {
+        summary: 'Cria um novo link de pagamento compartilhável (PIX ou Cartão)',
+        security: [{ apiKey: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['title'],
+                properties: {
+                  title: { type: 'string', maxLength: 120 },
+                  description: { type: 'string', maxLength: 500 },
+                  amountCents: { type: 'integer', minimum: 100, maximum: 100000000 },
+                  allowCustomAmount: { type: 'boolean', default: false },
+                  acceptedMethods: { type: 'array', items: { type: 'string', enum: ['PIX', 'CARD'] }, default: ['PIX', 'CARD'] },
+                  expiresAt: { type: 'string', format: 'date-time' },
+                  maxUses: { type: 'integer', minimum: 1 },
+                  metadata: { type: 'object' },
+                },
+              },
+            },
+          },
+        },
+        responses: { '201': { description: 'Link criado com sucesso.' } },
+      },
+    },
+    '/v1/payment-links/{id}': {
+      get: {
+        summary: 'Consulta pública dos dados de um link de pagamento (para compradores)',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { '200': { description: 'Dados públicos do link de pagamento.' }, '404': { description: 'Não encontrado ou expirado.' } },
+      },
+      delete: {
+        summary: 'Remove ou desativa um link de pagamento do merchant',
+        security: [{ apiKey: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { '200': { description: 'Link removido.' }, '404': { description: 'Não encontrado.' } },
+      },
+    },
+    '/v1/payment-links/{id}/pay': {
+      post: {
+        summary: 'Processa o pagamento de um link público (Gera QR Code PIX ou client_secret Stripe)',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['paymentMethod'],
+                properties: {
+                  paymentMethod: { type: 'string', enum: ['PIX', 'CARD'] },
+                  amountCents: { type: 'integer', minimum: 100, maximum: 100000000 },
+                  customerName: { type: 'string', maxLength: 120 },
+                  customerEmail: { type: 'string', format: 'email' },
+                  customerDocument: { type: 'string', maxLength: 32 },
+                },
+              },
+            },
+          },
+        },
+        responses: { '201': { description: 'Pagamento iniciado.' }, '400': { description: 'Erro na requisição.' } },
+      },
+    },
   },
 } as const;

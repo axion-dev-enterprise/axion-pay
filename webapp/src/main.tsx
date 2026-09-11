@@ -8,6 +8,7 @@ const PayDashboard = lazy(() => import("./pages/PayDashboard"));
 const ApiDocs = lazy(() => import("./pages/ApiDocs"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const CardCheckout = lazy(() => import("./pages/CardCheckout"));
+const PaymentLinkCheckout = lazy(() => import("./pages/PaymentLinkCheckout"));
 const adminHost = window.location.hostname === "admin.pay.axionenterprise.cloud";
 
 const LazyLoad = ({ children }: { children: React.ReactNode }) => (
@@ -31,6 +32,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       <Route path="/docs" element={<LazyLoad><ApiDocs /></LazyLoad>} />
       <Route path="/admin/*" element={<LazyLoad><AdminDashboard /></LazyLoad>} />
       <Route path="/card-checkout" element={<LazyLoad><CardCheckout /></LazyLoad>} />
+      <Route path="/p/:id" element={<LazyLoad><PaymentLinkCheckout /></LazyLoad>} />
+      <Route path="/pay/:id" element={<LazyLoad><PaymentLinkCheckout /></LazyLoad>} />
       <Route path="/checkout/*" element={<App />} />
       </>}
     </Routes>
