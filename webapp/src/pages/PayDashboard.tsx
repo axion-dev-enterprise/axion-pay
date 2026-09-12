@@ -54,6 +54,7 @@ import {
   MessageSquare,
   CheckCheck,
   Smartphone,
+  Users,
 } from "lucide-react";
 
 const AUTH_API = "https://auth.axionenterprise.cloud";
@@ -270,6 +271,9 @@ const VALID_SECTIONS: Record<string, string> = {
   "whatsapp": "whatsapp",
   "api-logs": "api-logs",
   "logs": "api-logs",
+  "subscriptions": "subscriptions",
+  "assinaturas": "subscriptions",
+  "portal": "subscriptions",
   "integrations": "integrations",
   "settings": "settings",
 };
@@ -300,6 +304,7 @@ export default function PayDashboard() {
       webhooks: "AXION Pay — Webhooks por Merchant",
       "payment-links": "AXION Pay — Links de Pagamento",
       "api-logs": "AXION Pay — Logs de API",
+      subscriptions: "AXION Pay — Assinaturas & Portal",
       transactions: "AXION Pay — Transações",
       payouts: "AXION Pay — Saques & Saldos",
       onboarding: "AXION Pay — Cadastro & KYC",
@@ -361,6 +366,97 @@ export default function PayDashboard() {
   const [loadingWhatsapp, setLoadingWhatsapp] = useState(false);
   const [savingWhatsapp, setSavingWhatsapp] = useState(false);
   const [activeWhatsappTab, setActiveWhatsappTab] = useState<string>("pix_created");
+  // Estados de Assinaturas & Portal do Assinante
+  const [selectedSubMerchantId, setSelectedSubMerchantId] = useState<string>("");
+  const [subscriptionsList, setSubscriptionsList] = useState<any[]>([]);
+  const [subMetrics, setSubMetrics] = useState<{ activeCount: number; totalCount: number; activeMrrCents: number; churnRatePercent: number } | null>(null);
+  const [loadingSubs, setLoadingSubs] = useState<boolean>(false);
+  const [newSubModal, setNewSubModal] = useState<boolean>(false);
+  const [newSubForm, setNewSubForm] = useState({
+    customerName: "",
+    customerEmail: "",
+    customerTaxId: "",
+    customerPhone: "",
+    planName: "Plano Pro Mensal",
+    amountCents: 9900,
+    interval: "MONTH",
+    paymentMethodBrand: "mastercard",
+    paymentMethodLast4: "4242",
+  });
+  const [createdPortalUrlModal, setCreatedPortalUrlModal] = useState<{ url: string; customerName: string } | null>(null);
+
+  useEffect(() => {
+    if (!selectedSubMerchantId && merchants.length > 0) {
+      setSelectedSubMerchantId(merchants[0].id);
+    }
+  }, [merchants, selectedSubMerchantId]);
+
+  const loadSubscriptions = async (merchantId: string) => {
+    if (!merchantId) return;
+    setLoadingSubs(true);
+    try {
+      const res = await apiFetch(`/v1/dashboard/merchants/${merchantId}/subscriptions`);
+      if (res?.subscriptions) {
+        setSubscriptionsList(res.subscriptions);
+        setSubMetrics(res.metrics || null);
+      }
+    } finally {
+      setLoadingSubs(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeSection === "subscriptions" && selectedSubMerchantId) {
+      loadSubscriptions(selectedSubMerchantId);
+    }
+  }, [activeSection, selectedSubMerchantId]);
+
+  const handleCreateSubscription = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedSubMerchantId) return;
+    setSubmittingAction("create-sub");
+    try {
+      // Cria plano temporário / ou busca plano do merchant
+      // Cria assinatura direta
+      const res = await apiFetch(`/v1/dashboard/merchants/${selectedSubMerchantId}/subscriptions`, {
+        method: "POST",
+        body: JSON.stringify({
+          customerName: newSubForm.customerName,
+          customerEmail: newSubForm.customerEmail,
+          customerTaxId: newSubForm.customerTaxId || undefined,
+          customerPhone: newSubForm.customerPhone || undefined,
+          paymentMethodBrand: newSubForm.paymentMethodBrand,
+          paymentMethodLast4: newSubForm.paymentMethodLast4,
+        }),
+      });
+
+      if (res?.subscription) {
+        notify("success", "Assinatura cadastrada e Portal gerado com sucesso!");
+        setNewSubModal(false);
+        setCreatedPortalUrlModal({
+          url: res.subscription.portalUrl,
+          customerName: newSubForm.customerName,
+        });
+        setNewSubForm({
+          customerName: "",
+          customerEmail: "",
+          customerTaxId: "",
+          customerPhone: "",
+          planName: "Plano Pro Mensal",
+          amountCents: 9900,
+          interval: "MONTH",
+          paymentMethodBrand: "mastercard",
+          paymentMethodLast4: "4242",
+        });
+        await loadSubscriptions(selectedSubMerchantId);
+      } else {
+        notify("error", res?.error || "Erro ao criar assinatura.");
+      }
+    } finally {
+      setSubmittingAction(null);
+    }
+  };
+
   // Estados do API Logs Explorer (Request Inspector)
   const [selectedApiLogMerchantId, setSelectedApiLogMerchantId] = useState<string>("");
   const [apiLogs, setApiLogs] = useState<any[]>([]);
@@ -1374,6 +1470,7 @@ export default function PayDashboard() {
     { id: "payment-links", label: "Links de Pagamento", icon: Link2, path: "/dashboard/payment-links" },
     { id: "whatsapp", label: "Régua WhatsApp", icon: MessageSquare, path: "/dashboard/whatsapp" },
     { id: "api-logs", label: "Logs de API", icon: Terminal, path: "/dashboard/api-logs" },
+    { id: "subscriptions", label: "Assinaturas & Portal", icon: Users, path: "/dashboard/subscriptions" },
     { id: "transactions", label: "Transações", icon: Wallet, path: "/dashboard/transactions" },
     { id: "payouts", label: "Saques & Saldos", icon: Banknote, path: "/dashboard/payouts" },
     { id: "onboarding", label: "Cadastro & KYC", icon: FileCheck2, path: "/dashboard/onboarding" },
@@ -3640,6 +3737,338 @@ function verifyAxionWebhook(rawBody: string, signatureHeader: string, secret: st
                   </table>
                 </div>
               </div>
+            </div>
+          )}
+
+          {activeSection === "subscriptions" && (
+            <div className="space-y-6 animate-fadeIn">
+              {/* Header com Dropdown de Merchant e Botão de Criação */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#213428] pb-5">
+                <div>
+                  <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+                    <Users className="w-5 h-5 text-[#00e66b]" />
+                    <span>Assinaturas Recorrentes & Portal do Assinante</span>
+                  </h1>
+                  <p className="text-xs text-[#a1b0a6] mt-0.5">
+                    Controle de assinantes, métricas de MRR, retenção e links de autoatendimento self-service.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <select
+                    value={selectedSubMerchantId}
+                    onChange={(e) => setSelectedSubMerchantId(e.target.value)}
+                    className="bg-[#101d14] border border-[#213428] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#00e66b] cursor-pointer"
+                  >
+                    {merchants.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <button
+                    type="button"
+                    onClick={() => setNewSubModal(true)}
+                    className="px-4 py-2 bg-[#00e66b] hover:bg-[#69f0ae] text-black font-semibold text-xs rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-sm shadow-emerald-500/20"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Nova Assinatura</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Cards de Métricas de Recorrência */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="p-5 rounded-2xl bg-[#09120d] border border-[#213428] space-y-1">
+                  <span className="text-[11px] font-mono text-[#8b9f93] uppercase">MRR Ativo (Mensal)</span>
+                  <div className="text-2xl font-bold text-white font-mono">
+                    R$ {(((subMetrics?.activeMrrCents ?? 0) / 100)).toFixed(2).replace(".", ",")}
+                  </div>
+                  <span className="text-[10px] text-emerald-400 font-mono">Receita Recorrente Mensal</span>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-[#09120d] border border-[#213428] space-y-1">
+                  <span className="text-[11px] font-mono text-[#8b9f93] uppercase">Assinantes Ativos</span>
+                  <div className="text-2xl font-bold text-[#00e66b] font-mono">
+                    {subMetrics?.activeCount ?? 0}
+                  </div>
+                  <span className="text-[10px] text-[#8b9f93] font-mono">Clientes em adimplência</span>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-[#09120d] border border-[#213428] space-y-1">
+                  <span className="text-[11px] font-mono text-[#8b9f93] uppercase">Taxa de Churn</span>
+                  <div className="text-2xl font-bold text-amber-400 font-mono">
+                    {subMetrics?.churnRatePercent ?? 0}%
+                  </div>
+                  <span className="text-[10px] text-[#8b9f93] font-mono">Cancelamentos no período</span>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-[#09120d] border border-[#213428] space-y-1">
+                  <span className="text-[11px] font-mono text-[#8b9f93] uppercase">Total de Contratos</span>
+                  <div className="text-2xl font-bold text-white font-mono">
+                    {subMetrics?.totalCount ?? 0}
+                  </div>
+                  <span className="text-[10px] text-[#8b9f93] font-mono">Base histórica da operação</span>
+                </div>
+              </div>
+
+              {/* Tabela de Assinaturas */}
+              <div className="rounded-2xl bg-[#09120d] border border-[#213428] overflow-hidden">
+                <div className="flex items-center justify-between p-4 border-b border-[#213428] bg-[#050c08]/50">
+                  <span className="text-xs font-bold text-white">Carteira de Clientes Recorrentes</span>
+                  <button
+                    type="button"
+                    onClick={() => selectedSubMerchantId && loadSubscriptions(selectedSubMerchantId)}
+                    className="text-xs text-[#00e66b] hover:underline flex items-center gap-1 font-mono cursor-pointer"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${loadingSubs ? "animate-spin" : ""}`} />
+                    <span>Atualizar</span>
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-[#213428] bg-[#050c08]/60 text-[#8b9f93] font-mono uppercase text-[10px]">
+                        <th className="p-3.5">Status</th>
+                        <th className="p-3.5">Cliente / Assinante</th>
+                        <th className="p-3.5">Plano / Valor</th>
+                        <th className="p-3.5">Método</th>
+                        <th className="p-3.5">Próxima Renovação</th>
+                        <th className="p-3.5 text-right">Portal Self-Service</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#213428]/60">
+                      {loadingSubs && subscriptionsList.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="p-8 text-center text-[#8b9f93]">
+                            <Loader2 className="w-6 h-6 animate-spin text-[#00e66b] mx-auto mb-2" />
+                            Carregando assinaturas da operação...
+                          </td>
+                        </tr>
+                      ) : subscriptionsList.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="p-8 text-center text-[#8b9f93]">
+                            <Users className="w-8 h-8 text-[#213428] mx-auto mb-2" />
+                            Nenhuma assinatura cadastrada para esta operação.
+                          </td>
+                        </tr>
+                      ) : (
+                        subscriptionsList.map((sub) => {
+                          const portalUrl = `https://pay.axionenterprise.cloud/portal/${sub.portalToken}`;
+                          return (
+                            <tr key={sub.id} className="hover:bg-[#101d14]/40 transition-colors">
+                              <td className="p-3.5">
+                                <span
+                                  className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${
+                                    sub.status === "ACTIVE"
+                                      ? "bg-emerald-500/10 text-[#00e66b] border border-emerald-500/30"
+                                      : sub.status === "CANCELED"
+                                      ? "bg-rose-500/10 text-rose-400 border border-rose-500/30"
+                                      : "bg-amber-500/10 text-amber-400 border border-amber-500/30"
+                                  }`}
+                                >
+                                  {sub.status === "ACTIVE" ? "Ativa" : sub.status === "CANCELED" ? "Cancelada" : sub.status}
+                                </span>
+                              </td>
+                              <td className="p-3.5">
+                                <div className="font-semibold text-white">{sub.customerName}</div>
+                                <div className="text-[11px] text-[#8b9f93] font-mono">{sub.customerEmail}</div>
+                              </td>
+                              <td className="p-3.5">
+                                <div className="text-white font-medium">{sub.planName || "Plano Standard"}</div>
+                                <div className="text-[11px] font-mono text-emerald-400 font-semibold">
+                                  R$ {((sub.amountCents || 0) / 100).toFixed(2).replace(".", ",")}
+                                  <span className="text-[10px] text-[#8b9f93] font-sans font-normal ml-1">/ {sub.interval === "YEAR" ? "ano" : "mês"}</span>
+                                </div>
+                              </td>
+                              <td className="p-3.5">
+                                <div className="text-white font-mono uppercase text-[11px]">
+                                  {sub.paymentMethodBrand || "Cartão"}
+                                </div>
+                                <div className="text-[10px] text-[#8b9f93] font-mono">
+                                  •••• {sub.paymentMethodLast4 || "4242"}
+                                </div>
+                              </td>
+                              <td className="p-3.5 font-mono text-[11px] text-[#8b9f93]">
+                                {sub.currentPeriodEnd ? new Date(sub.currentPeriodEnd).toLocaleDateString("pt-BR") : "—"}
+                              </td>
+                              <td className="p-3.5 text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(portalUrl);
+                                      notify("success", "Link do Portal do Assinante copiado!");
+                                    }}
+                                    className="p-1.5 rounded-lg bg-[#101d14] hover:bg-[#182b20] border border-[#213428] text-[#00e66b] transition cursor-pointer"
+                                    title="Copiar Link Seguro do Portal"
+                                  >
+                                    <Copy className="w-3.5 h-3.5" />
+                                  </button>
+                                  <a
+                                    href={portalUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="p-1.5 rounded-lg bg-[#101d14] hover:bg-[#182b20] border border-[#213428] text-white transition inline-flex items-center"
+                                    title="Abrir Portal do Cliente"
+                                  >
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                  </a>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Modal: Nova Assinatura */}
+              {newSubModal && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                  <div className="w-full max-w-md bg-[#09120d] border border-[#213428] rounded-3xl p-6 space-y-4 shadow-2xl animate-fadeIn">
+                    <div className="flex items-center justify-between border-b border-[#213428] pb-3">
+                      <h3 className="text-base font-bold text-white flex items-center gap-2">
+                        <Users className="w-4 h-4 text-[#00e66b]" />
+                        <span>Cadastrar Assinatura com Portal</span>
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => setNewSubModal(false)}
+                        className="text-[#8b9f93] hover:text-white cursor-pointer"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleCreateSubscription} className="space-y-3.5">
+                      <div>
+                        <label className="block text-[11px] font-mono text-[#8b9f93] uppercase mb-1">
+                          Nome do Assinante
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Ex: Carlos Santana"
+                          value={newSubForm.customerName}
+                          onChange={(e) => setNewSubForm({ ...newSubForm, customerName: e.target.value })}
+                          className="w-full bg-[#101d14] border border-[#213428] rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#00e66b]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-mono text-[#8b9f93] uppercase mb-1">
+                          E-mail do Cliente
+                        </label>
+                        <input
+                          type="email"
+                          required
+                          placeholder="cliente@exemplo.com"
+                          value={newSubForm.customerEmail}
+                          onChange={(e) => setNewSubForm({ ...newSubForm, customerEmail: e.target.value })}
+                          className="w-full bg-[#101d14] border border-[#213428] rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#00e66b]"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-mono text-[#8b9f93] uppercase mb-1">
+                            Bandeira Cartão
+                          </label>
+                          <select
+                            value={newSubForm.paymentMethodBrand}
+                            onChange={(e) => setNewSubForm({ ...newSubForm, paymentMethodBrand: e.target.value })}
+                            className="w-full bg-[#101d14] border border-[#213428] rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#00e66b] cursor-pointer"
+                          >
+                            <option value="mastercard">Mastercard</option>
+                            <option value="visa">Visa</option>
+                            <option value="elo">Elo</option>
+                            <option value="amex">Amex</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-mono text-[#8b9f93] uppercase mb-1">
+                            Últimos 4 Dígitos
+                          </label>
+                          <input
+                            type="text"
+                            maxLength={4}
+                            placeholder="4242"
+                            value={newSubForm.paymentMethodLast4}
+                            onChange={(e) => setNewSubForm({ ...newSubForm, paymentMethodLast4: e.target.value.replace(/\D/g, '') })}
+                            className="w-full bg-[#101d14] border border-[#213428] rounded-xl px-3.5 py-2 text-xs font-mono text-white focus:outline-none focus:border-[#00e66b]"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="pt-2 flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setNewSubModal(false)}
+                          className="px-4 py-2 bg-[#101d14] hover:bg-[#182b20] text-zinc-300 font-semibold text-xs rounded-xl transition cursor-pointer"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={submittingAction === "create-sub"}
+                          className="px-4 py-2 bg-[#00e66b] hover:bg-[#69f0ae] text-black font-semibold text-xs rounded-xl transition cursor-pointer flex items-center gap-1.5"
+                        >
+                          {submittingAction === "create-sub" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                          <span>Confirmar & Gerar Link</span>
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+
+              {/* Modal de Sucesso com Link do Portal */}
+              {createdPortalUrlModal && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                  <div className="w-full max-w-md bg-[#09120d] border border-[#213428] rounded-3xl p-6 space-y-4 shadow-2xl animate-fadeIn">
+                    <div className="flex items-center gap-3 text-[#00e66b]">
+                      <CheckCircle2 className="w-6 h-6" />
+                      <div>
+                        <h3 className="text-base font-bold text-white">Assinatura Ativada!</h3>
+                        <p className="text-xs text-[#a1b0a6]">Link seguro de autoatendimento para {createdPortalUrlModal.customerName}</p>
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 rounded-xl bg-[#050c08] border border-[#213428] space-y-2">
+                      <span className="text-[10px] uppercase font-mono text-[#8b9f93]">URL Direta do Portal do Assinante:</span>
+                      <div className="font-mono text-xs text-[#00e66b] break-all select-all">
+                        {createdPortalUrlModal.url}
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(createdPortalUrlModal.url);
+                          notify("success", "Link copiado!");
+                        }}
+                        className="px-4 py-2 bg-[#101d14] hover:bg-[#182b20] border border-[#30513d] text-[#00e66b] font-semibold text-xs rounded-xl transition cursor-pointer flex items-center gap-1.5"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Copiar Link</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCreatedPortalUrlModal(null)}
+                        className="px-4 py-2 bg-[#00e66b] hover:bg-[#69f0ae] text-black font-semibold text-xs rounded-xl transition cursor-pointer"
+                      >
+                        Concluído
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

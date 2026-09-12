@@ -69,6 +69,14 @@ import {
   getMerchantApiLogById,
   clearMerchantApiLogs,
 } from './services/api-logs.service.js';
+import {
+  getSubscriberPortalData,
+  cancelSubscriberPortal,
+  reactivateSubscriberPortal,
+  updateSubscriberPaymentMethod,
+  listMerchantSubscriptionsForDashboard,
+  CustomerPortalError,
+} from './services/customer-portal.service.js';
 import { openapi } from './openapi.js';
 
 const createChargeSchema = z.object({
@@ -148,6 +156,25 @@ const createMerchantSubscriptionSchema = z.object({
   paymentMethodId: z.string().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
+
+const portalTokenParams = z.object({ token: z.string().trim().min(16).max(128) });
+const cancelSubscriberPortalSchema = z.object({
+  reason: z.string().trim().max(500).optional(),
+  immediately: z.boolean().optional(),
+});
+const updateSubscriberPaymentMethodSchema = z.object({
+  paymentMethodId: z.string().trim().optional(),
+  brand: z.string().trim().max(32).optional(),
+  last4: z.string().trim().regex(/^\d{4}$/).optional(),
+});
+const createDashboardSubscriptionSchema = z.object({
+  customerEmail: z.string().email(),
+  customerName: z.string().trim().max(120).optional(),
+  amountCents: z.number().int().min(100).max(100_000_000),
+  interval: z.enum(['month', 'year']).default('month'),
+  planCode: z.string().trim().max(120).optional(),
+});
+
 const dashboardMerchantSchema = z.object({
   name: z.string().trim().min(1).max(120),
   document: z.string().trim().max(32).optional(),
@@ -1151,6 +1178,128 @@ export async function buildApp(dependencies: AppDependencies = {}) {
       search: query?.search,
     });
     return reply.code(200).send(logsData);
+  });
+
+  // --- Customer Subscriber Self-Service Portal ---
+  app.get('/v1/portal/subscriptions/:token', async (request, reply) => {
+    const { token } = portalTokenParams.parse(request.params);
+    try {
+      const data = await getSubscriberPortalData(database, token);
+      return reply.code(200).send(data);
+    } catch (err) {
+      if (err instanceof CustomerPortalError) {
+        return reply.code(err.statusCode).send({ error: err.message });
+      }
+      throw err;
+    }
+  });
+
+  app.post('/v1/portal/subscriptions/:token/cancel', async (request, reply) => {
+    const { token } = portalTokenParams.parse(request.params);
+    const body = cancelSubscriberPortalSchema.parse(request.body ?? {});
+    try {
+      const stripeClient = config.STRIPE_SECRET_KEY ? new Stripe(config.STRIPE_SECRET_KEY) : null;
+      const result = await cancelSubscriberPortal(database, stripeClient, token, body.reason, body.immediately);
+      return reply.code(200).send(result);
+    } catch (err) {
+      if (err instanceof CustomerPortalError) {
+        return reply.code(err.statusCode).send({ error: err.message });
+      }
+      throw err;
+    }
+  });
+
+  app.post('/v1/portal/subscriptions/:token/reactivate', async (request, reply) => {
+    const { token } = portalTokenParams.parse(request.params);
+    try {
+      const stripeClient = config.STRIPE_SECRET_KEY ? new Stripe(config.STRIPE_SECRET_KEY) : null;
+      const result = await reactivateSubscriberPortal(database, stripeClient, token);
+      return reply.code(200).send(result);
+    } catch (err) {
+      if (err instanceof CustomerPortalError) {
+        return reply.code(err.statusCode).send({ error: err.message });
+      }
+      throw err;
+    }
+  });
+
+  app.post('/v1/portal/subscriptions/:token/payment-method', async (request, reply) => {
+    const { token } = portalTokenParams.parse(request.params);
+    const body = updateSubscriberPaymentMethodSchema.parse(request.body ?? {});
+    try {
+      const stripeClient = config.STRIPE_SECRET_KEY ? new Stripe(config.STRIPE_SECRET_KEY) : null;
+      const result = await updateSubscriberPaymentMethod(database, stripeClient, token, body);
+      return reply.code(200).send(result);
+    } catch (err) {
+      if (err instanceof CustomerPortalError) {
+        return reply.code(err.statusCode).send({ error: err.message });
+      }
+      throw err;
+    }
+  });
+
+  // --- Dashboard Merchant Subscriptions & Portal Management ---
+  app.get('/v1/dashboard/merchants/:merchantId/subscriptions', async (request, reply) => {
+    const user = await requireDashboardUser(request, reply, database);
+    if (!user) return;
+    const { merchantId } = merchantIdParams.parse(request.params);
+    const owned = await database.query<{ id: string }>(
+      `SELECT id FROM merchant_accounts WHERE id = $1 AND owner_auth_user_id = $2 LIMIT 1`,
+      [merchantId, user.id],
+    );
+    if (!owned.rowCount) return reply.code(404).send({ error: 'Operação não encontrada.' });
+
+    const result = await listMerchantSubscriptionsForDashboard(database, merchantId);
+    return reply.code(200).send(result);
+  });
+
+  app.post('/v1/dashboard/merchants/:merchantId/subscriptions', async (request, reply) => {
+    const user = await requireDashboardUser(request, reply, database);
+    if (!user) return;
+    const { merchantId } = merchantIdParams.parse(request.params);
+    const owned = await database.query<{ id: string }>(
+      `SELECT id FROM merchant_accounts WHERE id = $1 AND owner_auth_user_id = $2 LIMIT 1`,
+      [merchantId, user.id],
+    );
+    if (!owned.rowCount) return reply.code(404).send({ error: 'Operação não encontrada.' });
+
+    const input = createDashboardSubscriptionSchema.parse(request.body);
+    const portalToken = randomUUID().replace(/-/g, '') + randomUUID().replace(/-/g, '').slice(0, 16);
+
+    const inserted = await database.query<{ id: string }>(
+      `INSERT INTO merchant_subscriptions (
+        merchant_id, customer_email, customer_name, stripe_customer_id, stripe_subscription_id,
+        plan_code, amount_cents, currency, interval, status, current_period_end, portal_token
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7, 'BRL', $8, 'ACTIVE', NOW() + INTERVAL '1 month', $9
+      ) RETURNING id`,
+      [
+        merchantId,
+        input.customerEmail.toLowerCase().trim(),
+        input.customerName || null,
+        `cus_portal_${Date.now()}`,
+        `sub_portal_${Date.now()}`,
+        input.planCode || 'Recorrência Personalizada',
+        input.amountCents,
+        input.interval,
+        portalToken,
+      ],
+    );
+
+    const subId = inserted.rows[0].id;
+    await database.query(
+      `INSERT INTO merchant_subscription_invoices (subscription_id, amount_cents, currency, status, paid_at)
+       VALUES ($1, $2, 'BRL', 'PAID', NOW())`,
+      [subId, input.amountCents],
+    );
+
+    return reply.code(201).send({
+      subscription: {
+        id: subId,
+        portalToken,
+        portalUrl: `https://pay.axionenterprise.cloud/portal/${portalToken}`,
+      },
+    });
   });
 
   if (config.ENABLE_BANK_RECONCILIATION) {

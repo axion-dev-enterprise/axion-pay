@@ -571,5 +571,114 @@ export const openapi = {
         responses: { '200': { description: 'Logs de API retornados com sucesso.' } },
       },
     },
+    '/v1/portal/subscriptions/{token}': {
+      get: {
+        summary: 'Obtém dados completos da assinatura e histórico de faturas via token seguro de autoatendimento do cliente',
+        security: [],
+        parameters: [{ name: 'token', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: 'Dados da assinatura e faturas retornados com sucesso.' },
+          '404': { description: 'Assinatura não encontrada ou token inválido.' },
+        },
+      },
+    },
+    '/v1/portal/subscriptions/{token}/cancel': {
+      post: {
+        summary: 'Cancela a assinatura através do portal self-service do assinante com registro de motivo',
+        security: [],
+        parameters: [{ name: 'token', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: false,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: { reason: { type: 'string', maxLength: 500 } },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Assinatura cancelada com sucesso.' },
+          '404': { description: 'Assinatura não encontrada.' },
+        },
+      },
+    },
+    '/v1/portal/subscriptions/{token}/reactivate': {
+      post: {
+        summary: 'Reativa uma assinatura cancelada pelo próprio cliente no portal self-service',
+        security: [],
+        parameters: [{ name: 'token', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: 'Assinatura reativada com sucesso.' },
+          '404': { description: 'Assinatura não encontrada.' },
+        },
+      },
+    },
+    '/v1/portal/subscriptions/{token}/payment-method': {
+      post: {
+        summary: 'Atualiza o cartão de crédito / método de pagamento cadastrado na assinatura',
+        security: [],
+        parameters: [{ name: 'token', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['brand', 'last4'],
+                properties: {
+                  brand: { type: 'string' },
+                  last4: { type: 'string', minLength: 4, maxLength: 4 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Método de pagamento atualizado com sucesso.' },
+          '404': { description: 'Assinatura não encontrada.' },
+        },
+      },
+    },
+    '/v1/dashboard/merchants/{merchantId}/subscriptions': {
+      get: {
+        summary: 'Lista assinaturas do merchant com métricas de MRR, assinantes ativos e churn',
+        security: [{ sessionAuth: [] }],
+        parameters: [
+          { name: 'merchantId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+          { name: 'limit', in: 'query', required: false, schema: { type: 'integer', default: 50 } },
+          { name: 'offset', in: 'query', required: false, schema: { type: 'integer', default: 0 } },
+          { name: 'status', in: 'query', required: false, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: 'Lista de assinaturas e métricas calculadas.' } },
+      },
+      post: {
+        summary: 'Cria uma nova assinatura recorrente para um cliente com geração automática do link do portal self-service',
+        security: [{ sessionAuth: [] }],
+        parameters: [{ name: 'merchantId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['planId', 'customerName', 'customerEmail'],
+                properties: {
+                  planId: { type: 'string', format: 'uuid' },
+                  customerName: { type: 'string' },
+                  customerEmail: { type: 'string', format: 'email' },
+                  customerTaxId: { type: 'string' },
+                  customerPhone: { type: 'string' },
+                  paymentMethodBrand: { type: 'string' },
+                  paymentMethodLast4: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+        responses: { '201': { description: 'Assinatura criada com portal_url gerado.' } },
+      },
+    },
   },
 } as const;
