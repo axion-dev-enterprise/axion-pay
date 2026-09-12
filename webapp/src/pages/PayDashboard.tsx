@@ -2161,89 +2161,121 @@ export default function PayDashboard() {
     (user?.email || "").toLowerCase().trim() === "iago@axionenterprise.cloud" || user?.isAdmin
   );
 
-  const navItems = [
-    { id: "overview", label: "Visão Geral", icon: BarChart3, path: "/dashboard" },
-    { id: "merchants", label: "Merchants & Operações", icon: Building2, path: "/dashboard/merchants" },
-    { id: "api-keys", label: "Chaves de API", icon: Key, path: "/dashboard/api-keys" },
-    { id: "webhooks", label: "Webhooks", icon: Webhook, path: "/dashboard/webhooks" },
-    { id: "payment-links", label: "Links de Pagamento", icon: Link2, path: "/dashboard/payment-links" },
-    { id: "whatsapp", label: "Régua WhatsApp", icon: MessageSquare, path: "/dashboard/whatsapp" },
-    { id: "api-logs", label: "Logs de API", icon: Terminal, path: "/dashboard/api-logs" },
-    { id: "subscriptions", label: "Assinaturas & Portal", icon: Users, path: "/dashboard/subscriptions" },
-    { id: "transactions", label: "Transações", icon: Wallet, path: "/dashboard/transactions" },
-    { id: "payouts", label: "Saques & Saldos", icon: Banknote, path: "/dashboard/payouts" },
-    { id: "onboarding", label: "Cadastro & KYC", icon: FileCheck2, path: "/dashboard/onboarding" },
-    ...(isPlatformAdmin && canReviewKyc ? [{ id: "kyc-review", label: "Análise KYC", icon: Shield, path: "/dashboard/kyc-review" }] : []),
-    { id: "billing", label: "Plano & Cobrança", icon: CreditCard, path: "/dashboard/billing" },
-    { id: "integrations", label: "Integrações", icon: Globe, path: "/dashboard/integrations" },
-    { id: "settings", label: "Configurações", icon: Settings, path: "/dashboard/settings" },
+  const navGroups = [
+    {
+      category: "Principal",
+      items: [
+        { id: "overview", label: "Visão Geral", icon: BarChart3, path: "/dashboard" },
+        { id: "transactions", label: "Transações", icon: Wallet, path: "/dashboard/transactions" },
+        { id: "payouts", label: "Saques & Saldos", icon: Banknote, path: "/dashboard/payouts" },
+      ],
+    },
+    {
+      category: "Vendas & Pagamentos",
+      items: [
+        { id: "payment-links", label: "Links de Pagamento", icon: Link2, path: "/dashboard/payment-links" },
+        { id: "subscriptions", label: "Assinaturas & Portal", icon: Users, path: "/dashboard/subscriptions" },
+        { id: "whatsapp", label: "Régua WhatsApp", icon: MessageSquare, path: "/dashboard/whatsapp" },
+      ],
+    },
+    {
+      category: "Desenvolvedor",
+      items: [
+        { id: "merchants", label: "Merchants & Operações", icon: Building2, path: "/dashboard/merchants" },
+        { id: "api-keys", label: "Chaves de API", icon: Key, path: "/dashboard/api-keys" },
+        { id: "webhooks", label: "Webhooks", icon: Webhook, path: "/dashboard/webhooks" },
+        { id: "api-logs", label: "Logs de API", icon: Terminal, path: "/dashboard/api-logs" },
+        { id: "integrations", label: "Integrações", icon: Globe, path: "/dashboard/integrations" },
+      ],
+    },
+    {
+      category: "Conta & Compliance",
+      items: [
+        { id: "onboarding", label: "Cadastro & KYC", icon: FileCheck2, path: "/dashboard/onboarding" },
+        ...(isPlatformAdmin && canReviewKyc
+          ? [{ id: "kyc-review", label: "Análise KYC", icon: Shield, path: "/dashboard/kyc-review" }]
+          : []),
+        { id: "billing", label: "Plano & Cobrança", icon: CreditCard, path: "/dashboard/billing" },
+        { id: "settings", label: "Configurações", icon: Settings, path: "/dashboard/settings" },
+      ],
+    },
   ];
+  const navItems = navGroups.flatMap((g) => g.items);
   const canGenerateApiKeys = onboarding?.status === "APPROVED";
 
   return (
     <div className="pay-workspace min-h-screen bg-[#040806] text-[#f3f7f4] font-sans antialiased flex flex-col md:flex-row">
       {/* SIDEBAR */}
       <aside
-        className={`fixed md:sticky top-0 h-screen bg-[#09120d] border-r border-[#213428]/80 z-40 flex flex-col justify-between transition-all duration-300 ${
+        className={`fixed md:sticky top-0 h-screen max-h-screen bg-[#09120d] border-r border-[#213428]/80 z-40 flex flex-col justify-between overflow-hidden transition-all duration-300 ${
           mobileOpen ? "left-0 w-64" : "-left-64 md:left-0"
         } ${collapsed ? "md:w-16" : "md:w-64"}`}
       >
-        <div>
-          <div className="flex items-center justify-between px-5 h-16 border-b border-[#213428]/80">
-            {(!collapsed || mobileOpen) ? (
-              <Link to="/dashboard" className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-[#00e66b]/10 border border-[#00e66b]/30 flex items-center justify-center overflow-hidden shadow-sm shadow-emerald-500/20">
-                  <img src="/axionpay_logo.png" className="h-8 w-8 object-contain p-0.5" alt="AXION Pay" />
-                </div>
-                <span className="text-base font-semibold tracking-tight text-white">
-                  AXION <span className="text-[#00e66b]">Pay</span>
-                </span>
-              </Link>
-            ) : (
-              <Link to="/dashboard" className="mx-auto flex items-center justify-center">
-                <div className="w-8 h-8 rounded-xl bg-[#00e66b]/10 border border-[#00e66b]/30 flex items-center justify-center overflow-hidden shadow-sm shadow-emerald-500/20">
-                  <img src="/axionpay_logo.png" className="h-8 w-8 object-contain p-0.5" alt="AXION Pay" />
-                </div>
-              </Link>
-            )}
-            <button
-              onClick={() => setMobileOpen(false)}
-              className="md:hidden p-1 text-[#a1b0a6] hover:text-white"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          <nav className="p-3 space-y-1">
-            {navItems.map((item) => (
-              <Link
-                key={item.id}
-                to={item.path}
-                onClick={() => setMobileOpen(false)}
-                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  activeSection === item.id
-                    ? "bg-[#00e66b] text-black shadow-lg shadow-emerald-500/10"
-                    : "text-[#a1b0a6] hover:text-white hover:bg-[#101d14]"
-                }`}
-              >
-                <item.icon className="w-4 h-4 shrink-0" />
-                {(!collapsed || mobileOpen) && <span>{item.label}</span>}
-              </Link>
-            ))}
-          </nav>
+        {/* Top Header Logo */}
+        <div className="shrink-0 flex items-center justify-between px-5 h-16 border-b border-[#213428]/80">
+          {(!collapsed || mobileOpen) ? (
+            <Link to="/dashboard" className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-[#00e66b]/10 border border-[#00e66b]/30 flex items-center justify-center overflow-hidden shadow-sm shadow-emerald-500/20">
+                <img src="/axionpay_logo.png" className="h-8 w-8 object-contain p-0.5" alt="AXION Pay" />
+              </div>
+              <span className="text-base font-semibold tracking-tight text-white">
+                AXION <span className="text-[#00e66b]">Pay</span>
+              </span>
+            </Link>
+          ) : (
+            <Link to="/dashboard" className="mx-auto flex items-center justify-center">
+              <div className="w-8 h-8 rounded-xl bg-[#00e66b]/10 border border-[#00e66b]/30 flex items-center justify-center overflow-hidden shadow-sm shadow-emerald-500/20">
+                <img src="/axionpay_logo.png" className="h-8 w-8 object-contain p-0.5" alt="AXION Pay" />
+              </div>
+            </Link>
+          )}
+          <button
+            onClick={() => setMobileOpen(false)}
+            className="md:hidden p-1 text-[#a1b0a6] hover:text-white"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
-        {/* User Card no rodapé da Sidebar */}
-        <div className="p-4 border-t border-[#213428]/80">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-[#182b20] flex items-center justify-center text-white font-bold text-xs">
+        {/* Scrollable Navigation Area */}
+        <nav className="flex-1 overflow-y-auto min-h-0 px-2.5 py-3 space-y-4 [scrollbar-width:thin]">
+          {navGroups.map((group) => (
+            <div key={group.category} className="space-y-1">
+              {(!collapsed || mobileOpen) && (
+                <div className="px-2.5 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-[#617568]">
+                  {group.category}
+                </div>
+              )}
+              {group.items.map((item) => (
+                <Link
+                  key={item.id}
+                  to={item.path}
+                  onClick={() => setMobileOpen(false)}
+                  className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                    activeSection === item.id
+                      ? "bg-[#00e66b] text-black shadow-md shadow-emerald-500/10 font-bold"
+                      : "text-[#a1b0a6] hover:text-white hover:bg-[#101d14]"
+                  }`}
+                >
+                  <item.icon className="w-4 h-4 shrink-0" />
+                  {(!collapsed || mobileOpen) && <span className="truncate">{item.label}</span>}
+                </Link>
+              ))}
+            </div>
+          ))}
+        </nav>
+
+        {/* Fixed User Card Footer */}
+        <div className="shrink-0 p-3 border-t border-[#213428]/80 bg-[#070e0a]">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full bg-[#182b20] border border-[#213428] flex items-center justify-center text-white font-bold text-xs shrink-0">
               {user.name ? user.name.slice(0, 2).toUpperCase() : "AX"}
             </div>
             {(!collapsed || mobileOpen) && (
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-bold text-white truncate">{user.name || "Usuário AXION"}</p>
+                <p className="text-xs font-bold text-white truncate leading-tight">{user.name || "Usuário AXION"}</p>
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className={`w-1.5 h-1.5 rounded-full ${isPlatformAdmin ? "bg-[#00e66b]" : "bg-sky-400"}`} />
+                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isPlatformAdmin ? "bg-[#00e66b]" : "bg-sky-400"}`} />
                   <span className="text-[10px] font-mono text-[#8b9f93] truncate">
                     {isPlatformAdmin ? "Admin Total" : "Merchant"} · {user.email}
                   </span>
@@ -2256,7 +2288,7 @@ export default function PayDashboard() {
                 window.location.reload();
               }}
               title="Sair"
-              className="p-1.5 text-[#8b9f93] hover:text-red-400 transition-colors"
+              className="p-1.5 text-[#8b9f93] hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all shrink-0"
             >
               <LogOut className="w-4 h-4" />
             </button>
