@@ -1213,6 +1213,10 @@ export default function PayDashboard() {
       if (m?.merchants) {
         setMerchants(m.merchants);
         setSelectedWebhookMerchantId((prev) => prev || (m.merchants.length > 0 ? m.merchants[0].id : ""));
+        const userIsAdmin = (user?.email || "").toLowerCase().trim() === "iago@axionenterprise.cloud" || Boolean(user?.isAdmin);
+        if (!userIsAdmin && m.merchants.length > 0) {
+          setOverviewMerchantId((prev) => (prev === "all" ? m.merchants[0].id : prev));
+        }
       }
       if (k?.keys) setApiKeys(k.keys);
       if (tx?.transactions) setTransactions(tx.transactions);
@@ -2153,6 +2157,10 @@ export default function PayDashboard() {
     );
   }
 
+  const isPlatformAdmin = Boolean(
+    (user?.email || "").toLowerCase().trim() === "iago@axionenterprise.cloud" || user?.isAdmin
+  );
+
   const navItems = [
     { id: "overview", label: "Visão Geral", icon: BarChart3, path: "/dashboard" },
     { id: "merchants", label: "Merchants & Operações", icon: Building2, path: "/dashboard/merchants" },
@@ -2165,7 +2173,7 @@ export default function PayDashboard() {
     { id: "transactions", label: "Transações", icon: Wallet, path: "/dashboard/transactions" },
     { id: "payouts", label: "Saques & Saldos", icon: Banknote, path: "/dashboard/payouts" },
     { id: "onboarding", label: "Cadastro & KYC", icon: FileCheck2, path: "/dashboard/onboarding" },
-    ...(canReviewKyc ? [{ id: "kyc-review", label: "Análise KYC", icon: Shield, path: "/dashboard/kyc-review" }] : []),
+    ...(isPlatformAdmin && canReviewKyc ? [{ id: "kyc-review", label: "Análise KYC", icon: Shield, path: "/dashboard/kyc-review" }] : []),
     { id: "billing", label: "Plano & Cobrança", icon: CreditCard, path: "/dashboard/billing" },
     { id: "integrations", label: "Integrações", icon: Globe, path: "/dashboard/integrations" },
     { id: "settings", label: "Configurações", icon: Settings, path: "/dashboard/settings" },
@@ -2234,7 +2242,12 @@ export default function PayDashboard() {
             {(!collapsed || mobileOpen) && (
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-bold text-white truncate">{user.name || "Usuário AXION"}</p>
-                <p className="text-[10px] font-mono text-[#8b9f93] truncate">{user.email}</p>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className={`w-1.5 h-1.5 rounded-full ${isPlatformAdmin ? "bg-[#00e66b]" : "bg-sky-400"}`} />
+                  <span className="text-[10px] font-mono text-[#8b9f93] truncate">
+                    {isPlatformAdmin ? "Admin Total" : "Merchant"} · {user.email}
+                  </span>
+                </div>
               </div>
             )}
             <button
@@ -2256,7 +2269,7 @@ export default function PayDashboard() {
         {/* TOPBAR */}
         <header className="h-16 px-6 border-b border-[#213428]/80 flex items-center justify-between bg-[#040806]/80 backdrop-blur-md sticky top-0 z-30">
           <div className="flex items-center gap-3">
-            {canReviewKyc && (
+            {isPlatformAdmin ? (
               <a
                 href="https://admin.pay.axionenterprise.cloud"
                 className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-[#30513d] bg-[#101d14] px-3 py-1.5 text-xs font-bold text-[#69f0ae] hover:bg-[#182b20]"
@@ -2264,6 +2277,13 @@ export default function PayDashboard() {
                 <Shield className="h-3.5 w-3.5" />
                 Admin financeiro
               </a>
+            ) : (
+              <div
+                className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-[#213428] bg-[#0c1610] px-3 py-1.5 text-xs font-medium text-[#8b9f93]"
+              >
+                <Building2 className="h-3.5 w-3.5 text-[#00e66b]" />
+                <span className="text-white font-medium">{merchants[0]?.name || "Operação Merchant"}</span>
+              </div>
             )}
             <button
               onClick={() => setMobileOpen(true)}
@@ -2318,10 +2338,12 @@ export default function PayDashboard() {
                 <div>
                   <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2.5">
                     <BarChart3 className="w-6 h-6 text-[#00e66b]" />
-                    <span>Visão Geral do Gateway</span>
+                    <span>{isPlatformAdmin ? "Visão Geral do Gateway" : "Visão Geral da Operação"}</span>
                   </h1>
                   <p className="text-xs text-[#a1b0a6] mt-1">
-                    Métricas consolidadas em tempo real com conciliação no PostgreSQL e Webhook Ingestion.
+                    {isPlatformAdmin
+                      ? "Métricas consolidadas de toda a plataforma em tempo real com conciliação no PostgreSQL."
+                      : "Métricas consolidadas da sua conta em tempo real com conciliação e liquidação Pix."}
                   </p>
                 </div>
 
@@ -2336,9 +2358,11 @@ export default function PayDashboard() {
                         onChange={(e) => setOverviewMerchantId(e.target.value)}
                         className="bg-transparent text-xs text-white font-medium focus:outline-none cursor-pointer pr-1"
                       >
-                        <option value="all" className="bg-[#09120d] text-white">
-                          Todos os Merchants ({merchants.length})
-                        </option>
+                        {isPlatformAdmin && (
+                          <option value="all" className="bg-[#09120d] text-white">
+                            Todos os Merchants ({merchants.length})
+                          </option>
+                        )}
                         {merchants.map((m) => (
                           <option key={m.id} value={m.id} className="bg-[#09120d] text-white">
                             {m.name}

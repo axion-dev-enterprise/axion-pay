@@ -421,7 +421,8 @@ export async function buildApp(dependencies: AppDependencies = {}) {
     if (!user) return;
     const { merchantId } = merchantIdParams.parse(request.params);
     const { status } = merchantStatusSchema.parse(request.body);
-    const merchant = await setMerchantStatus(database, user.id, merchantId, status);
+    const isAdmin = isPlatformAdmin(user);
+    const merchant = await setMerchantStatus(database, user.id, merchantId, status, isAdmin);
     if (!merchant) return reply.code(404).send({ error: 'Operação não encontrada.' });
     return { merchant };
   });
@@ -436,11 +437,12 @@ export async function buildApp(dependencies: AppDependencies = {}) {
   app.post('/v1/dashboard/api-keys', async (request, reply) => {
     const user = await requireDashboardUser(request, reply, database);
     if (!user) return;
-    if (!await isOnboardingApproved(database, user.id)) {
+    const isAdmin = isPlatformAdmin(user);
+    if (!isAdmin && !await isOnboardingApproved(database, user.id)) {
       return reply.code(409).send({ error: 'KYC aprovado é obrigatório antes de gerar chaves de API.' });
     }
     const input = dashboardApiKeySchema.parse(request.body);
-    const key = await createMerchantApiKey(database, user.id, input);
+    const key = await createMerchantApiKey(database, user.id, input, isAdmin);
     if (!key) return reply.code(404).send({ error: 'Operação ativa não encontrada.' });
     return reply.code(201).send({ key });
   });
@@ -449,7 +451,8 @@ export async function buildApp(dependencies: AppDependencies = {}) {
     const user = await requireDashboardUser(request, reply, database);
     if (!user) return;
     const { keyId } = apiKeyIdParams.parse(request.params);
-    const key = await revokeMerchantApiKey(database, user.id, keyId);
+    const isAdmin = isPlatformAdmin(user);
+    const key = await revokeMerchantApiKey(database, user.id, keyId, isAdmin);
     if (!key) return reply.code(404).send({ error: 'Chave ativa não encontrada.' });
     return { key };
   });
@@ -802,11 +805,8 @@ export async function buildApp(dependencies: AppDependencies = {}) {
     const user = await requireDashboardUser(request, reply, database);
     if (!user) return;
     const { merchantId } = merchantIdParams.parse(request.params);
-    const owned = await database.query<{ id: string }>(
-      `SELECT id FROM merchant_accounts WHERE id = $1 AND owner_auth_user_id = $2 LIMIT 1`,
-      [merchantId, user.id],
-    );
-    if (!owned.rowCount) return reply.code(404).send({ error: 'Operação não encontrada.' });
+    const hasAccess = await assertMerchantAccess(database, user, merchantId);
+    if (!hasAccess) return reply.code(404).send({ error: 'Operação não encontrada.' });
     const webhooks = await listMerchantWebhooks(database, merchantId);
     return reply.code(200).send({ webhooks });
   });
@@ -815,11 +815,8 @@ export async function buildApp(dependencies: AppDependencies = {}) {
     const user = await requireDashboardUser(request, reply, database);
     if (!user) return;
     const { merchantId } = merchantIdParams.parse(request.params);
-    const owned = await database.query<{ id: string }>(
-      `SELECT id FROM merchant_accounts WHERE id = $1 AND owner_auth_user_id = $2 LIMIT 1`,
-      [merchantId, user.id],
-    );
-    if (!owned.rowCount) return reply.code(404).send({ error: 'Operação não encontrada.' });
+    const hasAccess = await assertMerchantAccess(database, user, merchantId);
+    if (!hasAccess) return reply.code(404).send({ error: 'Operação não encontrada.' });
     try {
       const body = createMerchantWebhookSchema.parse(request.body);
       const webhook = await createMerchantWebhook(database, merchantId, body.url, body.events);
@@ -834,11 +831,8 @@ export async function buildApp(dependencies: AppDependencies = {}) {
     const user = await requireDashboardUser(request, reply, database);
     if (!user) return;
     const { merchantId, id } = dashboardMerchantWebhookParams.parse(request.params);
-    const owned = await database.query<{ id: string }>(
-      `SELECT id FROM merchant_accounts WHERE id = $1 AND owner_auth_user_id = $2 LIMIT 1`,
-      [merchantId, user.id],
-    );
-    if (!owned.rowCount) return reply.code(404).send({ error: 'Operação não encontrada.' });
+    const hasAccess = await assertMerchantAccess(database, user, merchantId);
+    if (!hasAccess) return reply.code(404).send({ error: 'Operação não encontrada.' });
     try {
       const result = await deleteMerchantWebhook(database, merchantId, id);
       return reply.code(200).send(result);
@@ -852,11 +846,8 @@ export async function buildApp(dependencies: AppDependencies = {}) {
     const user = await requireDashboardUser(request, reply, database);
     if (!user) return;
     const { merchantId } = merchantIdParams.parse(request.params);
-    const owned = await database.query<{ id: string }>(
-      `SELECT id FROM merchant_accounts WHERE id = $1 AND owner_auth_user_id = $2 LIMIT 1`,
-      [merchantId, user.id],
-    );
-    if (!owned.rowCount) return reply.code(404).send({ error: 'Operação não encontrada.' });
+    const hasAccess = await assertMerchantAccess(database, user, merchantId);
+    if (!hasAccess) return reply.code(404).send({ error: 'Operação não encontrada.' });
     const deliveries = await listMerchantWebhookDeliveries(database, merchantId);
     return reply.code(200).send({ deliveries });
   });
@@ -995,11 +986,8 @@ export async function buildApp(dependencies: AppDependencies = {}) {
     const user = await requireDashboardUser(request, reply, database);
     if (!user) return;
     const { merchantId } = merchantIdParams.parse(request.params);
-    const owned = await database.query<{ id: string }>(
-      `SELECT id FROM merchant_accounts WHERE id = $1 AND owner_auth_user_id = $2 LIMIT 1`,
-      [merchantId, user.id],
-    );
-    if (!owned.rowCount) return reply.code(404).send({ error: 'Operação não encontrada.' });
+    const hasAccess = await assertMerchantAccess(database, user, merchantId);
+    if (!hasAccess) return reply.code(404).send({ error: 'Operação não encontrada.' });
     const links = await listMerchantPaymentLinks(database, merchantId);
     return reply.code(200).send({ links });
   });
@@ -1008,11 +996,8 @@ export async function buildApp(dependencies: AppDependencies = {}) {
     const user = await requireDashboardUser(request, reply, database);
     if (!user) return;
     const { merchantId } = merchantIdParams.parse(request.params);
-    const owned = await database.query<{ id: string }>(
-      `SELECT id FROM merchant_accounts WHERE id = $1 AND owner_auth_user_id = $2 LIMIT 1`,
-      [merchantId, user.id],
-    );
-    if (!owned.rowCount) return reply.code(404).send({ error: 'Operação não encontrada.' });
+    const hasAccess = await assertMerchantAccess(database, user, merchantId);
+    if (!hasAccess) return reply.code(404).send({ error: 'Operação não encontrada.' });
 
     try {
       const body = createPaymentLinkSchema.parse(request.body);
@@ -1028,11 +1013,8 @@ export async function buildApp(dependencies: AppDependencies = {}) {
     const user = await requireDashboardUser(request, reply, database);
     if (!user) return;
     const { merchantId, id } = dashboardPaymentLinkParams.parse(request.params);
-    const owned = await database.query<{ id: string }>(
-      `SELECT id FROM merchant_accounts WHERE id = $1 AND owner_auth_user_id = $2 LIMIT 1`,
-      [merchantId, user.id],
-    );
-    if (!owned.rowCount) return reply.code(404).send({ error: 'Operação não encontrada.' });
+    const hasAccess = await assertMerchantAccess(database, user, merchantId);
+    if (!hasAccess) return reply.code(404).send({ error: 'Operação não encontrada.' });
 
     try {
       const result = await deletePaymentLink(database, merchantId, id);
@@ -1084,11 +1066,8 @@ export async function buildApp(dependencies: AppDependencies = {}) {
     const user = await requireDashboardUser(request, reply, database);
     if (!user) return;
     const { merchantId } = merchantIdParams.parse(request.params);
-    const owned = await database.query<{ id: string }>(
-      `SELECT id FROM merchant_accounts WHERE id = $1 AND owner_auth_user_id = $2 LIMIT 1`,
-      [merchantId, user.id],
-    );
-    if (!owned.rowCount) return reply.code(404).send({ error: 'Operação não encontrada.' });
+    const hasAccess = await assertMerchantAccess(database, user, merchantId);
+    if (!hasAccess) return reply.code(404).send({ error: 'Operação não encontrada.' });
     const settings = await getMerchantWhatsappSettings(database, merchantId);
     return reply.code(200).send(settings);
   });
@@ -1097,11 +1076,8 @@ export async function buildApp(dependencies: AppDependencies = {}) {
     const user = await requireDashboardUser(request, reply, database);
     if (!user) return;
     const { merchantId } = merchantIdParams.parse(request.params);
-    const owned = await database.query<{ id: string }>(
-      `SELECT id FROM merchant_accounts WHERE id = $1 AND owner_auth_user_id = $2 LIMIT 1`,
-      [merchantId, user.id],
-    );
-    if (!owned.rowCount) return reply.code(404).send({ error: 'Operação não encontrada.' });
+    const hasAccess = await assertMerchantAccess(database, user, merchantId);
+    if (!hasAccess) return reply.code(404).send({ error: 'Operação não encontrada.' });
     const body = updateMerchantWhatsappSettingsSchema.parse(request.body);
     const settings = await saveMerchantWhatsappSettings(database, merchantId, body);
     return reply.code(200).send(settings);
@@ -1111,11 +1087,8 @@ export async function buildApp(dependencies: AppDependencies = {}) {
     const user = await requireDashboardUser(request, reply, database);
     if (!user) return;
     const { merchantId } = merchantIdParams.parse(request.params);
-    const owned = await database.query<{ id: string }>(
-      `SELECT id FROM merchant_accounts WHERE id = $1 AND owner_auth_user_id = $2 LIMIT 1`,
-      [merchantId, user.id],
-    );
-    if (!owned.rowCount) return reply.code(404).send({ error: 'Operação não encontrada.' });
+    const hasAccess = await assertMerchantAccess(database, user, merchantId);
+    if (!hasAccess) return reply.code(404).send({ error: 'Operação não encontrada.' });
     const body = sendTestWhatsappNotificationSchema.parse(request.body);
     try {
       const result = await sendTestWhatsappNotification(database, merchantId, body.phone, body.eventType);
@@ -1129,11 +1102,8 @@ export async function buildApp(dependencies: AppDependencies = {}) {
     const user = await requireDashboardUser(request, reply, database);
     if (!user) return;
     const { merchantId } = merchantIdParams.parse(request.params);
-    const owned = await database.query<{ id: string }>(
-      `SELECT id FROM merchant_accounts WHERE id = $1 AND owner_auth_user_id = $2 LIMIT 1`,
-      [merchantId, user.id],
-    );
-    if (!owned.rowCount) return reply.code(404).send({ error: 'Operação não encontrada.' });
+    const hasAccess = await assertMerchantAccess(database, user, merchantId);
+    if (!hasAccess) return reply.code(404).send({ error: 'Operação não encontrada.' });
     const logs = await listMerchantWhatsappLogs(database, merchantId, 50);
     return reply.code(200).send({ logs });
   });
@@ -1143,11 +1113,8 @@ export async function buildApp(dependencies: AppDependencies = {}) {
     const user = await requireDashboardUser(request, reply, database);
     if (!user) return;
     const { merchantId } = merchantIdParams.parse(request.params);
-    const owned = await database.query<{ id: string }>(
-      `SELECT id FROM merchant_accounts WHERE id = $1 AND owner_auth_user_id = $2 LIMIT 1`,
-      [merchantId, user.id],
-    );
-    if (!owned.rowCount) return reply.code(404).send({ error: 'Operação não encontrada.' });
+    const hasAccess = await assertMerchantAccess(database, user, merchantId);
+    if (!hasAccess) return reply.code(404).send({ error: 'Operação não encontrada.' });
 
     const query = request.query as any;
     const logsData = await listMerchantApiLogs(database, merchantId, {
@@ -1164,11 +1131,8 @@ export async function buildApp(dependencies: AppDependencies = {}) {
     const user = await requireDashboardUser(request, reply, database);
     if (!user) return;
     const { merchantId, id } = dashboardMerchantWebhookParams.parse(request.params);
-    const owned = await database.query<{ id: string }>(
-      `SELECT id FROM merchant_accounts WHERE id = $1 AND owner_auth_user_id = $2 LIMIT 1`,
-      [merchantId, user.id],
-    );
-    if (!owned.rowCount) return reply.code(404).send({ error: 'Operação não encontrada.' });
+    const hasAccess = await assertMerchantAccess(database, user, merchantId);
+    if (!hasAccess) return reply.code(404).send({ error: 'Operação não encontrada.' });
 
     const log = await getMerchantApiLogById(database, merchantId, id);
     if (!log) return reply.code(404).send({ error: 'Log de requisição não encontrado.' });
@@ -1179,11 +1143,8 @@ export async function buildApp(dependencies: AppDependencies = {}) {
     const user = await requireDashboardUser(request, reply, database);
     if (!user) return;
     const { merchantId } = merchantIdParams.parse(request.params);
-    const owned = await database.query<{ id: string }>(
-      `SELECT id FROM merchant_accounts WHERE id = $1 AND owner_auth_user_id = $2 LIMIT 1`,
-      [merchantId, user.id],
-    );
-    if (!owned.rowCount) return reply.code(404).send({ error: 'Operação não encontrada.' });
+    const hasAccess = await assertMerchantAccess(database, user, merchantId);
+    if (!hasAccess) return reply.code(404).send({ error: 'Operação não encontrada.' });
 
     const result = await clearMerchantApiLogs(database, merchantId);
     return reply.code(200).send({ success: true, ...result });
@@ -1267,11 +1228,8 @@ export async function buildApp(dependencies: AppDependencies = {}) {
     const user = await requireDashboardUser(request, reply, database);
     if (!user) return;
     const { merchantId } = merchantIdParams.parse(request.params);
-    const owned = await database.query<{ id: string }>(
-      `SELECT id FROM merchant_accounts WHERE id = $1 AND owner_auth_user_id = $2 LIMIT 1`,
-      [merchantId, user.id],
-    );
-    if (!owned.rowCount) return reply.code(404).send({ error: 'Operação não encontrada.' });
+    const hasAccess = await assertMerchantAccess(database, user, merchantId);
+    if (!hasAccess) return reply.code(404).send({ error: 'Operação não encontrada.' });
 
     const result = await listMerchantSubscriptionsForDashboard(database, merchantId);
     return reply.code(200).send(result);
@@ -1281,11 +1239,8 @@ export async function buildApp(dependencies: AppDependencies = {}) {
     const user = await requireDashboardUser(request, reply, database);
     if (!user) return;
     const { merchantId } = merchantIdParams.parse(request.params);
-    const owned = await database.query<{ id: string }>(
-      `SELECT id FROM merchant_accounts WHERE id = $1 AND owner_auth_user_id = $2 LIMIT 1`,
-      [merchantId, user.id],
-    );
-    if (!owned.rowCount) return reply.code(404).send({ error: 'Operação não encontrada.' });
+    const hasAccess = await assertMerchantAccess(database, user, merchantId);
+    if (!hasAccess) return reply.code(404).send({ error: 'Operação não encontrada.' });
 
     const input = createDashboardSubscriptionSchema.parse(request.body);
     const portalToken = randomUUID().replace(/-/g, '') + randomUUID().replace(/-/g, '').slice(0, 16);
@@ -1433,12 +1388,26 @@ async function requireMerchant(
 }
 
 function isPlatformAdmin(user: DashboardUser): boolean {
-  return (
-    config.kycReviewerIds.has(user.id) ||
-    user.email === 'iago@axionenterprise.cloud' ||
-    user.email === 'axionenterprise777@gmail.com' ||
-    user.email.endsWith('@axionenterprise.cloud')
+  return (user.email || '').toLowerCase().trim() === 'iago@axionenterprise.cloud';
+}
+
+async function assertMerchantAccess(
+  database: Pick<Pool, 'query'>,
+  user: DashboardUser,
+  merchantId: string,
+): Promise<boolean> {
+  if (isPlatformAdmin(user)) {
+    const res = await database.query<{ id: string }>(
+      `SELECT id FROM merchant_accounts WHERE id = $1 LIMIT 1`,
+      [merchantId],
+    );
+    return Boolean(res.rowCount);
+  }
+  const res = await database.query<{ id: string }>(
+    `SELECT id FROM merchant_accounts WHERE id = $1 AND owner_auth_user_id = $2 LIMIT 1`,
+    [merchantId, user.id],
   );
+  return Boolean(res.rowCount);
 }
 
 async function requireDashboardUser(

@@ -99,13 +99,24 @@ export async function createMerchant(
   return result.rows[0];
 }
 
-export async function setMerchantStatus(database: Database, userId: string, merchantId: string, status: 'ACTIVE' | 'INACTIVE') {
+export async function setMerchantStatus(
+  database: Database,
+  userId: string,
+  merchantId: string,
+  status: 'ACTIVE' | 'INACTIVE',
+  isAdmin = false,
+) {
   const result = await database.query(
-    `UPDATE merchant_accounts
-        SET status = $3, updated_at = NOW()
-      WHERE id = $1 AND owner_auth_user_id = $2
-      RETURNING id, status`,
-    [merchantId, userId, status],
+    isAdmin
+      ? `UPDATE merchant_accounts
+            SET status = $2, updated_at = NOW()
+          WHERE id = $1
+          RETURNING id, status`
+      : `UPDATE merchant_accounts
+            SET status = $3, updated_at = NOW()
+          WHERE id = $1 AND owner_auth_user_id = $2
+          RETURNING id, status`,
+    isAdmin ? [merchantId, status] : [merchantId, userId, status],
   );
   return result.rows[0] ?? null;
 }
@@ -134,10 +145,13 @@ export async function createMerchantApiKey(
   database: Database,
   userId: string,
   input: { merchantId: string; name: string },
+  isAdmin = false,
 ) {
   const ownedMerchant = await database.query<{ id: string }>(
-    `SELECT id FROM merchant_accounts WHERE id = $1 AND owner_auth_user_id = $2 AND status = 'ACTIVE' LIMIT 1`,
-    [input.merchantId, userId],
+    isAdmin
+      ? `SELECT id FROM merchant_accounts WHERE id = $1 AND status = 'ACTIVE' LIMIT 1`
+      : `SELECT id FROM merchant_accounts WHERE id = $1 AND owner_auth_user_id = $2 AND status = 'ACTIVE' LIMIT 1`,
+    isAdmin ? [input.merchantId] : [input.merchantId, userId],
   );
   if (!ownedMerchant.rowCount) return null;
 
@@ -153,15 +167,20 @@ export async function createMerchantApiKey(
   return { ...result.rows[0], secret };
 }
 
-export async function revokeMerchantApiKey(database: Database, userId: string, keyId: string) {
+export async function revokeMerchantApiKey(database: Database, userId: string, keyId: string, isAdmin = false) {
   const result = await database.query(
-    `UPDATE merchant_api_keys k
-        SET status = 'REVOKED', revoked_at = NOW()
-       FROM merchant_accounts m
-      WHERE k.id = $1 AND k.merchant_id = m.id AND m.owner_auth_user_id = $2
-        AND k.status = 'ACTIVE'
-      RETURNING k.id, k.status`,
-    [keyId, userId],
+    isAdmin
+      ? `UPDATE merchant_api_keys k
+            SET status = 'REVOKED', revoked_at = NOW()
+          WHERE k.id = $1 AND k.status = 'ACTIVE'
+          RETURNING k.id, k.status`
+      : `UPDATE merchant_api_keys k
+            SET status = 'REVOKED', revoked_at = NOW()
+           FROM merchant_accounts m
+          WHERE k.id = $1 AND k.merchant_id = m.id AND m.owner_auth_user_id = $2
+            AND k.status = 'ACTIVE'
+          RETURNING k.id, k.status`,
+    isAdmin ? [keyId] : [keyId, userId],
   );
   return result.rows[0] ?? null;
 }
