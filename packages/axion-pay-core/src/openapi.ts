@@ -487,12 +487,43 @@ export const openapi = {
                   customerName: { type: 'string', maxLength: 120 },
                   customerEmail: { type: 'string', format: 'email' },
                   customerDocument: { type: 'string', maxLength: 32 },
+                  customerPhone: { type: 'string', maxLength: 32 },
                 },
               },
             },
           },
         },
         responses: { '201': { description: 'Pagamento iniciado.' }, '400': { description: 'Erro na requisição.' } },
+      },
+    },
+    '/v1/dashboard/merchants/{merchantId}/whatsapp/settings': {
+      get: {
+        summary: 'Obtém as configurações da Régua de Notificações via WhatsApp do merchant',
+        security: [{ sessionAuth: [] }],
+        parameters: [{ name: 'merchantId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { '200': { description: 'Configurações de WhatsApp retornadas.' } },
+      },
+      put: {
+        summary: 'Salva ou atualiza as configurações da Régua de Notificações via WhatsApp do merchant',
+        security: [{ sessionAuth: [] }],
+        parameters: [{ name: 'merchantId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { '200': { description: 'Configurações salvas com sucesso.' } },
+      },
+    },
+    '/v1/dashboard/merchants/{merchantId}/whatsapp/test': {
+      post: {
+        summary: 'Dispara uma notificação de teste via WhatsApp para simular o recebimento',
+        security: [{ sessionAuth: [] }],
+        parameters: [{ name: 'merchantId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { '200': { description: 'Teste enviado com sucesso.' } },
+      },
+    },
+    '/v1/dashboard/merchants/{merchantId}/whatsapp/logs': {
+      get: {
+        summary: 'Consulta o histórico auditável de disparos via WhatsApp do merchant',
+        security: [{ sessionAuth: [] }],
+        parameters: [{ name: 'merchantId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { '200': { description: 'Logs de entrega retornados.' } },
       },
     },
   },

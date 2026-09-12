@@ -56,6 +56,7 @@ export default function PaymentLinkCheckout() {
   const [customerName, setCustomerName] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerDoc, setCustomerDoc] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
 
   // Execution State
   const [submitting, setSubmitting] = useState(false);
@@ -159,6 +160,7 @@ export default function PaymentLinkCheckout() {
         customerName: customerName.trim() || undefined,
         customerEmail: customerEmail.trim() || undefined,
         customerDocument: customerDoc.replace(/\D/g, '') || undefined,
+        customerPhone: customerPhone.replace(/\D/g, '') || undefined,
       };
 
       const res = await fetch(`${API_BASE}/v1/payment-links/${id}/pay`, {
@@ -185,8 +187,7 @@ export default function PaymentLinkCheckout() {
         mountStripeElements(data.clientSecret);
       }
     } catch (err: any) {
-      alert(err.message || 'Erro ao processar pagamento.');
-      setStatusMessage('');
+      setStatusMessage(err.message || 'Erro ao processar pagamento.');
     } finally {
       setSubmitting(false);
     }
@@ -503,6 +504,20 @@ export default function PaymentLinkCheckout() {
                     className="w-full bg-[#101d14] border border-[#213428] rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-[#506657] focus:outline-none focus:border-[#00e66b]"
                   />
                 </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] font-mono text-[#8b9f93] uppercase">WhatsApp / Celular (Opcional)</label>
+                  <span className="text-[10px] text-[#00e66b] font-mono">Receba o Pix no WhatsApp</span>
+                </div>
+                <input
+                  type="tel"
+                  value={customerPhone}
+                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  placeholder="(11) 99999-9999"
+                  className="w-full bg-[#101d14] border border-[#213428] rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-[#506657] focus:outline-none focus:border-[#00e66b]"
+                />
               </div>
             </div>
 

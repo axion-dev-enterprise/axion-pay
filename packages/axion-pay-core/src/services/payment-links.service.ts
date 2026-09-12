@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
 import type { PaymentOrchestrator } from '../core/orchestrator.js';
 import { createCardPaymentIntent } from './card-payments.service.js';
+import { dispatchWhatsappNotification } from './merchant-whatsapp.service.js';
 
 type Database = Pick<Pool, 'query'>;
 
@@ -195,6 +196,7 @@ export type ProcessPaymentLinkPaymentParams = {
   customerName?: string;
   customerEmail?: string;
   customerDocument?: string;
+  customerPhone?: string;
 };
 
 export async function processPaymentLinkPayment(
@@ -257,6 +259,45 @@ export async function processPaymentLinkPayment(
       `UPDATE payment_links SET times_used = times_used + 1, updated_at = NOW() WHERE id = $1`,
       [linkId],
     );
+
+    // Persiste metadata para reconciliação e webhook pós-pagamento
+    await database.query(
+      `UPDATE payment_intents 
+       SET metadata = jsonb_build_object(
+         'customer_phone', $1::text,
+         'customer_name', $2::text,
+         'customer_email', $3::text,
+         'product_title', $4::text,
+         'payment_link_id', $5::text
+       )
+       WHERE correlation_id = $6`,
+      [
+        input.customerPhone || null,
+        input.customerName || null,
+        input.customerEmail || null,
+        link.title,
+        link.id,
+        charge.correlation_id,
+      ],
+    );
+
+    // Dispara notificação transacional via WhatsApp de forma assíncrona
+    if (input.customerPhone) {
+      dispatchWhatsappNotification(
+        database,
+        link.merchant_id,
+        'pix_created',
+        input.customerPhone,
+        {
+          customer_name: input.customerName || 'Cliente',
+          amount: `R$ ${(finalAmountCents / 100).toFixed(2).replace('.', ',')}`,
+          product_title: link.title,
+          pix_code: charge.br_code || '',
+          checkout_url: `https://pay.axionenterprise.cloud/p/${link.id}`,
+        },
+        charge.correlation_id,
+      ).catch((err) => console.error('[WhatsAppNotifier] Falha ao disparar pix_created:', err));
+    }
 
     return {
       method: 'PIX' as const,

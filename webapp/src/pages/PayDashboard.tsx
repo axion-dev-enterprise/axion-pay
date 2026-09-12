@@ -50,6 +50,9 @@ import {
   Play,
   Link2,
   Share2,
+  MessageSquare,
+  CheckCheck,
+  Smartphone,
 } from "lucide-react";
 
 const AUTH_API = "https://auth.axionenterprise.cloud";
@@ -263,6 +266,7 @@ const VALID_SECTIONS: Record<string, string> = {
   "kyc-applications": "kyc-review",
   "billing": "billing",
   "payment-links": "payment-links",
+  "whatsapp": "whatsapp",
   "integrations": "integrations",
   "settings": "settings",
 };
@@ -345,6 +349,112 @@ export default function PayDashboard() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastState>(null);
   const [submittingAction, setSubmittingAction] = useState<string | null>(null);
+
+  // WhatsApp Notification Cadence State
+  const [selectedWhatsappMerchantId, setSelectedWhatsappMerchantId] = useState<string>("");
+  const [whatsappSettings, setWhatsappSettings] = useState<any>(null);
+  const [whatsappLogs, setWhatsappLogs] = useState<any[]>([]);
+  const [loadingWhatsapp, setLoadingWhatsapp] = useState(false);
+  const [savingWhatsapp, setSavingWhatsapp] = useState(false);
+  const [activeWhatsappTab, setActiveWhatsappTab] = useState<string>("pix_created");
+  const [testWhatsappModal, setTestWhatsappModal] = useState(false);
+  const [testWhatsappPhone, setTestWhatsappPhone] = useState("");
+  const [testWhatsappEvent, setTestWhatsappEvent] = useState<string>("pix_created");
+  const [testingWhatsapp, setTestingWhatsapp] = useState(false);
+  const [testWhatsappResult, setTestWhatsappResult] = useState<any>(null);
+
+  // Auto-select merchant for WhatsApp
+  useEffect(() => {
+    if (!selectedWhatsappMerchantId && merchants.length > 0) {
+      setSelectedWhatsappMerchantId(merchants[0].id);
+    }
+  }, [merchants, selectedWhatsappMerchantId]);
+
+  const loadWhatsappData = async (merchantId: string) => {
+    if (!merchantId) return;
+    setLoadingWhatsapp(true);
+    try {
+      const [settingsRes, logsRes] = await Promise.all([
+        apiFetch(`/v1/dashboard/merchants/${merchantId}/whatsapp/settings`),
+        apiFetch(`/v1/dashboard/merchants/${merchantId}/whatsapp/logs`),
+      ]);
+      if (settingsRes) setWhatsappSettings(settingsRes);
+      if (logsRes?.logs) setWhatsappLogs(logsRes.logs);
+    } catch (err: any) {
+      notify("error", "Erro ao carregar configurações de WhatsApp: " + (err.message || ""));
+    } finally {
+      setLoadingWhatsapp(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedWhatsappMerchantId && activeSection === "whatsapp") {
+      loadWhatsappData(selectedWhatsappMerchantId);
+    }
+  }, [selectedWhatsappMerchantId, activeSection]);
+
+  const handleSaveWhatsappSettings = async (updates: Record<string, any>) => {
+    if (!selectedWhatsappMerchantId) return;
+    setSavingWhatsapp(true);
+    try {
+      const updated = await apiFetch(`/v1/dashboard/merchants/${selectedWhatsappMerchantId}/whatsapp/settings`, {
+        method: "PUT",
+        body: JSON.stringify(updates),
+      });
+      setWhatsappSettings(updated);
+      notify("success", "Configurações de WhatsApp salvas com sucesso!");
+    } catch (err: any) {
+      notify("error", err.message || "Erro ao salvar configurações.");
+    } finally {
+      setSavingWhatsapp(false);
+    }
+  };
+
+  const handleSendTestWhatsapp = async () => {
+    if (!selectedWhatsappMerchantId) return;
+    if (!testWhatsappPhone.trim()) {
+      notify("error", "Informe o número de telefone com DDD.");
+      return;
+    }
+    setTestingWhatsapp(true);
+    setTestWhatsappResult(null);
+    try {
+      const res = await apiFetch(`/v1/dashboard/merchants/${selectedWhatsappMerchantId}/whatsapp/test`, {
+        method: "POST",
+        body: JSON.stringify({
+          phone: testWhatsappPhone.trim(),
+          eventType: testWhatsappEvent,
+        }),
+      });
+      setTestWhatsappResult(res);
+      notify("success", "Mensagem de teste enviada com sucesso!");
+      loadWhatsappData(selectedWhatsappMerchantId);
+    } catch (err: any) {
+      setTestWhatsappResult({ success: false, error: err.message });
+      notify("error", err.message || "Falha ao enviar mensagem de teste.");
+    } finally {
+      setTestingWhatsapp(false);
+    }
+  };
+
+  const insertVariableTag = (tag: string) => {
+    if (!whatsappSettings) return;
+    const currentTemplateKey =
+      activeWhatsappTab === "pix_created"
+        ? "templatePixCreated"
+        : activeWhatsappTab === "payment_approved"
+        ? "templatePaymentApproved"
+        : activeWhatsappTab === "pix_expiring"
+        ? "templatePixExpiring"
+        : "templateSubscriptionFailed";
+
+    const currentVal = whatsappSettings[currentTemplateKey] || "";
+    setWhatsappSettings({
+      ...whatsappSettings,
+      [currentTemplateKey]: currentVal + " " + tag,
+    });
+  };
+
   const [pendingRevoke, setPendingRevoke] = useState<{ id: string; name: string } | null>(null);
 
   // Modais de Criação
@@ -1182,6 +1292,7 @@ export default function PayDashboard() {
     { id: "api-keys", label: "Chaves de API", icon: Key, path: "/dashboard/api-keys" },
     { id: "webhooks", label: "Webhooks", icon: Webhook, path: "/dashboard/webhooks" },
     { id: "payment-links", label: "Links de Pagamento", icon: Link2, path: "/dashboard/payment-links" },
+    { id: "whatsapp", label: "Régua WhatsApp", icon: MessageSquare, path: "/dashboard/whatsapp" },
     { id: "transactions", label: "Transações", icon: Wallet, path: "/dashboard/transactions" },
     { id: "payouts", label: "Saques & Saldos", icon: Banknote, path: "/dashboard/payouts" },
     { id: "onboarding", label: "Cadastro & KYC", icon: FileCheck2, path: "/dashboard/onboarding" },
@@ -2669,6 +2780,482 @@ function verifyAxionWebhook(rawBody: string, signatureHeader: string, secret: st
           )}
 
           {/* TAB 7: CONFIGURAÇÕES */}
+          
+          {/* TAB: RÉGUA DE NOTIFICAÇÕES VIA WHATSAPP */}
+          {activeSection === "whatsapp" && (
+            <div className="space-y-6 animate-fadeIn">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2.5">
+                    <MessageSquare className="w-6 h-6 text-[#00e66b]" />
+                    <span>Régua de Notificações via WhatsApp</span>
+                  </h1>
+                  <p className="text-xs text-[#a1b0a6] mt-1">
+                    Notificações transacionais automatizadas integradas ao AXION Comm para envio de Pix Copia e Cola, recibos digitais e alertas.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  {merchants.length > 1 && (
+                    <div className="flex items-center gap-2 bg-[#09120d] border border-[#213428] rounded-xl px-3 py-1.5">
+                      <Building className="w-3.5 h-3.5 text-[#00e66b]" />
+                      <select
+                        value={selectedWhatsappMerchantId}
+                        onChange={(e) => setSelectedWhatsappMerchantId(e.target.value)}
+                        className="bg-transparent text-xs text-white focus:outline-none cursor-pointer"
+                      >
+                        {merchants.map((m) => (
+                          <option key={m.id} value={m.id} className="bg-[#09120d] text-white">
+                            {m.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={() => {
+                      setTestWhatsappModal(true);
+                      setTestWhatsappResult(null);
+                    }}
+                    className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#101d14] border border-[#213428] hover:border-[#00e66b] text-white text-xs font-semibold transition-all cursor-pointer shadow-sm"
+                  >
+                    <Play className="w-3.5 h-3.5 text-[#00e66b]" />
+                    <span>Disparar Teste Real</span>
+                  </button>
+
+                  <button
+                    onClick={() => selectedWhatsappMerchantId && loadWhatsappData(selectedWhatsappMerchantId)}
+                    disabled={loadingWhatsapp}
+                    className="p-2 rounded-xl bg-[#101d14] border border-[#213428] text-[#a1b0a6] hover:text-white transition-all cursor-pointer"
+                    title="Atualizar dados"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${loadingWhatsapp ? "animate-spin text-[#00e66b]" : ""}`} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Banner Mestre de Ativação */}
+              <div className="rounded-2xl border border-[#213428] bg-gradient-to-r from-[#0d1710] to-[#09120d] p-5 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-10 h-10 rounded-xl bg-[#00e66b]/10 border border-[#00e66b]/30 flex items-center justify-center shrink-0 text-[#00e66b]">
+                    <MessageSquare className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2.5">
+                      <h3 className="text-sm font-bold text-white">Envio Transacional Automático</h3>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-500/10 text-[#00e66b] border border-emerald-500/30">
+                        AXION Comm Bridge Online
+                      </span>
+                    </div>
+                    <p className="text-xs text-[#a1b0a6] mt-0.5">
+                      Quando ativado, os compradores recebem o Pix Copia e Cola e o comprovante instantâneo diretamente no WhatsApp.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className="text-xs font-mono font-semibold text-white">
+                    {whatsappSettings?.enabled ? "ATIVADO" : "PAUSADO"}
+                  </span>
+                  <button
+                    onClick={() => handleSaveWhatsappSettings({ enabled: !whatsappSettings?.enabled })}
+                    disabled={savingWhatsapp || loadingWhatsapp}
+                    className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer ${
+                      whatsappSettings?.enabled ? "bg-[#00e66b]" : "bg-[#213428]"
+                    }`}
+                  >
+                    <div
+                      className={`w-4 h-4 rounded-full bg-black absolute top-1 transition-transform ${
+                        whatsappSettings?.enabled ? "left-7" : "left-1"
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              {/* Grid Principal: Configuração de Templates & Mockup WhatsApp */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* Coluna Esquerda: Editor de Templates */}
+                <div className="lg:col-span-7 space-y-4">
+                  <div className="rounded-2xl border border-[#213428] bg-[#09120d] p-5 space-y-4">
+                    <div className="border-b border-[#213428] pb-3 flex items-center justify-between">
+                      <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                        <Code2 className="w-4 h-4 text-[#00e66b]" />
+                        <span>Gatilhos e Mensagens da Régua</span>
+                      </h3>
+                      <span className="text-[11px] font-mono text-[#8b9f93]">Interpolação Dinâmica</span>
+                    </div>
+
+                    {/* Subtabs de Eventos */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {[
+                        { id: "pix_created", label: "Pix Gerado", key: "notifyOnPixCreated" },
+                        { id: "payment_approved", label: "Aprovado", key: "notifyOnPaymentApproved" },
+                        { id: "pix_expiring", label: "Expirando", key: "notifyOnPixExpiring" },
+                        { id: "subscription_failed", label: "Falha Cartão", key: "notifyOnSubscriptionFailed" },
+                      ].map((tab) => {
+                        const isEnabled = whatsappSettings?.[tab.key] ?? true;
+                        return (
+                          <button
+                            key={tab.id}
+                            onClick={() => setActiveWhatsappTab(tab.id)}
+                            className={`px-3 py-2 rounded-xl text-xs font-semibold flex flex-col items-center gap-1 border transition-all cursor-pointer ${
+                              activeWhatsappTab === tab.id
+                                ? "bg-[#101d14] border-[#00e66b] text-white shadow-sm"
+                                : "bg-[#040806]/40 border-[#213428] text-[#8b9f93] hover:text-white"
+                            }`}
+                          >
+                            <span>{tab.label}</span>
+                            <span className={`text-[9px] font-mono px-1.5 py-0.2 rounded ${isEnabled ? "text-[#00e66b] bg-[#00e66b]/10" : "text-[#8b9f93] bg-zinc-800"}`}>
+                              {isEnabled ? "Ativo" : "Inativo"}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Conteúdo do Evento Ativo */}
+                    {whatsappSettings && (
+                      <div className="space-y-4 pt-2">
+                        {/* Switch do Evento Ativo */}
+                        <div className="flex items-center justify-between p-3 rounded-xl bg-[#101d14] border border-[#213428]">
+                          <div>
+                            <p className="text-xs font-bold text-white">
+                              {activeWhatsappTab === "pix_created" && "Disparar quando uma cobrança Pix for emitida"}
+                              {activeWhatsappTab === "payment_approved" && "Disparar imediatamente na aprovação do pagamento"}
+                              {activeWhatsappTab === "pix_expiring" && "Lembrete 15 minutos antes de a chave Pix expirar"}
+                              {activeWhatsappTab === "subscription_failed" && "Alerta quando a renovação da assinatura falhar"}
+                            </p>
+                            <p className="text-[11px] text-[#8b9f93]">
+                              {activeWhatsappTab === "pix_created" && "Envia o código copia e cola para pagamento com 1 clique."}
+                              {activeWhatsappTab === "payment_approved" && "Envia recibo digital com link do comprovante."}
+                              {activeWhatsappTab === "pix_expiring" && "Reduz o abandono de carrinho em até 40%."}
+                              {activeWhatsappTab === "subscription_failed" && "Evita cancelamento com link direto para atualizar o cartão."}
+                            </p>
+                          </div>
+
+                          <input
+                            type="checkbox"
+                            checked={
+                              activeWhatsappTab === "pix_created"
+                                ? whatsappSettings.notifyOnPixCreated
+                                : activeWhatsappTab === "payment_approved"
+                                ? whatsappSettings.notifyOnPaymentApproved
+                                : activeWhatsappTab === "pix_expiring"
+                                ? whatsappSettings.notifyOnPixExpiring
+                                : whatsappSettings.notifyOnSubscriptionFailed
+                            }
+                            onChange={(e) => {
+                              const key =
+                                activeWhatsappTab === "pix_created"
+                                  ? "notifyOnPixCreated"
+                                  : activeWhatsappTab === "payment_approved"
+                                  ? "notifyOnPaymentApproved"
+                                  : activeWhatsappTab === "pix_expiring"
+                                  ? "notifyOnPixExpiring"
+                                  : "notifyOnSubscriptionFailed";
+                              setWhatsappSettings({ ...whatsappSettings, [key]: e.target.checked });
+                            }}
+                            className="w-4 h-4 rounded text-[#00e66b] focus:ring-0 cursor-pointer"
+                          />
+                        </div>
+
+                        {/* Variáveis Dinâmicas */}
+                        <div>
+                          <label className="block text-[11px] font-mono text-[#8b9f93] uppercase mb-1.5">
+                            Variáveis Disponíveis (Clique para inserir)
+                          </label>
+                          <div className="flex flex-wrap gap-1.5">
+                            {[
+                              "{{customer_name}}",
+                              "{{amount}}",
+                              "{{product_title}}",
+                              "{{pix_code}}",
+                              "{{receipt_url}}",
+                              "{{checkout_url}}",
+                            ].map((tag) => (
+                              <button
+                                key={tag}
+                                type="button"
+                                onClick={() => insertVariableTag(tag)}
+                                className="px-2 py-1 rounded-lg bg-[#040806] border border-[#213428] hover:border-[#00e66b] text-[11px] font-mono text-[#00e66b] transition-all cursor-pointer"
+                              >
+                                {tag}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Textarea do Template */}
+                        <div>
+                          <label className="block text-[11px] font-mono text-[#8b9f93] uppercase mb-1.5">
+                            Texto da Mensagem (Suporta formatação *negrito*, _itálico_ e ```código```)
+                          </label>
+                          <textarea
+                            rows={6}
+                            value={
+                              activeWhatsappTab === "pix_created"
+                                ? whatsappSettings.templatePixCreated
+                                : activeWhatsappTab === "payment_approved"
+                                ? whatsappSettings.templatePaymentApproved
+                                : activeWhatsappTab === "pix_expiring"
+                                ? whatsappSettings.templatePixExpiring
+                                : whatsappSettings.templateSubscriptionFailed
+                            }
+                            onChange={(e) => {
+                              const key =
+                                activeWhatsappTab === "pix_created"
+                                  ? "templatePixCreated"
+                                  : activeWhatsappTab === "payment_approved"
+                                  ? "templatePaymentApproved"
+                                  : activeWhatsappTab === "pix_expiring"
+                                  ? "templatePixExpiring"
+                                  : "templateSubscriptionFailed";
+                              setWhatsappSettings({ ...whatsappSettings, [key]: e.target.value });
+                            }}
+                            className="w-full bg-[#040806] border border-[#213428] rounded-xl p-3 text-xs text-white font-mono focus:outline-none focus:border-[#00e66b] leading-relaxed resize-none"
+                          />
+                        </div>
+
+                        {/* Botão Salvar Alterações */}
+                        <div className="flex justify-end pt-2">
+                          <button
+                            onClick={() => handleSaveWhatsappSettings(whatsappSettings)}
+                            disabled={savingWhatsapp}
+                            className="px-4 py-2 rounded-xl bg-[#00e66b] hover:bg-[#69f0ae] text-black font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 disabled:opacity-50 transition-all cursor-pointer"
+                          >
+                            {savingWhatsapp ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                            <span>{savingWhatsapp ? "Salvando…" : "Salvar Configurações"}</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Coluna Direita: Live WhatsApp Dark Mode Mockup */}
+                <div className="lg:col-span-5 space-y-4">
+                  <div className="rounded-2xl border border-[#213428] bg-[#09120d] p-5 space-y-4">
+                    <div className="border-b border-[#213428] pb-3 flex items-center justify-between">
+                      <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                        <Smartphone className="w-4 h-4 text-[#00e66b]" />
+                        <span>Prévia em Tempo Real</span>
+                      </h3>
+                      <span className="text-[10px] font-mono text-[#00e66b] bg-[#00e66b]/10 px-2 py-0.5 rounded border border-[#00e66b]/20">
+                        WhatsApp Dark UI
+                      </span>
+                    </div>
+
+                    {/* Smartphone Screen Frame */}
+                    <div className="rounded-2xl border border-[#213428] bg-[#0b141a] overflow-hidden shadow-2xl">
+                      {/* WhatsApp Chat Topbar */}
+                      <div className="bg-[#202c33] px-3.5 py-2.5 flex items-center gap-2.5 border-b border-white/5">
+                        <div className="w-7 h-7 rounded-full bg-[#00e66b]/20 border border-[#00e66b] flex items-center justify-center text-[#00e66b] font-bold text-[10px]">
+                          AX
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-bold text-white truncate">
+                            {merchants.find((m) => m.id === selectedWhatsappMerchantId)?.name || "AXION Pay Merchant"}
+                          </p>
+                          <p className="text-[9px] text-[#00e66b] font-mono">Conta Oficial Verificada</p>
+                        </div>
+                      </div>
+
+                      {/* Chat Messages Area */}
+                      <div className="p-4 min-h-64 bg-[#0b141a] bg-[radial-gradient(#1f2c34_1px,transparent_1px)] [background-size:16px_16px] flex flex-col justify-end">
+                        {/* Outbound WhatsApp Speech Bubble */}
+                        <div className="max-w-[88%] bg-[#005c4b] text-[#e9edef] rounded-2xl rounded-tr-none px-3.5 py-2.5 shadow-md self-end space-y-2 text-xs leading-relaxed">
+                          <div className="whitespace-pre-wrap font-sans text-xs">
+                            {(() => {
+                              const raw =
+                                activeWhatsappTab === "pix_created"
+                                  ? whatsappSettings?.templatePixCreated
+                                  : activeWhatsappTab === "payment_approved"
+                                  ? whatsappSettings?.templatePaymentApproved
+                                  : activeWhatsappTab === "pix_expiring"
+                                  ? whatsappSettings?.templatePixExpiring
+                                  : whatsappSettings?.templateSubscriptionFailed;
+
+                              const sampleText = (raw || "Carregando template…")
+                                .replace(/\{\{\s*customer_name\s*\}\}/g, "João da Silva")
+                                .replace(/\{\{\s*amount\s*\}\}/g, "R$ 99,00")
+                                .replace(/\{\{\s*product_title\s*\}\}/g, "Plano Pro Anual")
+                                .replace(/\{\{\s*pix_code\s*\}\}/g, "00020126580014br.gov.bcb.pix0136123e4567...")
+                                .replace(/\{\{\s*receipt_url\s*\}\}/g, "https://pay.axionenterprise.cloud/recibo/ch_123")
+                                .replace(/\{\{\s*checkout_url\s*\}\}/g, "https://pay.axionenterprise.cloud/p/plink_123")
+                                .replace(/\{\{\s*merchant_name\s*\}\}/g, "AXION Pay");
+
+                              return sampleText;
+                            })()}
+                          </div>
+
+                          <div className="flex items-center justify-end gap-1 text-[10px] text-white/60 pt-0.5">
+                            <span>12:45</span>
+                            <CheckCheck className="w-3.5 h-3.5 text-[#53bdeb]" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tabela de Histórico de Disparos Recentes */}
+              <div className="rounded-2xl border border-[#213428] bg-[#09120d] p-5 space-y-4">
+                <div className="flex items-center justify-between border-b border-[#213428] pb-3">
+                  <div>
+                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                      <Send className="w-4 h-4 text-[#00e66b]" />
+                      <span>Histórico de Notificações Disparadas</span>
+                    </h3>
+                    <p className="text-[11px] text-[#8b9f93] mt-0.5">
+                      Auditoria detalhada de entregas transacionais enviadas pelo bridge.
+                    </p>
+                  </div>
+                  <span className="text-xs font-mono text-[#a1b0a6]">
+                    {whatsappLogs.length} disparos registrados
+                  </span>
+                </div>
+
+                {whatsappLogs.length === 0 ? (
+                  <div className="text-center py-8 text-xs text-[#8b9f93]">
+                    Nenhuma notificação via WhatsApp registrada para esta operação.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-[#213428] text-[10px] font-mono text-[#8b9f93] uppercase">
+                          <th className="pb-2.5">Status</th>
+                          <th className="pb-2.5">Destinatário</th>
+                          <th className="pb-2.5">Evento</th>
+                          <th className="pb-2.5">Mensagem</th>
+                          <th className="pb-2.5">Data / Hora</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#15231a]">
+                        {whatsappLogs.map((log) => (
+                          <tr key={log.id} className="hover:bg-[#101d14]/60 transition-colors">
+                            <td className="py-2.5">
+                              <span
+                                className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
+                                  log.status === "DELIVERED"
+                                    ? "bg-emerald-500/10 text-[#00e66b] border border-emerald-500/30"
+                                    : log.status === "QUEUED"
+                                    ? "bg-amber-500/10 text-amber-400 border border-amber-500/30"
+                                    : "bg-red-500/10 text-red-400 border border-red-500/30"
+                                }`}
+                              >
+                                {log.status}
+                              </span>
+                            </td>
+                            <td className="py-2.5 font-mono text-white">
+                              {log.recipientPhone.replace(/^(\d{2})(\d{2})(\d{1})(\d{4})(\d{4})$/, "+$1 ($2) $3****-$5")}
+                            </td>
+                            <td className="py-2.5 font-mono text-[#a1b0a6]">{log.eventType}</td>
+                            <td className="py-2.5 text-[#e1ece4] max-w-xs truncate" title={log.messageBody}>
+                              {log.messageBody}
+                            </td>
+                            <td className="py-2.5 font-mono text-[#8b9f93]">
+                              {new Date(log.createdAt).toLocaleString("pt-BR")}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* MODAL: DISPARAR MENSAGEM DE TESTE */}
+              {testWhatsappModal && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                  <div className="w-full max-w-md bg-[#09120d] border border-[#213428] rounded-3xl p-6 space-y-4 shadow-2xl relative animate-fadeIn">
+                    <div className="flex items-center justify-between border-b border-[#213428] pb-3">
+                      <h3 className="text-base font-bold text-white flex items-center gap-2">
+                        <Play className="w-4 h-4 text-[#00e66b]" />
+                        <span>Simular Envio no WhatsApp</span>
+                      </h3>
+                      <button
+                        onClick={() => setTestWhatsappModal(false)}
+                        className="p-1 text-[#8b9f93] hover:text-white cursor-pointer"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="space-y-3.5">
+                      <div>
+                        <label className="block text-[11px] font-mono text-[#8b9f93] uppercase mb-1">
+                          Telefone Destinatário (com DDD)
+                        </label>
+                        <input
+                          type="tel"
+                          placeholder="Ex: 11999999999"
+                          value={testWhatsappPhone}
+                          onChange={(e) => setTestWhatsappPhone(e.target.value)}
+                          className="w-full bg-[#101d14] border border-[#213428] rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#00e66b]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-mono text-[#8b9f93] uppercase mb-1">
+                          Tipo de Evento Transacional
+                        </label>
+                        <select
+                          value={testWhatsappEvent}
+                          onChange={(e) => setTestWhatsappEvent(e.target.value)}
+                          className="w-full bg-[#101d14] border border-[#213428] rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#00e66b] cursor-pointer"
+                        >
+                          <option value="pix_created">Pix Gerado (Código Copia e Cola)</option>
+                          <option value="payment_approved">Pagamento Confirmado (Recibo Digital)</option>
+                          <option value="pix_expiring">Cobrança Expirando (Lembrete)</option>
+                          <option value="subscription_failed">Falha na Renovação de Assinatura</option>
+                        </select>
+                      </div>
+
+                      {testWhatsappResult && (
+                        <div
+                          className={`p-3 rounded-xl border text-xs font-mono ${
+                            testWhatsappResult.success
+                              ? "bg-[#00e66b]/10 border-[#00e66b]/30 text-[#00e66b]"
+                              : "bg-red-500/10 border-red-500/30 text-red-400"
+                          }`}
+                        >
+                          <p className="font-bold">
+                            {testWhatsappResult.success ? "Enviado com sucesso via bridge!" : "Falha no envio:"}
+                          </p>
+                          <p className="text-[11px] mt-1 break-all">
+                            {testWhatsappResult.error || "Mensagem enfileirada e entregue."}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#213428]">
+                      <button
+                        onClick={() => setTestWhatsappModal(false)}
+                        className="px-4 py-2 rounded-xl bg-[#101d14] hover:bg-zinc-800 text-xs font-semibold text-[#a1b0a6] cursor-pointer"
+                      >
+                        Fechar
+                      </button>
+                      <button
+                        onClick={handleSendTestWhatsapp}
+                        disabled={testingWhatsapp}
+                        className="px-4 py-2 rounded-xl bg-[#00e66b] hover:bg-[#69f0ae] text-black font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 disabled:opacity-50 cursor-pointer"
+                      >
+                        {testingWhatsapp ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                        <span>{testingWhatsapp ? "Enviando…" : "Disparar Teste"}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {activeSection === "settings" && (
             <div className="space-y-6 animate-fadeIn max-w-2xl">
               <div>

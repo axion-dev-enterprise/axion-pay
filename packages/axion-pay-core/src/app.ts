@@ -57,6 +57,12 @@ import {
   processPaymentLinkPayment,
   PaymentLinkError,
 } from './services/payment-links.service.js';
+import {
+  getMerchantWhatsappSettings,
+  saveMerchantWhatsappSettings,
+  sendTestWhatsappNotification,
+  listMerchantWhatsappLogs,
+} from './services/merchant-whatsapp.service.js';
 import { openapi } from './openapi.js';
 
 const createChargeSchema = z.object({
@@ -102,6 +108,24 @@ const payPaymentLinkSchema = z.object({
   customerName: z.string().trim().max(120).optional(),
   customerEmail: z.string().trim().email().optional(),
   customerDocument: z.string().trim().max(32).optional(),
+  customerPhone: z.string().trim().max(32).optional(),
+});
+
+const updateMerchantWhatsappSettingsSchema = z.object({
+  enabled: z.boolean().optional(),
+  notifyOnPixCreated: z.boolean().optional(),
+  notifyOnPaymentApproved: z.boolean().optional(),
+  notifyOnPixExpiring: z.boolean().optional(),
+  notifyOnSubscriptionFailed: z.boolean().optional(),
+  templatePixCreated: z.string().optional(),
+  templatePaymentApproved: z.string().optional(),
+  templatePixExpiring: z.string().optional(),
+  templateSubscriptionFailed: z.string().optional(),
+});
+
+const sendTestWhatsappNotificationSchema = z.object({
+  phone: z.string().trim().min(8).max(32),
+  eventType: z.enum(['pix_created', 'payment_approved', 'pix_expiring', 'subscription_failed']),
 });
 
 const createMerchantWebhookSchema = z.object({
@@ -953,6 +977,65 @@ export async function buildApp(dependencies: AppDependencies = {}) {
       if (err instanceof PaymentLinkError) return reply.code(err.statusCode).send({ error: err.message });
       throw err;
     }
+  });
+
+  // --- Merchant WhatsApp Notification Cadence Dashboard Routes ---
+  app.get('/v1/dashboard/merchants/:merchantId/whatsapp/settings', async (request, reply) => {
+    const user = await requireDashboardUser(request, reply, database);
+    if (!user) return;
+    const { merchantId } = merchantIdParams.parse(request.params);
+    const owned = await database.query<{ id: string }>(
+      `SELECT id FROM merchant_accounts WHERE id = $1 AND owner_auth_user_id = $2 LIMIT 1`,
+      [merchantId, user.id],
+    );
+    if (!owned.rowCount) return reply.code(404).send({ error: 'Operação não encontrada.' });
+    const settings = await getMerchantWhatsappSettings(database, merchantId);
+    return reply.code(200).send(settings);
+  });
+
+  app.put('/v1/dashboard/merchants/:merchantId/whatsapp/settings', async (request, reply) => {
+    const user = await requireDashboardUser(request, reply, database);
+    if (!user) return;
+    const { merchantId } = merchantIdParams.parse(request.params);
+    const owned = await database.query<{ id: string }>(
+      `SELECT id FROM merchant_accounts WHERE id = $1 AND owner_auth_user_id = $2 LIMIT 1`,
+      [merchantId, user.id],
+    );
+    if (!owned.rowCount) return reply.code(404).send({ error: 'Operação não encontrada.' });
+    const body = updateMerchantWhatsappSettingsSchema.parse(request.body);
+    const settings = await saveMerchantWhatsappSettings(database, merchantId, body);
+    return reply.code(200).send(settings);
+  });
+
+  app.post('/v1/dashboard/merchants/:merchantId/whatsapp/test', async (request, reply) => {
+    const user = await requireDashboardUser(request, reply, database);
+    if (!user) return;
+    const { merchantId } = merchantIdParams.parse(request.params);
+    const owned = await database.query<{ id: string }>(
+      `SELECT id FROM merchant_accounts WHERE id = $1 AND owner_auth_user_id = $2 LIMIT 1`,
+      [merchantId, user.id],
+    );
+    if (!owned.rowCount) return reply.code(404).send({ error: 'Operação não encontrada.' });
+    const body = sendTestWhatsappNotificationSchema.parse(request.body);
+    try {
+      const result = await sendTestWhatsappNotification(database, merchantId, body.phone, body.eventType);
+      return reply.code(200).send(result);
+    } catch (err: any) {
+      return reply.code(400).send({ error: err.message || 'Falha ao enviar mensagem de teste' });
+    }
+  });
+
+  app.get('/v1/dashboard/merchants/:merchantId/whatsapp/logs', async (request, reply) => {
+    const user = await requireDashboardUser(request, reply, database);
+    if (!user) return;
+    const { merchantId } = merchantIdParams.parse(request.params);
+    const owned = await database.query<{ id: string }>(
+      `SELECT id FROM merchant_accounts WHERE id = $1 AND owner_auth_user_id = $2 LIMIT 1`,
+      [merchantId, user.id],
+    );
+    if (!owned.rowCount) return reply.code(404).send({ error: 'Operação não encontrada.' });
+    const logs = await listMerchantWhatsappLogs(database, merchantId, 50);
+    return reply.code(200).send({ logs });
   });
 
   if (config.ENABLE_BANK_RECONCILIATION) {

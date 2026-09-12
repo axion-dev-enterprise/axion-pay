@@ -4,6 +4,7 @@ import { db } from '../db.js';
 import type { PaymentStatus } from '../core/types.js';
 import { WooviProvider } from '../providers/woovi.provider.js';
 import { dispatchMerchantEventAsync } from './merchant-webhook-dispatcher.service.js';
+import { dispatchWhatsappNotification } from './merchant-whatsapp.service.js';
 
 type WebhookDetails = {
   correlationId?: string;
@@ -104,7 +105,7 @@ export class WooviWebhookService {
       return 'identificador transacional ausente em evento pago';
     }
 
-    const updated = await client.query<{ id: string; merchant_id: string; amount_cents: number }>(
+    const updated = await client.query<{ id: string; merchant_id: string; amount_cents: number; metadata: any }>(
       `
         UPDATE payment_intents
         SET status = $1, updated_at = NOW()
@@ -117,7 +118,7 @@ export class WooviWebhookService {
           -- A signed event is still rejected if it does not describe the
           -- amount originally requested for this correlation id.
           AND ($3::bigint IS NULL OR amount_cents = $3::bigint)
-        RETURNING id, merchant_id, amount_cents
+        RETURNING id, merchant_id, amount_cents, metadata
       `,
       [details.status, details.correlationId, details.amountCents ?? null],
     );
@@ -158,6 +159,23 @@ export class WooviWebhookService {
             endToEndId: details.endToEndId ?? null,
           },
         );
+
+        const customerPhone = updated.rows[0].metadata?.customer_phone;
+        if (customerPhone) {
+          dispatchWhatsappNotification(
+            db,
+            updated.rows[0].merchant_id,
+            'payment_approved',
+            customerPhone,
+            {
+              customer_name: updated.rows[0].metadata?.customer_name || 'Cliente',
+              amount: `R$ ${(Number(amount) / 100).toFixed(2).replace('.', ',')}`,
+              product_title: updated.rows[0].metadata?.product_title || 'Cobrança Pix',
+              receipt_url: `https://pay.axionenterprise.cloud/recibo/${details.correlationId}`,
+            },
+            details.correlationId,
+          ).catch((err) => console.error('[Webhook] Falha ao disparar WhatsApp payment_approved:', err));
+        }
       }
     }
 
