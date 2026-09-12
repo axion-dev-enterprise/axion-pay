@@ -23,32 +23,45 @@ export async function syncDashboardUser(database: Database, user: DashboardUser)
   );
 }
 
-export async function getDashboardOverview(database: Database, userId: string) {
+export async function getDashboardOverview(database: Database, userId: string, isAdmin = false) {
+  const query = isAdmin
+    ? `SELECT
+         (SELECT COUNT(*) FROM merchant_accounts WHERE status = 'ACTIVE') AS merchants,
+         (SELECT COUNT(*)
+            FROM merchant_api_keys k
+            JOIN merchant_accounts m ON m.id = k.merchant_id
+           WHERE m.status = 'ACTIVE' AND k.status = 'ACTIVE') AS active_keys,
+         (SELECT COUNT(*)
+            FROM payment_intents pi
+           WHERE pi.created_at >= date_trunc('day', NOW())) AS transactions_today,
+         (SELECT COALESCE(SUM(pi.amount_cents), 0)
+            FROM payment_intents pi
+           WHERE pi.created_at >= date_trunc('month', NOW())
+             AND pi.status = 'PAID') AS volume_month_cents`
+    : `SELECT
+         (SELECT COUNT(*) FROM merchant_accounts WHERE owner_auth_user_id = $1 AND status = 'ACTIVE') AS merchants,
+         (SELECT COUNT(*)
+            FROM merchant_api_keys k
+            JOIN merchant_accounts m ON m.id = k.merchant_id
+           WHERE m.owner_auth_user_id = $1 AND m.status = 'ACTIVE' AND k.status = 'ACTIVE') AS active_keys,
+         (SELECT COUNT(*)
+            FROM payment_intents pi
+            JOIN merchant_accounts m ON m.id::text = pi.merchant_id
+           WHERE m.owner_auth_user_id = $1
+             AND pi.created_at >= date_trunc('day', NOW())) AS transactions_today,
+         (SELECT COALESCE(SUM(pi.amount_cents), 0)
+            FROM payment_intents pi
+            JOIN merchant_accounts m ON m.id::text = pi.merchant_id
+           WHERE m.owner_auth_user_id = $1
+             AND pi.created_at >= date_trunc('month', NOW())
+             AND pi.status = 'PAID') AS volume_month_cents`;
+
   const result = await database.query<{
     merchants: string;
     active_keys: string;
     transactions_today: string;
     volume_month_cents: string;
-  }>(
-    `SELECT
-       (SELECT COUNT(*) FROM merchant_accounts WHERE owner_auth_user_id = $1 AND status = 'ACTIVE') AS merchants,
-       (SELECT COUNT(*)
-          FROM merchant_api_keys k
-          JOIN merchant_accounts m ON m.id = k.merchant_id
-         WHERE m.owner_auth_user_id = $1 AND m.status = 'ACTIVE' AND k.status = 'ACTIVE') AS active_keys,
-       (SELECT COUNT(*)
-          FROM payment_intents pi
-          JOIN merchant_accounts m ON m.id::text = pi.merchant_id
-         WHERE m.owner_auth_user_id = $1
-           AND pi.created_at >= date_trunc('day', NOW())) AS transactions_today,
-       (SELECT COALESCE(SUM(pi.amount_cents), 0)
-          FROM payment_intents pi
-          JOIN merchant_accounts m ON m.id::text = pi.merchant_id
-         WHERE m.owner_auth_user_id = $1
-           AND pi.created_at >= date_trunc('month', NOW())
-           AND pi.status = 'PAID') AS volume_month_cents`,
-    [userId],
-  );
+  }>(query, isAdmin ? [] : [userId]);
   const row = result.rows[0] ?? { merchants: '0', active_keys: '0', transactions_today: '0', volume_month_cents: '0' };
   return {
     merchants: Number(row.merchants),
@@ -58,14 +71,17 @@ export async function getDashboardOverview(database: Database, userId: string) {
   };
 }
 
-export async function listMerchants(database: Database, userId: string) {
-  const result = await database.query(
-    `SELECT id, name, document, billing_email AS "billingEmail", status, created_at AS "createdAt"
-       FROM merchant_accounts
-      WHERE owner_auth_user_id = $1
-      ORDER BY created_at DESC`,
-    [userId],
-  );
+export async function listMerchants(database: Database, userId: string, isAdmin = false) {
+  const query = isAdmin
+    ? `SELECT id, name, document, billing_email AS "billingEmail", status, created_at AS "createdAt"
+         FROM merchant_accounts
+        ORDER BY created_at DESC`
+    : `SELECT id, name, document, billing_email AS "billingEmail", status, created_at AS "createdAt"
+         FROM merchant_accounts
+        WHERE owner_auth_user_id = $1
+        ORDER BY created_at DESC`;
+
+  const result = await database.query(query, isAdmin ? [] : [userId]);
   return result.rows;
 }
 
@@ -94,17 +110,23 @@ export async function setMerchantStatus(database: Database, userId: string, merc
   return result.rows[0] ?? null;
 }
 
-export async function listMerchantApiKeys(database: Database, userId: string) {
-  const result = await database.query(
-    `SELECT k.id, k.merchant_id AS "merchantId", m.name AS "merchantName", k.name,
-            k.key_prefix AS "keyPrefix", k.scopes, k.status,
-            k.created_at AS "createdAt", k.last_used_at AS "lastUsedAt"
-       FROM merchant_api_keys k
-       JOIN merchant_accounts m ON m.id = k.merchant_id
-      WHERE m.owner_auth_user_id = $1
-      ORDER BY k.created_at DESC`,
-    [userId],
-  );
+export async function listMerchantApiKeys(database: Database, userId: string, isAdmin = false) {
+  const query = isAdmin
+    ? `SELECT k.id, k.merchant_id AS "merchantId", m.name AS "merchantName", k.name,
+              k.key_prefix AS "keyPrefix", k.scopes, k.status,
+              k.created_at AS "createdAt", k.last_used_at AS "lastUsedAt"
+         FROM merchant_api_keys k
+         JOIN merchant_accounts m ON m.id = k.merchant_id
+        ORDER BY k.created_at DESC`
+    : `SELECT k.id, k.merchant_id AS "merchantId", m.name AS "merchantName", k.name,
+              k.key_prefix AS "keyPrefix", k.scopes, k.status,
+              k.created_at AS "createdAt", k.last_used_at AS "lastUsedAt"
+         FROM merchant_api_keys k
+         JOIN merchant_accounts m ON m.id = k.merchant_id
+        WHERE m.owner_auth_user_id = $1
+        ORDER BY k.created_at DESC`;
+
+  const result = await database.query(query, isAdmin ? [] : [userId]);
   return result.rows;
 }
 
@@ -144,18 +166,29 @@ export async function revokeMerchantApiKey(database: Database, userId: string, k
   return result.rows[0] ?? null;
 }
 
-export async function listDashboardTransactions(database: Database, userId: string) {
-  const result = await database.query(
-    `SELECT pi.id, pi.correlation_id AS "correlationId", pi.amount_cents AS "amountCents",
-            pi.status, pi.provider, pi.created_at AS "createdAt", m.name AS "merchantName"
-       FROM payment_intents pi
-       JOIN merchant_accounts m ON m.id::text = pi.merchant_id
-      WHERE m.owner_auth_user_id = $1
-      ORDER BY pi.created_at DESC
-      LIMIT 100`,
-    [userId],
-  );
-  return result.rows;
+export async function listDashboardTransactions(database: Database, userId: string, isAdmin = false) {
+  const query = isAdmin
+    ? `SELECT pi.id, pi.correlation_id AS "correlationId", pi.amount_cents AS "amountCents",
+              pi.status, pi.provider, pi.created_at AS "createdAt", m.name AS "merchantName",
+              m.id::text AS "merchantId"
+         FROM payment_intents pi
+         LEFT JOIN merchant_accounts m ON m.id::text = pi.merchant_id
+        ORDER BY pi.created_at DESC
+        LIMIT 200`
+    : `SELECT pi.id, pi.correlation_id AS "correlationId", pi.amount_cents AS "amountCents",
+              pi.status, pi.provider, pi.created_at AS "createdAt", m.name AS "merchantName",
+              m.id::text AS "merchantId"
+         FROM payment_intents pi
+         JOIN merchant_accounts m ON m.id::text = pi.merchant_id
+        WHERE m.owner_auth_user_id = $1
+        ORDER BY pi.created_at DESC
+        LIMIT 100`;
+
+  const result = await database.query(query, isAdmin ? [] : [userId]);
+  return result.rows.map((row: any) => ({
+    ...row,
+    amountCents: Number(row.amountCents),
+  }));
 }
 
 export async function getDashboardSettings(database: Database, userId: string) {

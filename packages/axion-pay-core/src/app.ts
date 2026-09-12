@@ -391,19 +391,21 @@ export async function buildApp(dependencies: AppDependencies = {}) {
   app.get('/v1/dashboard/me', async (request, reply) => {
     const user = await requireDashboardUser(request, reply, database);
     if (!user) return;
-    return { user };
+    return { user: { ...user, isAdmin: isPlatformAdmin(user) } };
   });
 
   app.get('/v1/dashboard/overview', async (request, reply) => {
     const user = await requireDashboardUser(request, reply, database);
     if (!user) return;
-    return getDashboardOverview(database, user.id);
+    const isAdmin = isPlatformAdmin(user);
+    return getDashboardOverview(database, user.id, isAdmin);
   });
 
   app.get('/v1/dashboard/merchants', async (request, reply) => {
     const user = await requireDashboardUser(request, reply, database);
     if (!user) return;
-    return { merchants: await listMerchants(database, user.id) };
+    const isAdmin = isPlatformAdmin(user);
+    return { merchants: await listMerchants(database, user.id, isAdmin) };
   });
 
   app.post('/v1/dashboard/merchants', async (request, reply) => {
@@ -427,7 +429,8 @@ export async function buildApp(dependencies: AppDependencies = {}) {
   app.get('/v1/dashboard/api-keys', async (request, reply) => {
     const user = await requireDashboardUser(request, reply, database);
     if (!user) return;
-    return { keys: await listMerchantApiKeys(database, user.id) };
+    const isAdmin = isPlatformAdmin(user);
+    return { keys: await listMerchantApiKeys(database, user.id, isAdmin) };
   });
 
   app.post('/v1/dashboard/api-keys', async (request, reply) => {
@@ -454,7 +457,8 @@ export async function buildApp(dependencies: AppDependencies = {}) {
   app.get('/v1/dashboard/transactions', async (request, reply) => {
     const user = await requireDashboardUser(request, reply, database);
     if (!user) return;
-    return { transactions: await listDashboardTransactions(database, user.id) };
+    const isAdmin = isPlatformAdmin(user);
+    return { transactions: await listDashboardTransactions(database, user.id, isAdmin) };
   });
 
   app.get('/v1/dashboard/settings', async (request, reply) => {
@@ -463,7 +467,7 @@ export async function buildApp(dependencies: AppDependencies = {}) {
     return { settings: await getDashboardSettings(database, user.id) };
   });
 
-  app.post('/v1/dashboard/settings', async (request, reply) => {
+  app.put('/v1/dashboard/settings', async (request, reply) => {
     const user = await requireDashboardUser(request, reply, database);
     if (!user) return;
     const { organizationName } = dashboardSettingsSchema.parse(request.body);
@@ -475,7 +479,7 @@ export async function buildApp(dependencies: AppDependencies = {}) {
     if (!user) return;
     return {
       onboarding: await getOnboardingProfile(database, user.id),
-      canReviewKyc: config.kycReviewerIds.has(user.id),
+      canReviewKyc: isPlatformAdmin(user),
     };
   });
 
@@ -1428,6 +1432,15 @@ async function requireMerchant(
   return principal;
 }
 
+function isPlatformAdmin(user: DashboardUser): boolean {
+  return (
+    config.kycReviewerIds.has(user.id) ||
+    user.email === 'iago@axionenterprise.cloud' ||
+    user.email === 'axionenterprise777@gmail.com' ||
+    user.email.endsWith('@axionenterprise.cloud')
+  );
+}
+
 async function requireDashboardUser(
   request: FastifyRequest,
   reply: FastifyReply,
@@ -1479,7 +1492,7 @@ async function requireKycReviewer(
 ): Promise<DashboardUser | null> {
   const user = await requireDashboardUser(request, reply, database);
   if (!user) return null;
-  if (!config.kycReviewerIds.has(user.id)) {
+  if (!isPlatformAdmin(user)) {
     reply.code(403).send({ error: 'Permissão de revisão KYC obrigatória.' });
     return null;
   }

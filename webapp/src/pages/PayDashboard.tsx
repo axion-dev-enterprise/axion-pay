@@ -1359,13 +1359,13 @@ export default function PayDashboard() {
       if (bucket) {
         bucket.count += 1;
         if (tx.status === "PAID" || tx.status === "COMPLETED") {
-          bucket.volumeCents += tx.amountCents || 0;
+          bucket.volumeCents += Number(tx.amountCents) || 0;
           bucket.paidCount += 1;
         }
       }
     });
 
-    const totalVolumeCents = buckets.reduce((acc, b) => acc + b.volumeCents, 0);
+    const totalVolumeCents = buckets.reduce((acc, b) => acc + (Number(b.volumeCents) || 0), 0);
     const totalCount = buckets.reduce((acc, b) => acc + b.count, 0);
     const totalPaidCount = buckets.reduce((acc, b) => acc + b.paidCount, 0);
     const approvalRate = totalCount > 0 ? (totalPaidCount / totalCount) * 100 : 100;
@@ -1383,14 +1383,15 @@ export default function PayDashboard() {
     paidTxs.forEach((tx) => {
       const prov = (tx.provider || "").toLowerCase();
       const corr = (tx.correlationId || "").toLowerCase();
+      const amt = Number(tx.amountCents) || 0;
       if (prov.includes("sub") || corr.includes("sub")) {
-        subVolume += tx.amountCents || 0;
+        subVolume += amt;
         subCount += 1;
       } else if (prov.includes("stripe") || prov.includes("card")) {
-        cardVolume += tx.amountCents || 0;
+        cardVolume += amt;
         cardCount += 1;
       } else {
-        pixVolume += tx.amountCents || 0;
+        pixVolume += amt;
         pixCount += 1;
       }
     });
@@ -1435,12 +1436,12 @@ export default function PayDashboard() {
         pix: {
           volumeCents: pixVolume,
           count: pixCount,
-          percent: methodTotalVolume > 0 ? (pixVolume / methodTotalVolume) * 100 : 70,
+          percent: methodTotalVolume > 0 ? (pixVolume / methodTotalVolume) * 100 : 0,
         },
         card: {
           volumeCents: cardVolume,
           count: cardCount,
-          percent: methodTotalVolume > 0 ? (cardVolume / methodTotalVolume) * 100 : 30,
+          percent: methodTotalVolume > 0 ? (cardVolume / methodTotalVolume) * 100 : 0,
         },
         subscriptions: {
           volumeCents: subVolume,
@@ -2752,18 +2753,20 @@ export default function PayDashboard() {
                           {/* Trilho base */}
                           <circle cx="50" cy="50" r="38" fill="none" stroke="#101d14" strokeWidth="12" />
                           {/* Segmento PIX (Verde) */}
-                          <circle
-                            cx="50"
-                            cy="50"
-                            r="38"
-                            fill="none"
-                            stroke="#00e66b"
-                            strokeWidth="12"
-                            strokeDasharray={`${(analyticsData.breakdown.pix.percent / 100) * 238.76} 238.76`}
-                            strokeDashoffset="0"
-                            strokeLinecap="round"
-                            className="transition-all duration-500"
-                          />
+                          {analyticsData.breakdown.pix.percent > 0 && (
+                            <circle
+                              cx="50"
+                              cy="50"
+                              r="38"
+                              fill="none"
+                              stroke="#00e66b"
+                              strokeWidth="12"
+                              strokeDasharray={`${(analyticsData.breakdown.pix.percent / 100) * 238.76} 238.76`}
+                              strokeDashoffset="0"
+                              strokeLinecap="round"
+                              className="transition-all duration-500"
+                            />
+                          )}
                           {/* Segmento Cartão (Azul Sky) */}
                           {analyticsData.breakdown.card.percent > 0 && (
                             <circle
@@ -2775,6 +2778,21 @@ export default function PayDashboard() {
                               strokeWidth="12"
                               strokeDasharray={`${(analyticsData.breakdown.card.percent / 100) * 238.76} 238.76`}
                               strokeDashoffset={`${-((analyticsData.breakdown.pix.percent / 100) * 238.76)}`}
+                              strokeLinecap="round"
+                              className="transition-all duration-500"
+                            />
+                          )}
+                          {/* Segmento Assinaturas (Roxo Purple) */}
+                          {analyticsData.breakdown.subscriptions.percent > 0 && (
+                            <circle
+                              cx="50"
+                              cy="50"
+                              r="38"
+                              fill="none"
+                              stroke="#a855f7"
+                              strokeWidth="12"
+                              strokeDasharray={`${(analyticsData.breakdown.subscriptions.percent / 100) * 238.76} 238.76`}
+                              strokeDashoffset={`${-(((analyticsData.breakdown.pix.percent + analyticsData.breakdown.card.percent) / 100) * 238.76)}`}
                               strokeLinecap="round"
                               className="transition-all duration-500"
                             />
