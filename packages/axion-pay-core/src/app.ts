@@ -63,6 +63,12 @@ import {
   sendTestWhatsappNotification,
   listMerchantWhatsappLogs,
 } from './services/merchant-whatsapp.service.js';
+import {
+  recordApiLog,
+  listMerchantApiLogs,
+  getMerchantApiLogById,
+  clearMerchantApiLogs,
+} from './services/api-logs.service.js';
 import { openapi } from './openapi.js';
 
 const createChargeSchema = z.object({
@@ -254,14 +260,57 @@ export async function buildApp(dependencies: AppDependencies = {}) {
     reply.header('X-Trace-ID', traceId);
   });
 
+  app.addHook('onSend', async (_request, reply, payload) => {
+    try {
+      if (typeof payload === 'string') {
+        if (payload.length < 32768) {
+          (reply as any)._responsePayload = JSON.parse(payload);
+        }
+      } else if (payload && typeof payload === 'object') {
+        (reply as any)._responsePayload = payload;
+      }
+    } catch {
+      // Ignora erro de parsing de string não-JSON
+    }
+    return payload;
+  });
+
   app.addHook('onResponse', async (request, reply) => {
+    const traceId = reply.getHeader('x-trace-id');
+    const latencyMs = Math.round(reply.elapsedTime);
     app.log.info({
-      traceId: reply.getHeader('x-trace-id'),
+      traceId,
       method: request.method,
       route: request.routeOptions.url,
       statusCode: reply.statusCode,
-      latencyMs: Math.round(reply.elapsedTime),
+      latencyMs,
     }, 'request_completed');
+
+    const merchant = (request as any).merchant;
+    const url = request.url;
+    if (merchant?.merchantId && url.startsWith('/v1/') && !url.includes('/dashboard/merchants/')) {
+      const idempotencyKey = String(request.headers['idempotency-key'] ?? '').trim() || null;
+      const ipAddress = getClientIp(request);
+      const userAgent = typeof request.headers['user-agent'] === 'string' ? request.headers['user-agent'] : null;
+      const responsePayload = (reply as any)._responsePayload;
+
+      setImmediate(() => {
+        recordApiLog(database, {
+          merchantId: merchant.merchantId,
+          apiKeyId: (merchant as any).apiKeyId || null,
+          method: request.method,
+          path: url.split('?')[0],
+          statusCode: reply.statusCode,
+          latencyMs,
+          ipAddress,
+          userAgent,
+          idempotencyKey,
+          requestHeaders: request.headers as Record<string, unknown>,
+          requestBody: request.body,
+          responseBody: responsePayload,
+        }).catch(() => {});
+      });
+    }
   });
 
   app.setErrorHandler((error, _request, reply) => {
@@ -1038,6 +1087,72 @@ export async function buildApp(dependencies: AppDependencies = {}) {
     return reply.code(200).send({ logs });
   });
 
+  // API Logs Explorer
+  app.get('/v1/dashboard/merchants/:merchantId/api-logs', async (request, reply) => {
+    const user = await requireDashboardUser(request, reply, database);
+    if (!user) return;
+    const { merchantId } = merchantIdParams.parse(request.params);
+    const owned = await database.query<{ id: string }>(
+      `SELECT id FROM merchant_accounts WHERE id = $1 AND owner_auth_user_id = $2 LIMIT 1`,
+      [merchantId, user.id],
+    );
+    if (!owned.rowCount) return reply.code(404).send({ error: 'Operação não encontrada.' });
+
+    const query = request.query as any;
+    const logsData = await listMerchantApiLogs(database, merchantId, {
+      limit: query?.limit ? parseInt(query.limit, 10) : 25,
+      offset: query?.offset ? parseInt(query.offset, 10) : 0,
+      method: query?.method,
+      statusCode: query?.statusCode,
+      search: query?.search,
+    });
+    return reply.code(200).send(logsData);
+  });
+
+  app.get('/v1/dashboard/merchants/:merchantId/api-logs/:id', async (request, reply) => {
+    const user = await requireDashboardUser(request, reply, database);
+    if (!user) return;
+    const { merchantId, id } = dashboardMerchantWebhookParams.parse(request.params);
+    const owned = await database.query<{ id: string }>(
+      `SELECT id FROM merchant_accounts WHERE id = $1 AND owner_auth_user_id = $2 LIMIT 1`,
+      [merchantId, user.id],
+    );
+    if (!owned.rowCount) return reply.code(404).send({ error: 'Operação não encontrada.' });
+
+    const log = await getMerchantApiLogById(database, merchantId, id);
+    if (!log) return reply.code(404).send({ error: 'Log de requisição não encontrado.' });
+    return reply.code(200).send({ log });
+  });
+
+  app.delete('/v1/dashboard/merchants/:merchantId/api-logs', async (request, reply) => {
+    const user = await requireDashboardUser(request, reply, database);
+    if (!user) return;
+    const { merchantId } = merchantIdParams.parse(request.params);
+    const owned = await database.query<{ id: string }>(
+      `SELECT id FROM merchant_accounts WHERE id = $1 AND owner_auth_user_id = $2 LIMIT 1`,
+      [merchantId, user.id],
+    );
+    if (!owned.rowCount) return reply.code(404).send({ error: 'Operação não encontrada.' });
+
+    const result = await clearMerchantApiLogs(database, merchantId);
+    return reply.code(200).send({ success: true, ...result });
+  });
+
+  app.get('/v1/api-logs', async (request, reply) => {
+    const merchant = await requireMerchant(request, reply, ['charges:read'], cache, database);
+    if (!merchant) return;
+
+    const query = request.query as any;
+    const logsData = await listMerchantApiLogs(database, merchant.merchantId, {
+      limit: query?.limit ? parseInt(query.limit, 10) : 25,
+      offset: query?.offset ? parseInt(query.offset, 10) : 0,
+      method: query?.method,
+      statusCode: query?.statusCode,
+      search: query?.search,
+    });
+    return reply.code(200).send(logsData);
+  });
+
   if (config.ENABLE_BANK_RECONCILIATION) {
     app.post('/internal/reconcile/nubank', async (request, reply) => {
       const merchant = await requireMerchant(request, reply, ['reconciliation:write'], cache, database);
@@ -1104,6 +1219,7 @@ async function requireMerchant(
     reply.code(401).send({ error: 'API key ausente ou inválida.' });
     return null;
   }
+  (request as any).merchant = principal;
   if (!hasScopes(principal, scopes)) {
     reply.code(403).send({ error: 'Escopo insuficiente.' });
     return null;

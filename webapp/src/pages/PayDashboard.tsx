@@ -29,6 +29,7 @@ import {
   AlertCircle,
   CheckCircle2,
   Terminal,
+  Filter,
   Globe,
   Lock,
   X,
@@ -267,6 +268,8 @@ const VALID_SECTIONS: Record<string, string> = {
   "billing": "billing",
   "payment-links": "payment-links",
   "whatsapp": "whatsapp",
+  "api-logs": "api-logs",
+  "logs": "api-logs",
   "integrations": "integrations",
   "settings": "settings",
 };
@@ -296,6 +299,7 @@ export default function PayDashboard() {
       "api-keys": "AXION Pay — Chaves de API",
       webhooks: "AXION Pay — Webhooks por Merchant",
       "payment-links": "AXION Pay — Links de Pagamento",
+      "api-logs": "AXION Pay — Logs de API",
       transactions: "AXION Pay — Transações",
       payouts: "AXION Pay — Saques & Saldos",
       onboarding: "AXION Pay — Cadastro & KYC",
@@ -357,6 +361,82 @@ export default function PayDashboard() {
   const [loadingWhatsapp, setLoadingWhatsapp] = useState(false);
   const [savingWhatsapp, setSavingWhatsapp] = useState(false);
   const [activeWhatsappTab, setActiveWhatsappTab] = useState<string>("pix_created");
+  // Estados do API Logs Explorer (Request Inspector)
+  const [selectedApiLogMerchantId, setSelectedApiLogMerchantId] = useState<string>("");
+  const [apiLogs, setApiLogs] = useState<any[]>([]);
+  const [apiLogMetrics, setApiLogMetrics] = useState<any>(null);
+  const [loadingApiLogs, setLoadingApiLogs] = useState<boolean>(false);
+  const [apiLogMethodFilter, setApiLogMethodFilter] = useState<string>("ALL");
+  const [apiLogStatusFilter, setApiLogStatusFilter] = useState<string>("ALL");
+  const [apiLogSearch, setApiLogSearch] = useState<string>("");
+  const [autoRefreshLogs, setAutoRefreshLogs] = useState<boolean>(false);
+  const [inspectedLog, setInspectedLog] = useState<any>(null);
+  const [inspectedLogTab, setInspectedLogTab] = useState<"general" | "req_headers" | "req_body" | "res_body" | "curl">("general");
+  const [purgingLogs, setPurgingLogs] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!selectedApiLogMerchantId && merchants.length > 0) {
+      setSelectedApiLogMerchantId(merchants[0].id);
+    }
+  }, [merchants, selectedApiLogMerchantId]);
+
+  const loadApiLogs = async (merchantId: string, silent = false) => {
+    if (!merchantId) return;
+    if (!silent) setLoadingApiLogs(true);
+    try {
+      const params = new URLSearchParams();
+      if (apiLogMethodFilter !== "ALL") params.set("method", apiLogMethodFilter);
+      if (apiLogStatusFilter !== "ALL") params.set("statusCode", apiLogStatusFilter);
+      if (apiLogSearch.trim()) params.set("search", apiLogSearch.trim());
+      params.set("limit", "50");
+
+      const res = await apiFetch(`/v1/dashboard/merchants/${merchantId}/api-logs?${params.toString()}`);
+      if (res) {
+        setApiLogs(res.logs || []);
+        if (res.metrics) setApiLogMetrics(res.metrics);
+      }
+    } catch (err: any) {
+      if (!silent) notify("error", "Erro ao carregar logs de API: " + (err.message || ""));
+    } finally {
+      if (!silent) setLoadingApiLogs(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedApiLogMerchantId && activeSection === "api-logs") {
+      loadApiLogs(selectedApiLogMerchantId);
+    }
+  }, [selectedApiLogMerchantId, activeSection, apiLogMethodFilter, apiLogStatusFilter]);
+
+  useEffect(() => {
+    let interval: any;
+    if (autoRefreshLogs && selectedApiLogMerchantId && activeSection === "api-logs") {
+      interval = setInterval(() => {
+        loadApiLogs(selectedApiLogMerchantId, true);
+      }, 5000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [autoRefreshLogs, selectedApiLogMerchantId, activeSection, apiLogMethodFilter, apiLogStatusFilter, apiLogSearch]);
+
+  const handleClearApiLogs = async () => {
+    if (!selectedApiLogMerchantId) return;
+    if (!window.confirm("Deseja realmente purgar todo o histórico de logs de API deste merchant?")) return;
+    setPurgingLogs(true);
+    try {
+      await apiFetch(`/v1/dashboard/merchants/${selectedApiLogMerchantId}/api-logs`, {
+        method: "DELETE",
+      });
+      notify("success", "Logs de API purgados com sucesso!");
+      await loadApiLogs(selectedApiLogMerchantId);
+    } catch (err: any) {
+      notify("error", err.message || "Erro ao purgar logs.");
+    } finally {
+      setPurgingLogs(false);
+    }
+  };
+
   const [testWhatsappModal, setTestWhatsappModal] = useState(false);
   const [testWhatsappPhone, setTestWhatsappPhone] = useState("");
   const [testWhatsappEvent, setTestWhatsappEvent] = useState<string>("pix_created");
@@ -1293,6 +1373,7 @@ export default function PayDashboard() {
     { id: "webhooks", label: "Webhooks", icon: Webhook, path: "/dashboard/webhooks" },
     { id: "payment-links", label: "Links de Pagamento", icon: Link2, path: "/dashboard/payment-links" },
     { id: "whatsapp", label: "Régua WhatsApp", icon: MessageSquare, path: "/dashboard/whatsapp" },
+    { id: "api-logs", label: "Logs de API", icon: Terminal, path: "/dashboard/api-logs" },
     { id: "transactions", label: "Transações", icon: Wallet, path: "/dashboard/transactions" },
     { id: "payouts", label: "Saques & Saldos", icon: Banknote, path: "/dashboard/payouts" },
     { id: "onboarding", label: "Cadastro & KYC", icon: FileCheck2, path: "/dashboard/onboarding" },
@@ -3256,6 +3337,312 @@ function verifyAxionWebhook(rawBody: string, signatureHeader: string, secret: st
             </div>
           )}
 
+          {activeSection === "api-logs" && (
+            <div className="space-y-6 animate-fadeIn">
+              {/* Header */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Terminal className="w-5 h-5 text-[#00e66b]" />
+                    <h1 className="text-xl font-bold text-white tracking-tight">Logs de API (Request Inspector)</h1>
+                  </div>
+                  <p className="text-xs text-[#a1b0a6] mt-0.5">
+                    Auditoria e telemetria em tempo real de cada chamada HTTP recebida pela API do AXION Pay
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {merchants.length > 1 && (
+                    <select
+                      value={selectedApiLogMerchantId}
+                      onChange={(e) => setSelectedApiLogMerchantId(e.target.value)}
+                      className="bg-[#09120d] border border-[#213428] text-xs text-white rounded-xl px-3 py-2 outline-none focus:border-[#00e66b]"
+                    >
+                      {merchants.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setAutoRefreshLogs(!autoRefreshLogs)}
+                    className={`px-3 py-2 rounded-xl text-xs font-mono font-medium border transition-all flex items-center gap-2 cursor-pointer ${
+                      autoRefreshLogs
+                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shadow-sm shadow-emerald-500/10"
+                        : "bg-[#09120d] text-[#8b9f93] border-[#213428] hover:text-white"
+                    }`}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${autoRefreshLogs ? "bg-emerald-400 animate-pulse" : "bg-zinc-600"}`} />
+                    Auto-refresh: {autoRefreshLogs ? "ON (5s)" : "OFF"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => loadApiLogs(selectedApiLogMerchantId)}
+                    disabled={loadingApiLogs}
+                    className="p-2 bg-[#09120d] hover:bg-[#101d14] border border-[#213428] text-[#a1b0a6] hover:text-white rounded-xl transition cursor-pointer"
+                    title="Atualizar agora"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${loadingApiLogs ? "animate-spin text-[#00e66b]" : ""}`} />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleClearApiLogs}
+                    disabled={purgingLogs || apiLogs.length === 0}
+                    className="px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-400 text-xs font-medium rounded-xl transition cursor-pointer flex items-center gap-1.5"
+                    title="Purgar histórico"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Limpar Logs</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Metrics Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="p-4 rounded-2xl bg-[#09120d] border border-[#213428] space-y-1">
+                  <span className="text-[11px] font-mono text-[#8b9f93] uppercase tracking-wider block">Requisições (24h)</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-bold font-mono text-white">
+                      {apiLogMetrics?.totalRequests24h ?? 0}
+                    </span>
+                    <span className="text-[10px] text-[#8b9f93]">chamadas</span>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-[#09120d] border border-[#213428] space-y-1">
+                  <span className="text-[11px] font-mono text-[#8b9f93] uppercase tracking-wider block">Taxa de Sucesso</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className={`text-2xl font-bold font-mono ${
+                      (apiLogMetrics?.successRate ?? 100) >= 95 ? "text-emerald-400" : "text-amber-400"
+                    }`}>
+                      {apiLogMetrics?.successRate ?? 100}%
+                    </span>
+                    <span className="text-[10px] text-[#8b9f93]">2xx responses</span>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-[#09120d] border border-[#213428] space-y-1">
+                  <span className="text-[11px] font-mono text-[#8b9f93] uppercase tracking-wider block">Latência Média</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-bold font-mono text-white">
+                      {apiLogMetrics?.avgLatencyMs ?? 0}
+                      <span className="text-xs font-normal text-[#8b9f93]">ms</span>
+                    </span>
+                    <span className="text-[10px] text-emerald-400">p50</span>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-[#09120d] border border-[#213428] space-y-1">
+                  <span className="text-[11px] font-mono text-[#8b9f93] uppercase tracking-wider block">Erros (4xx / 5xx)</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className={`text-2xl font-bold font-mono ${
+                      ((apiLogMetrics?.clientErrors24h ?? 0) + (apiLogMetrics?.serverErrors24h ?? 0)) > 0
+                        ? "text-rose-400"
+                        : "text-[#8b9f93]"
+                    }`}>
+                      {apiLogMetrics?.clientErrors24h ?? 0}
+                      <span className="text-xs text-[#8b9f93]"> / </span>
+                      {apiLogMetrics?.serverErrors24h ?? 0}
+                    </span>
+                    <span className="text-[10px] text-[#8b9f93]">falhas</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Filters Bar */}
+              <div className="p-3 rounded-2xl bg-[#09120d] border border-[#213428] flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-1.5 bg-[#050c08] border border-[#213428] rounded-xl px-3 py-1.5 text-xs">
+                    <Search className="w-3.5 h-3.5 text-[#8b9f93]" />
+                    <input
+                      type="text"
+                      placeholder="Filtrar por rota (/v1/charges) ou idempotency-key..."
+                      value={apiLogSearch}
+                      onChange={(e) => setApiLogSearch(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") loadApiLogs(selectedApiLogMerchantId);
+                      }}
+                      className="bg-transparent text-white placeholder-[#8b9f93] outline-none text-xs w-64 md:w-80 font-mono"
+                    />
+                  </div>
+
+                  {/* Method Filters */}
+                  <div className="flex items-center bg-[#050c08] p-1 rounded-xl border border-[#213428] gap-1">
+                    {["ALL", "GET", "POST", "PUT", "DELETE"].map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setApiLogMethodFilter(m)}
+                        className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold transition cursor-pointer ${
+                          apiLogMethodFilter === m
+                            ? "bg-[#00e66b] text-black"
+                            : "text-[#8b9f93] hover:text-white"
+                        }`}
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Status Filters */}
+                  <div className="flex items-center bg-[#050c08] p-1 rounded-xl border border-[#213428] gap-1">
+                    {[
+                      { id: "ALL", label: "TODOS" },
+                      { id: "2xx", label: "2xx OK" },
+                      { id: "4xx", label: "4xx Erro" },
+                      { id: "5xx", label: "5xx Falha" },
+                    ].map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => setApiLogStatusFilter(s.id)}
+                        className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold transition cursor-pointer ${
+                          apiLogStatusFilter === s.id
+                            ? "bg-[#182b20] text-emerald-400 border border-[#30513d]"
+                            : "text-[#8b9f93] hover:text-white"
+                        }`}
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <span className="text-[11px] font-mono text-[#8b9f93]">
+                  {apiLogs.length} requisições encontradas
+                </span>
+              </div>
+
+              {/* Logs Table */}
+              <div className="rounded-2xl bg-[#09120d] border border-[#213428] overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-[#213428] bg-[#050c08]/60 text-[#8b9f93] font-mono uppercase text-[10px] tracking-wider">
+                        <th className="p-3.5">Status</th>
+                        <th className="p-3.5">Método</th>
+                        <th className="p-3.5">Rota / Endpoint</th>
+                        <th className="p-3.5">Latência</th>
+                        <th className="p-3.5">IP de Origem</th>
+                        <th className="p-3.5">Idempotency Key</th>
+                        <th className="p-3.5">Data & Hora</th>
+                        <th className="p-3.5 text-right">Ação</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#213428]/60">
+                      {loadingApiLogs && apiLogs.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} className="p-8 text-center text-[#8b9f93]">
+                            <Loader2 className="w-6 h-6 animate-spin text-[#00e66b] mx-auto mb-2" />
+                            Carregando requisições...
+                          </td>
+                        </tr>
+                      ) : apiLogs.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} className="p-8 text-center text-[#8b9f93]">
+                            <Terminal className="w-8 h-8 text-[#213428] mx-auto mb-2" />
+                            Nenhuma requisição registrada para os filtros selecionados.
+                          </td>
+                        </tr>
+                      ) : (
+                        apiLogs.map((log) => {
+                          const is2xx = log.statusCode >= 200 && log.statusCode < 300;
+                          const is4xx = log.statusCode >= 400 && log.statusCode < 500;
+                          const is5xx = log.statusCode >= 500;
+                          return (
+                            <tr
+                              key={log.id}
+                              onClick={() => {
+                                setInspectedLog(log);
+                                setInspectedLogTab("general");
+                              }}
+                              className="hover:bg-[#101d14] transition cursor-pointer group"
+                            >
+                              <td className="p-3.5">
+                                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
+                                  is2xx
+                                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                                    : is4xx
+                                    ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                                    : "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                                }`}>
+                                  <span className={`w-1.5 h-1.5 rounded-full ${
+                                    is2xx ? "bg-emerald-400" : is4xx ? "bg-amber-400" : "bg-rose-400"
+                                  }`} />
+                                  {log.statusCode}
+                                </span>
+                              </td>
+
+                              <td className="p-3.5">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
+                                  log.method === "POST"
+                                    ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20"
+                                    : log.method === "GET"
+                                    ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                    : log.method === "DELETE"
+                                    ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                                    : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                                }`}>
+                                  {log.method}
+                                </span>
+                              </td>
+
+                              <td className="p-3.5">
+                                <span className="font-mono text-white group-hover:text-[#00e66b] transition font-medium">
+                                  {log.path}
+                                </span>
+                              </td>
+
+                              <td className="p-3.5 font-mono text-[11px] tabular-nums">
+                                <span className={
+                                  log.latencyMs < 200
+                                    ? "text-emerald-400"
+                                    : log.latencyMs < 600
+                                    ? "text-amber-400"
+                                    : "text-rose-400"
+                                }>
+                                  {log.latencyMs}ms
+                                </span>
+                              </td>
+
+                              <td className="p-3.5 font-mono text-[11px] text-[#8b9f93]">
+                                {log.ipAddress || "127.0.0.1"}
+                              </td>
+
+                              <td className="p-3.5 font-mono text-[10px] text-[#8b9f93] max-w-[120px] truncate">
+                                {log.idempotencyKey || "—"}
+                              </td>
+
+                              <td className="p-3.5 font-mono text-[11px] text-[#8b9f93] whitespace-nowrap">
+                                {new Date(log.createdAt).toLocaleTimeString("pt-BR", {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                  second: "2-digit",
+                                })}
+                              </td>
+
+                              <td className="p-3.5 text-right">
+                                <span className="inline-flex items-center gap-1 text-[11px] text-[#00e66b] font-medium opacity-80 group-hover:opacity-100">
+                                  <Code2 className="w-3.5 h-3.5" />
+                                  <span>Inspecionar</span>
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
           {activeSection === "settings" && (
             <div className="space-y-6 animate-fadeIn max-w-2xl">
               <div>
@@ -4281,6 +4668,220 @@ function verifyAxionWebhook(rawBody: string, signatureHeader: string, secret: st
                 className="px-5 py-3 bg-[#101d14] hover:bg-[#182b20] border border-[#30513d] text-white font-bold text-xs rounded-xl transition cursor-pointer"
               >
                 Concluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL REQUEST INSPECTOR (API LOGS) */}
+      {inspectedLog && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-3xl bg-[#09120d] border border-[#213428] rounded-3xl p-6 space-y-5 shadow-2xl max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex justify-between items-start border-b border-[#213428] pb-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className={`px-2 py-0.5 rounded text-xs font-mono font-bold ${
+                    inspectedLog.method === "POST"
+                      ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20"
+                      : inspectedLog.method === "GET"
+                      ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                      : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                  }`}>
+                    {inspectedLog.method}
+                  </span>
+                  <h3 className="text-base font-bold font-mono text-white">{inspectedLog.path}</h3>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-mono font-bold border ${
+                    inspectedLog.statusCode >= 200 && inspectedLog.statusCode < 300
+                      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                      : inspectedLog.statusCode >= 400 && inspectedLog.statusCode < 500
+                      ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                      : "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                  }`}>
+                    HTTP {inspectedLog.statusCode}
+                  </span>
+                </div>
+                <p className="text-xs text-[#8b9f93] font-mono">
+                  {new Date(inspectedLog.createdAt).toLocaleString("pt-BR")} • Latência: {inspectedLog.latencyMs}ms • IP: {inspectedLog.ipAddress || "127.0.0.1"}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setInspectedLog(null)}
+                className="text-[#8b9f93] hover:text-white p-1 rounded-lg transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Tabs */}
+            <div className="flex items-center gap-1 border-b border-[#213428] pb-2 text-xs font-mono">
+              {[
+                { id: "general", label: "Visão Geral" },
+                { id: "req_headers", label: "Request Headers" },
+                { id: "req_body", label: "Request Body" },
+                { id: "res_body", label: "Response Body" },
+                { id: "curl", label: "Copiar cURL" },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setInspectedLogTab(tab.id as any)}
+                  className={`px-3 py-1.5 rounded-xl font-medium transition cursor-pointer ${
+                    inspectedLogTab === tab.id
+                      ? "bg-[#00e66b] text-black font-bold"
+                      : "text-[#8b9f93] hover:text-white hover:bg-[#101d14]"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Modal Content */}
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+              {inspectedLogTab === "general" && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs font-mono">
+                  <div className="p-3 rounded-xl bg-[#050c08] border border-[#213428] space-y-1">
+                    <span className="text-[10px] text-[#8b9f93] uppercase block">Log ID</span>
+                    <span className="text-white select-all block">{inspectedLog.id}</span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-[#050c08] border border-[#213428] space-y-1">
+                    <span className="text-[10px] text-[#8b9f93] uppercase block">Idempotency Key</span>
+                    <span className="text-white select-all block">{inspectedLog.idempotencyKey || "Nenhum header enviado"}</span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-[#050c08] border border-[#213428] space-y-1">
+                    <span className="text-[10px] text-[#8b9f93] uppercase block">IP do Cliente</span>
+                    <span className="text-white block">{inspectedLog.ipAddress || "127.0.0.1"}</span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-[#050c08] border border-[#213428] space-y-1">
+                    <span className="text-[10px] text-[#8b9f93] uppercase block">User-Agent</span>
+                    <span className="text-white truncate block" title={inspectedLog.userAgent || ""}>
+                      {inspectedLog.userAgent || "Não informado"}
+                    </span>
+                  </div>
+                  {inspectedLog.errorMessage && (
+                    <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 col-span-2 space-y-1">
+                      <span className="text-[10px] uppercase font-bold block">Mensagem de Erro</span>
+                      <span className="block">{inspectedLog.errorMessage}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {inspectedLogTab === "req_headers" && (
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-mono text-[#8b9f93]">Cabeçalhos Sanitizados:</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(JSON.stringify(inspectedLog.requestHeaders, null, 2));
+                        notify("success", "Headers copiados!");
+                      }}
+                      className="text-xs text-[#00e66b] font-mono flex items-center gap-1 hover:underline cursor-pointer"
+                    >
+                      <Copy className="w-3.5 h-3.5" /> Copiar Headers
+                    </button>
+                  </div>
+                  <pre className="p-4 rounded-xl bg-[#050c08] border border-[#213428] font-mono text-xs text-[#00e66b] overflow-x-auto max-h-80 select-all">
+                    {JSON.stringify(inspectedLog.requestHeaders, null, 2)}
+                  </pre>
+                </div>
+              )}
+
+              {inspectedLogTab === "req_body" && (
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-mono text-[#8b9f93]">Corpo da Requisição (Sanitizado):</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(JSON.stringify(inspectedLog.requestBody, null, 2));
+                        notify("success", "Request body copiado!");
+                      }}
+                      className="text-xs text-[#00e66b] font-mono flex items-center gap-1 hover:underline cursor-pointer"
+                    >
+                      <Copy className="w-3.5 h-3.5" /> Copiar Body
+                    </button>
+                  </div>
+                  <pre className="p-4 rounded-xl bg-[#050c08] border border-[#213428] font-mono text-xs text-[#00e66b] overflow-x-auto max-h-80 select-all">
+                    {JSON.stringify(inspectedLog.requestBody, null, 2)}
+                  </pre>
+                </div>
+              )}
+
+              {inspectedLogTab === "res_body" && (
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-mono text-[#8b9f93]">Resposta do Gateway:</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(JSON.stringify(inspectedLog.responseBody, null, 2));
+                        notify("success", "Response body copiado!");
+                      }}
+                      className="text-xs text-[#00e66b] font-mono flex items-center gap-1 hover:underline cursor-pointer"
+                    >
+                      <Copy className="w-3.5 h-3.5" /> Copiar Resposta
+                    </button>
+                  </div>
+                  <pre className="p-4 rounded-xl bg-[#050c08] border border-[#213428] font-mono text-xs text-[#00e66b] overflow-x-auto max-h-80 select-all">
+                    {JSON.stringify(inspectedLog.responseBody, null, 2)}
+                  </pre>
+                </div>
+              )}
+
+              {inspectedLogTab === "curl" && (
+                <div className="space-y-2">
+                  <span className="text-xs font-mono text-[#8b9f93]">Comando cURL pronto para reprodução:</span>
+                  <div className="p-4 rounded-xl bg-[#050c08] border border-[#213428] space-y-3">
+                    <pre className="font-mono text-xs text-[#00e66b] overflow-x-auto select-all whitespace-pre-wrap">
+                      {`curl -X ${inspectedLog.method} "https://api.axionenterprise.cloud${inspectedLog.path}" \\
+  -H "Authorization: Bearer axp_..." \\
+  -H "Content-Type: application/json"${
+    inspectedLog.idempotencyKey ? ` \\
+  -H "Idempotency-Key: ${inspectedLog.idempotencyKey}"` : ""
+  }${
+    inspectedLog.method !== "GET" && inspectedLog.requestBody && Object.keys(inspectedLog.requestBody).length > 0
+      ? ` \\
+  -d '${JSON.stringify(inspectedLog.requestBody)}'`
+      : ""
+  }`}
+                    </pre>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const snippet = `curl -X ${inspectedLog.method} "https://api.axionenterprise.cloud${inspectedLog.path}" -H "Authorization: Bearer axp_..." -H "Content-Type: application/json"${
+                          inspectedLog.idempotencyKey ? ` -H "Idempotency-Key: ${inspectedLog.idempotencyKey}"` : ""
+                        }${
+                          inspectedLog.method !== "GET" && inspectedLog.requestBody && Object.keys(inspectedLog.requestBody).length > 0
+                            ? ` -d '${JSON.stringify(inspectedLog.requestBody)}'`
+                            : ""
+                        }`;
+                        navigator.clipboard.writeText(snippet);
+                        notify("success", "Comando cURL copiado!");
+                      }}
+                      className="px-4 py-2 bg-[#00e66b] hover:bg-[#69f0ae] text-black font-semibold text-xs rounded-xl transition cursor-pointer flex items-center gap-2"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>Copiar Comando cURL</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex justify-end pt-3 border-t border-[#213428]">
+              <button
+                type="button"
+                onClick={() => setInspectedLog(null)}
+                className="px-5 py-2.5 bg-[#101d14] hover:bg-[#182b20] border border-[#30513d] text-white font-bold text-xs rounded-xl transition cursor-pointer"
+              >
+                Fechar
               </button>
             </div>
           </div>

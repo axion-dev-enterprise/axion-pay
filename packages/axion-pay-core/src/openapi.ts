@@ -526,5 +526,50 @@ export const openapi = {
         responses: { '200': { description: 'Logs de entrega retornados.' } },
       },
     },
+    '/v1/dashboard/merchants/{merchantId}/api-logs': {
+      get: {
+        summary: 'Lista histórico de requisições HTTP recebidas pela API (Request Inspector) com métricas',
+        security: [{ sessionAuth: [] }],
+        parameters: [
+          { name: 'merchantId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+          { name: 'limit', in: 'query', required: false, schema: { type: 'integer', default: 25 } },
+          { name: 'offset', in: 'query', required: false, schema: { type: 'integer', default: 0 } },
+          { name: 'method', in: 'query', required: false, schema: { type: 'string' } },
+          { name: 'statusCode', in: 'query', required: false, schema: { type: 'string' } },
+          { name: 'search', in: 'query', required: false, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: 'Histórico de requisições e métricas 24h retornados com sucesso.' } },
+      },
+      delete: {
+        summary: 'Purga o histórico de logs de requisição do merchant',
+        security: [{ sessionAuth: [] }],
+        parameters: [{ name: 'merchantId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { '200': { description: 'Logs purgados com sucesso.' } },
+      },
+    },
+    '/v1/dashboard/merchants/{merchantId}/api-logs/{id}': {
+      get: {
+        summary: 'Obtém detalhes completos de uma requisição HTTP gravada (payloads, headers, latência)',
+        security: [{ sessionAuth: [] }],
+        parameters: [
+          { name: 'merchantId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+          { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: { '200': { description: 'Detalhes da requisição retornados.' } },
+      },
+    },
+    '/v1/api-logs': {
+      get: {
+        summary: 'Consulta programática S2S dos logs de API da operação autenticada',
+        security: [{ apiKeyAuth: [] }],
+        parameters: [
+          { name: 'limit', in: 'query', required: false, schema: { type: 'integer', default: 25 } },
+          { name: 'offset', in: 'query', required: false, schema: { type: 'integer', default: 0 } },
+          { name: 'method', in: 'query', required: false, schema: { type: 'string' } },
+          { name: 'statusCode', in: 'query', required: false, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: 'Logs de API retornados com sucesso.' } },
+      },
+    },
   },
 } as const;
