@@ -1059,7 +1059,7 @@ export default function PayDashboard() {
   const [webhookTab, setWebhookTab] = useState<"webhooks" | "endpoints">("webhooks");
 
   // Estados de Integrações & Conectores E-commerce
-  const [integrationTab, setIntegrationTab] = useState<"manual" | "ecommerces">("manual");
+  const [integrationTab, setIntegrationTab] = useState<"manual" | "ecommerces" | "custom-checkout">("manual");
   const [selectedEndpointCategory, setSelectedEndpointCategory] = useState<"all" | "pix" | "card" | "subscriptions" | "links">("all");
   const [selectedSnippetLang, setSelectedSnippetLang] = useState<"curl" | "typescript" | "python">("curl");
   const [expandedEndpoint, setExpandedEndpoint] = useState<string | null>("charges_create");
@@ -4161,9 +4161,24 @@ function verifyAxionWebhook(rawBody: string, signatureHeader: string, secret: st
                   }`}
                 >
                   <ShoppingBag className="w-4 h-4" />
-                  E-commerces & Plataformas (Futuras Integrações)
+                  E-commerces & Plataformas
                   <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-emerald-500/20 text-emerald-300 font-mono">
                     {ECOMMERCE_CONNECTORS.length} Conectores
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIntegrationTab("custom-checkout")}
+                  className={`pb-3 text-xs font-bold transition relative flex items-center gap-2 cursor-pointer ${
+                    integrationTab === "custom-checkout"
+                      ? "text-[#00e66b] border-b-2 border-[#00e66b]"
+                      : "text-[#a1b0a6] hover:text-white"
+                  }`}
+                >
+                  <Code2 className="w-4 h-4" />
+                  Checkouts Próprios (Headless)
+                  <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-emerald-500/20 text-emerald-300 font-mono">
+                    White-Label
                   </span>
                 </button>
               </div>
@@ -4528,6 +4543,205 @@ function verifyAxionWebhook(rawBody: string, signatureHeader: string, secret: st
                         </div>
                       ))}
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* CONTEÚDO 3: CHECKOUTS PERSONALIZADOS (HEADLESS / WHITE-LABEL) */}
+              {integrationTab === "custom-checkout" && (
+                <div className="space-y-6 animate-fadeIn">
+                  {/* Banner de Arquitetura */}
+                  <div className="p-6 rounded-2xl bg-gradient-to-br from-[#09120d] via-[#0d1c13] to-[#09120d] border border-emerald-500/30 space-y-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div className="space-y-1 max-w-3xl">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#00e66b]/20 text-[#00e66b] border border-[#00e66b]/30 uppercase tracking-wider">
+                            Arquitetura Headless / White-Label
+                          </span>
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-sky-500/20 text-sky-400 border border-sky-500/30 uppercase tracking-wider">
+                            Zero Redirecionamentos
+                          </span>
+                        </div>
+                        <h2 className="text-xl font-bold text-white tracking-tight">
+                          Construa seu Checkout Próprio e Consuma Apenas a API AXION Pay
+                        </h2>
+                        <p className="text-xs text-[#a1b0a6] leading-relaxed">
+                          Mantenha 100% da sua identidade visual, tipografia e fluxo de conversão. Seus clientes pagam diretamente no seu domínio sem sair da loja; a AXION Pay opera nos bastidores como motor de liquidação financeira de alta performance.
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText("https://api.axionenterprise.cloud/v1/charges");
+                            notify("success", "Endpoint copiado: POST https://api.axionenterprise.cloud/v1/charges");
+                          }}
+                          className="inline-flex items-center gap-2 rounded-xl bg-[#00e66b] hover:bg-[#69f0ae] text-black font-bold text-xs px-4 py-2.5 transition shadow-lg shadow-emerald-500/10 cursor-pointer"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>Copiar Endpoint Pix</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 3 Pilares */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
+                      <div className="p-4 rounded-xl bg-[#050c08]/80 border border-[#213428] space-y-1.5">
+                        <div className="flex items-center gap-2 text-xs font-bold text-emerald-400">
+                          <Lock className="w-4 h-4" />
+                          <span>1. Backend Seguro</span>
+                        </div>
+                        <p className="text-[11px] text-[#8b9f93] leading-relaxed">
+                          Seu servidor recebe o pedido e chama <code className="text-emerald-300">POST /v1/charges</code> com sua API Key privada (<code className="text-gray-400">axp_live_...</code>). A chave nunca é exposta no frontend.
+                        </p>
+                      </div>
+
+                      <div className="p-4 rounded-xl bg-[#050c08]/80 border border-[#213428] space-y-1.5">
+                        <div className="flex items-center gap-2 text-xs font-bold text-emerald-400">
+                          <QrCode className="w-4 h-4" />
+                          <span>2. Frontend Transparente</span>
+                        </div>
+                        <p className="text-[11px] text-[#8b9f93] leading-relaxed">
+                          Sua loja renderiza o QR Code Pix em Base64 e o código Copia e Cola, ou inicializa os campos seguros do cartão com <code className="text-emerald-300">clientSecret</code>.
+                        </p>
+                      </div>
+
+                      <div className="p-4 rounded-xl bg-[#050c08]/80 border border-[#213428] space-y-1.5">
+                        <div className="flex items-center gap-2 text-xs font-bold text-emerald-400">
+                          <Webhook className="w-4 h-4" />
+                          <span>3. Webhooks & Reconciliação</span>
+                        </div>
+                        <p className="text-[11px] text-[#8b9f93] leading-relaxed">
+                          Seu backend recebe o evento <code className="text-emerald-300">charge.completed</code> com assinatura HMAC-SHA256 e libera o pedido instantaneamente.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Snippets de Implementação Prática */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Bloco Backend */}
+                    <div className="p-5 rounded-2xl bg-[#09120d] border border-[#213428] space-y-3 flex flex-col justify-between">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Terminal className="w-4 h-4 text-emerald-400" />
+                            <span className="text-xs font-bold text-white uppercase tracking-wider">Passo 1: Backend (Node.js / Express)</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const code = `// Exemplo: Backend criando cobrança Pix na AXION Pay\\nconst res = await fetch("https://api.axionenterprise.cloud/v1/charges", {\\n  method: "POST",\\n  headers: {\\n    "Authorization": "Bearer axp_live_SEU_TOKEN",\\n    "Content-Type": "application/json",\\n    "Idempotency-Key": \`order_\${orderId}_\${Date.now()}\`\\n  },\\n  body: JSON.stringify({\\n    correlationId: \`order_\${orderId}\`,\\n    value: amountInCents, // ex: 4990 = R$ 49,90\\n    customer: { name, email, taxId: cpf.replace(/\\\\D/g, '') },\\n    expiresInSeconds: 3600\\n  })\\n});\\nconst { charge } = await res.json();\\nreturn res.json({ qrCode: charge.qrCodeImage, brCode: charge.brCode });`;
+                              navigator.clipboard.writeText(code);
+                              notify("success", "Código de backend copiado!");
+                            }}
+                            className="inline-flex items-center gap-1.5 text-xs text-[#a1b0a6] hover:text-white transition cursor-pointer"
+                          >
+                            <Copy className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>Copiar</span>
+                          </button>
+                        </div>
+                        <p className="text-[11px] text-[#8b9f93]">
+                          Receba a requisição de compra do seu checkout e gere a cobrança autenticada server-side:
+                        </p>
+                        <pre className="p-4 rounded-xl bg-[#050c08] border border-[#213428] font-mono text-[11px] text-[#b5c6bb] overflow-x-auto leading-relaxed">
+{`const res = await fetch("https://api.axionenterprise.cloud/v1/charges", {
+  method: "POST",
+  headers: {
+    "Authorization": "Bearer axp_live_SEU_TOKEN",
+    "Content-Type": "application/json",
+    "Idempotency-Key": \`order_\${orderId}_\${Date.now()}\`
+  },
+  body: JSON.stringify({
+    correlationId: \`order_\${orderId}\`,
+    value: amountInCents, // ex: 4990 = R$ 49,90
+    customer: { name, email, taxId: cpf.replace(/\\D/g, '') },
+    expiresInSeconds: 3600
+  })
+});
+const { charge } = await res.json();
+// Retorna qrCodeImage (base64) e brCode (copia e cola)`}
+                        </pre>
+                      </div>
+                    </div>
+
+                    {/* Bloco Frontend */}
+                    <div className="p-5 rounded-2xl bg-[#09120d] border border-[#213428] space-y-3 flex flex-col justify-between">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Code2 className="w-4 h-4 text-emerald-400" />
+                            <span className="text-xs font-bold text-white uppercase tracking-wider">Passo 2: Frontend (React / Drop-in)</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const code = `// Exemplo: Renderização do Pix no seu checkout\\nfunction PixView({ qrCode, brCode }) {\\n  return (\\n    <div className="text-center space-y-4">\\n      <img src={qrCode} alt="QR Code Pix" className="mx-auto w-48 h-48" />\\n      <button onClick={() => navigator.clipboard.writeText(brCode)}>\\n        Copiar Código Pix\\n      </button>\\n    </div>\\n  );\\n}`;
+                              navigator.clipboard.writeText(code);
+                              notify("success", "Código de frontend copiado!");
+                            }}
+                            className="inline-flex items-center gap-1.5 text-xs text-[#a1b0a6] hover:text-white transition cursor-pointer"
+                          >
+                            <Copy className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>Copiar</span>
+                          </button>
+                        </div>
+                        <p className="text-[11px] text-[#8b9f93]">
+                          Exiba o QR Code e forneça o botão para cópia imediata do código Pix:
+                        </p>
+                        <pre className="p-4 rounded-xl bg-[#050c08] border border-[#213428] font-mono text-[11px] text-[#b5c6bb] overflow-x-auto leading-relaxed">
+{`function PixPaymentModal({ qrCodeImage, brCode }) {
+  return (
+    <div className="p-6 bg-[#09120d] rounded-2xl border border-[#213428] text-center space-y-4">
+      <img src={qrCodeImage} alt="QR Code" className="mx-auto w-48 h-48 rounded-lg bg-white p-2" />
+      <div className="flex gap-2">
+        <input readOnly value={brCode} className="w-full bg-[#050c08] px-3 py-2 rounded text-xs font-mono text-gray-300" />
+        <button onClick={() => navigator.clipboard.writeText(brCode)} className="bg-[#00e66b] text-black px-4 py-2 font-bold text-xs rounded">
+          Copiar
+        </button>
+      </div>
+    </div>
+  );
+}`}
+                        </pre>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bloco de Validação Webhook HMAC */}
+                  <div className="p-5 rounded-2xl bg-[#09120d] border border-[#213428] space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Shield className="w-4 h-4 text-emerald-400" />
+                        <span className="text-xs font-bold text-white uppercase tracking-wider">Passo 3: Validação de Webhook com Assinatura Criptográfica HMAC-SHA256</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const code = `// Exemplo: Validação de assinatura em Express\\nconst crypto = require("crypto");\\n\\napp.post("/webhooks/axion-pay", express.raw({ type: "application/json" }), (req, res) => {\\n  const signature = req.headers["x-axion-signature"];\\n  const secret = process.env.AXION_WEBHOOK_SECRET;\\n  const expected = crypto.createHmac("sha256", secret).update(req.body).digest("hex");\\n  \\n  if (signature !== expected) return res.status(401).send("Invalid signature");\\n  \\n  const event = JSON.parse(req.body.toString());\\n  if (event.type === "charge.completed") {\\n    // Atualizar pedido para PAGO no banco\\n  }\\n  res.status(200).json({ received: true });\\n});`;
+                          navigator.clipboard.writeText(code);
+                          notify("success", "Código de webhook copiado!");
+                        }}
+                        className="inline-flex items-center gap-1.5 text-xs text-[#a1b0a6] hover:text-white transition cursor-pointer"
+                      >
+                        <Copy className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Copiar código de validação</span>
+                      </button>
+                    </div>
+                    <pre className="p-4 rounded-xl bg-[#050c08] border border-[#213428] font-mono text-[11px] text-[#b5c6bb] overflow-x-auto leading-relaxed">
+{`app.post("/webhooks/axion-pay", express.raw({ type: "application/json" }), (req, res) => {
+  const signature = req.headers["x-axion-signature"];
+  const expected = crypto.createHmac("sha256", process.env.AXION_WEBHOOK_SECRET).update(req.body).digest("hex");
+  if (signature !== expected) return res.status(401).send("Invalid signature");
+
+  const event = JSON.parse(req.body.toString());
+  if (event.type === "charge.completed") {
+    // Pedido aprovado! Libere a entrega e dispare nota fiscal
+  }
+  return res.status(200).json({ received: true });
+});`}
+                    </pre>
                   </div>
                 </div>
               )}
