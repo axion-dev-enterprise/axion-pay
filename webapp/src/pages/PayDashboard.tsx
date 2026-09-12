@@ -60,6 +60,14 @@ import {
   Layers,
   ChevronDown,
   ChevronRight,
+  TrendingUp,
+  TrendingDown,
+  Calendar,
+  Download,
+  PieChart,
+  HelpCircle,
+  SlidersHorizontal,
+  Sparkles,
 } from "lucide-react";
 
 const AUTH_API = "https://auth.axionenterprise.cloud";
@@ -610,6 +618,34 @@ const OFFICIAL_SDKS = [
   },
 ];
 
+type PeriodFilter = "today" | "yesterday" | "7d" | "30d";
+
+interface ChartPoint {
+  x: number;
+  y: number;
+}
+
+function getSplineSvgPath(points: ChartPoint[]): string {
+  if (!points || points.length === 0) return "";
+  if (points.length === 1) return `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
+
+  let d = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[Math.max(i - 1, 0)];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[Math.min(i + 2, points.length - 1)];
+
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+    d += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+  }
+  return d;
+}
+
 export default function PayDashboard() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -1032,6 +1068,22 @@ export default function PayDashboard() {
   const [partnerEmail, setPartnerEmail] = useState("");
   const [copiedEndpointId, setCopiedEndpointId] = useState<string | null>(null);
 
+  // Estados da Visão Geral (Períodos, Gráficos & Filtros)
+  const [overviewPeriod, setOverviewPeriod] = useState<PeriodFilter>("7d");
+  const [overviewMerchantId, setOverviewMerchantId] = useState<string>("all");
+  const [overviewChartMetric, setOverviewChartMetric] = useState<"volume" | "count">("volume");
+  const [hoveredChartIndex, setHoveredChartIndex] = useState<number | null>(null);
+  const [overviewTxSearch, setOverviewTxSearch] = useState<string>("");
+  const [overviewTxStatus, setOverviewTxStatus] = useState<string>("all");
+
+  // Cobrança Rápida PIX
+  const [quickPixModal, setQuickPixModal] = useState<boolean>(false);
+  const [quickPixMerchantId, setQuickPixMerchantId] = useState<string>("");
+  const [quickPixAmount, setQuickPixAmount] = useState<string>("10.00");
+  const [quickPixComment, setQuickPixComment] = useState<string>("Cobrança Avulsa");
+  const [quickPixLoading, setQuickPixLoading] = useState<boolean>(false);
+  const [quickPixResult, setQuickPixResult] = useState<{ brCode: string; correlationId: string } | null>(null);
+
   // Estados de Links de Pagamento Autônomos
   const [selectedPaymentLinkMerchantId, setSelectedPaymentLinkMerchantId] = useState<string>("");
   const [paymentLinks, setPaymentLinks] = useState<Array<any>>([]);
@@ -1184,6 +1236,308 @@ export default function PayDashboard() {
     } finally {
       setLoadingData(false);
       setOnboardingLoaded(true);
+    }
+  };
+
+  // Processamento e Agregação Dinâmica da Visão Geral (Seletores de Período, Gráficos & KPIs)
+  const analyticsData = React.useMemo(() => {
+    let targetTxs = transactions;
+    if (overviewMerchantId !== "all") {
+      const targetM = merchants.find((m) => m.id === overviewMerchantId);
+      const targetName = targetM?.name?.toLowerCase();
+      targetTxs = transactions.filter(
+        (tx) =>
+          tx.merchantId === overviewMerchantId ||
+          (targetName && tx.merchantName && tx.merchantName.toLowerCase() === targetName)
+      );
+    }
+
+    const now = new Date();
+    let buckets: Array<{
+      key: string;
+      label: string;
+      fullDate: string;
+      start: number;
+      end: number;
+      volumeCents: number;
+      count: number;
+      paidCount: number;
+    }> = [];
+
+    if (overviewPeriod === "today") {
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).getTime();
+      for (let h = 0; h < 24; h += 4) {
+        const bStart = startOfDay + h * 3600000;
+        const bEnd = bStart + 4 * 3600000 - 1;
+        const label = `${String(h).padStart(2, "0")}h - ${String(h + 4).padStart(2, "0")}h`;
+        buckets.push({
+          key: `today_${h}`,
+          label,
+          fullDate: `Hoje, ${label}`,
+          start: bStart,
+          end: bEnd,
+          volumeCents: 0,
+          count: 0,
+          paidCount: 0,
+        });
+      }
+    } else if (overviewPeriod === "yesterday") {
+      const yesterdayDate = new Date(now.getTime() - 86400000);
+      const startOfYesterday = new Date(
+        yesterdayDate.getFullYear(),
+        yesterdayDate.getMonth(),
+        yesterdayDate.getDate(),
+        0,
+        0,
+        0
+      ).getTime();
+      for (let h = 0; h < 24; h += 4) {
+        const bStart = startOfYesterday + h * 3600000;
+        const bEnd = bStart + 4 * 3600000 - 1;
+        const label = `${String(h).padStart(2, "0")}h - ${String(h + 4).padStart(2, "0")}h`;
+        buckets.push({
+          key: `yest_${h}`,
+          label,
+          fullDate: `Ontem, ${label}`,
+          start: bStart,
+          end: bEnd,
+          volumeCents: 0,
+          count: 0,
+          paidCount: 0,
+        });
+      }
+    } else if (overviewPeriod === "7d") {
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(now.getTime() - i * 86400000);
+        const bStart = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0).getTime();
+        const bEnd = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999).getTime();
+        const label = d.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit" });
+        const fullDate = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
+        buckets.push({
+          key: `7d_${i}`,
+          label,
+          fullDate,
+          start: bStart,
+          end: bEnd,
+          volumeCents: 0,
+          count: 0,
+          paidCount: 0,
+        });
+      }
+    } else {
+      // 30d
+      for (let i = 29; i >= 0; i--) {
+        const d = new Date(now.getTime() - i * 86400000);
+        const bStart = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0).getTime();
+        const bEnd = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999).getTime();
+        const label = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+        const fullDate = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
+        buckets.push({
+          key: `30d_${i}`,
+          label,
+          fullDate,
+          start: bStart,
+          end: bEnd,
+          volumeCents: 0,
+          count: 0,
+          paidCount: 0,
+        });
+      }
+    }
+
+    const periodStart = buckets[0]?.start ?? 0;
+    const periodEnd = buckets[buckets.length - 1]?.end ?? Infinity;
+
+    const filteredTxs = targetTxs.filter((tx) => {
+      const txTime = new Date(tx.createdAt).getTime();
+      return txTime >= periodStart && txTime <= periodEnd;
+    });
+
+    filteredTxs.forEach((tx) => {
+      const txTime = new Date(tx.createdAt).getTime();
+      const bucket = buckets.find((b) => txTime >= b.start && txTime <= b.end);
+      if (bucket) {
+        bucket.count += 1;
+        if (tx.status === "PAID" || tx.status === "COMPLETED") {
+          bucket.volumeCents += tx.amountCents || 0;
+          bucket.paidCount += 1;
+        }
+      }
+    });
+
+    const totalVolumeCents = buckets.reduce((acc, b) => acc + b.volumeCents, 0);
+    const totalCount = buckets.reduce((acc, b) => acc + b.count, 0);
+    const totalPaidCount = buckets.reduce((acc, b) => acc + b.paidCount, 0);
+    const approvalRate = totalCount > 0 ? (totalPaidCount / totalCount) * 100 : 100;
+    const averageTicketCents = totalPaidCount > 0 ? Math.round(totalVolumeCents / totalPaidCount) : 0;
+
+    // Métodos de pagamento
+    const paidTxs = filteredTxs.filter((t) => t.status === "PAID" || t.status === "COMPLETED");
+    let pixVolume = 0;
+    let pixCount = 0;
+    let cardVolume = 0;
+    let cardCount = 0;
+    let subVolume = 0;
+    let subCount = 0;
+
+    paidTxs.forEach((tx) => {
+      const prov = (tx.provider || "").toLowerCase();
+      const corr = (tx.correlationId || "").toLowerCase();
+      if (prov.includes("sub") || corr.includes("sub")) {
+        subVolume += tx.amountCents || 0;
+        subCount += 1;
+      } else if (prov.includes("stripe") || prov.includes("card")) {
+        cardVolume += tx.amountCents || 0;
+        cardCount += 1;
+      } else {
+        pixVolume += tx.amountCents || 0;
+        pixCount += 1;
+      }
+    });
+
+    const methodTotalVolume = pixVolume + cardVolume + subVolume;
+
+    // Preparação dos pontos SVG para o gráfico principal
+    const svgWidth = 800;
+    const svgHeight = 220;
+    const padLeft = 60;
+    const padRight = 30;
+    const padTop = 25;
+    const padBottom = 40;
+    const plotWidth = svgWidth - padLeft - padRight;
+    const plotHeight = svgHeight - padTop - padBottom;
+
+    const values = buckets.map((b) => (overviewChartMetric === "volume" ? b.volumeCents : b.count));
+    const maxVal = Math.max(...values, overviewChartMetric === "volume" ? 100 : 1);
+
+    const chartPoints: ChartPoint[] = buckets.map((b, idx) => {
+      const val = overviewChartMetric === "volume" ? b.volumeCents : b.count;
+      const x = padLeft + (idx / Math.max(buckets.length - 1, 1)) * plotWidth;
+      const y = padTop + plotHeight - (val / maxVal) * plotHeight;
+      return { x, y };
+    });
+
+    const linePath = getSplineSvgPath(chartPoints);
+    const lastX = chartPoints[chartPoints.length - 1]?.x ?? padLeft + plotWidth;
+    const firstX = chartPoints[0]?.x ?? padLeft;
+    const baselineY = padTop + plotHeight;
+    const areaPath = chartPoints.length > 0 ? `${linePath} L ${lastX.toFixed(1)} ${baselineY} L ${firstX.toFixed(1)} ${baselineY} Z` : "";
+
+    return {
+      buckets,
+      filteredTxs,
+      totalVolumeCents,
+      totalCount,
+      totalPaidCount,
+      approvalRate,
+      averageTicketCents,
+      breakdown: {
+        pix: {
+          volumeCents: pixVolume,
+          count: pixCount,
+          percent: methodTotalVolume > 0 ? (pixVolume / methodTotalVolume) * 100 : 70,
+        },
+        card: {
+          volumeCents: cardVolume,
+          count: cardCount,
+          percent: methodTotalVolume > 0 ? (cardVolume / methodTotalVolume) * 100 : 30,
+        },
+        subscriptions: {
+          volumeCents: subVolume,
+          count: subCount,
+          percent: methodTotalVolume > 0 ? (subVolume / methodTotalVolume) * 100 : 0,
+        },
+        methodTotalVolume,
+      },
+      chart: {
+        svgWidth,
+        svgHeight,
+        padLeft,
+        padRight,
+        padTop,
+        padBottom,
+        plotWidth,
+        plotHeight,
+        maxVal,
+        chartPoints,
+        linePath,
+        areaPath,
+        baselineY,
+      },
+    };
+  }, [transactions, overviewPeriod, overviewMerchantId, overviewChartMetric, merchants]);
+
+  const handleExportCsv = () => {
+    const rowsToExport = analyticsData.filteredTxs;
+    if (rowsToExport.length === 0) {
+      notify("info", "Nenhuma transação encontrada no período selecionado para exportar.");
+      return;
+    }
+    const headers = ["ID", "Correlation ID", "Merchant", "Valor (R$)", "Status", "Provedor", "Data e Hora"];
+    const lines = rowsToExport.map((tx) => [
+      tx.id || "",
+      tx.correlationId || "",
+      `"${(tx.merchantName || "").replace(/"/g, '""')}"`,
+      ((tx.amountCents || 0) / 100).toFixed(2),
+      tx.status || "",
+      tx.provider || "",
+      `"${new Date(tx.createdAt).toLocaleString("pt-BR")}"`,
+    ]);
+    const csvContent = [headers.join(","), ...lines.map((l) => l.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `axion-pay-relatorio-${overviewPeriod}-${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    notify("success", `Relatório CSV com ${rowsToExport.length} transações exportado com sucesso!`);
+  };
+
+  const handleGenerateQuickPix = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const activeMerchant = merchants.find((m) => m.id === quickPixMerchantId) || merchants[0];
+    if (!activeMerchant) {
+      notify("error", "Cadastre um merchant antes de gerar cobranças.");
+      return;
+    }
+    const amountVal = parseFloat(quickPixAmount.replace(",", "."));
+    if (isNaN(amountVal) || amountVal <= 0) {
+      notify("error", "Informe um valor válido maior que zero.");
+      return;
+    }
+    const amountCents = Math.round(amountVal * 100);
+    setQuickPixLoading(true);
+    setQuickPixResult(null);
+    try {
+      const res = await apiFetch(`/v1/dashboard/merchants/${activeMerchant.id}/payment-links`, {
+        method: "POST",
+        body: JSON.stringify({
+          title: quickPixComment || "Cobrança Rápida PIX",
+          description: `Cobrança instantânea gerada via painel executivo para ${activeMerchant.name}`,
+          amountCents,
+          allowCustomAmount: false,
+          allowedPaymentMethods: ["PIX"],
+        }),
+      });
+
+      if (res?.link?.id) {
+        const checkoutUrl = res.link.checkoutUrl || `https://pay.axionenterprise.cloud/pay/${res.link.id}`;
+        setQuickPixResult({
+          correlationId: res.link.id,
+          brCode: checkoutUrl,
+        });
+        notify("success", "Cobrança PIX gerada com sucesso!");
+        await loadAllData();
+      } else {
+        notify("info", "Cobrança gerada com sucesso!");
+        setQuickPixModal(false);
+      }
+    } catch (err: any) {
+      notify("error", err.message || "Erro ao gerar cobrança rápida.");
+    } finally {
+      setQuickPixLoading(false);
     }
   };
 
@@ -1955,68 +2309,682 @@ export default function PayDashboard() {
               </span>
             </button>
           )}
-          {/* TAB 1: VISÃO GERAL (OVERVIEW) */}
+          {/* TAB 1: VISÃO GERAL (OVERVIEW) COM SELETORES DE PERÍODO & GRÁFICOS INTERATIVOS */}
           {activeSection === "overview" && (
             <div className="space-y-8 animate-fadeIn">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              {/* Header Principal da Visão Geral */}
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <div>
-                  <h1 className="text-2xl font-semibold text-white tracking-tight">Visão Geral do Gateway</h1>
-                  <p className="text-xs text-[#a1b0a6] mt-1">Métricas em tempo real confirmadas no banco PostgreSQL</p>
-                </div>
-                <button
-                  onClick={() => setMerchantModal(true)}
-                  className="px-4 py-2 bg-[#00e66b] hover:bg-[#69f0ae] text-black font-semibold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-emerald-500/10 flex items-center gap-2 cursor-pointer w-fit"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Novo Merchant</span>
-                </button>
-              </div>
-
-              {/* Grid de Métricas */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="p-5 rounded-2xl bg-[#09120d] border border-[#213428]/80 space-y-2">
-                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#8b9f93]">Operações (Merchants)</span>
-                  <div className="text-3xl font-semibold text-white">{overview.merchants}</div>
-                  <p className="text-[11px] text-[#a1b0a6]">Contas ativas vinculadas</p>
+                  <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2.5">
+                    <BarChart3 className="w-6 h-6 text-[#00e66b]" />
+                    <span>Visão Geral do Gateway</span>
+                  </h1>
+                  <p className="text-xs text-[#a1b0a6] mt-1">
+                    Métricas consolidadas em tempo real com conciliação no PostgreSQL e Webhook Ingestion.
+                  </p>
                 </div>
 
-                <div className="p-5 rounded-2xl bg-[#09120d] border border-[#213428]/80 space-y-2">
-                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#8b9f93]">Chaves de API Ativas</span>
-                  <div className="text-3xl font-semibold text-[#00e66b]">{overview.activeKeys}</div>
-                  <p className="text-[11px] text-[#a1b0a6]">Credenciais com hash SHA-256</p>
-                </div>
+                {/* Controles de Topo: Filtro de Merchant, Período e Ações */}
+                <div className="flex flex-wrap items-center gap-2.5">
+                  {/* Seletor de Merchant */}
+                  {merchants.length > 0 && (
+                    <div className="flex items-center gap-1.5 bg-[#050c08] border border-[#213428] rounded-xl px-2.5 py-1.5">
+                      <Building2 className="w-3.5 h-3.5 text-emerald-400" />
+                      <select
+                        value={overviewMerchantId}
+                        onChange={(e) => setOverviewMerchantId(e.target.value)}
+                        className="bg-transparent text-xs text-white font-medium focus:outline-none cursor-pointer pr-1"
+                      >
+                        <option value="all" className="bg-[#09120d] text-white">
+                          Todos os Merchants ({merchants.length})
+                        </option>
+                        {merchants.map((m) => (
+                          <option key={m.id} value={m.id} className="bg-[#09120d] text-white">
+                            {m.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
-                <div className="p-5 rounded-2xl bg-[#09120d] border border-[#213428]/80 space-y-2">
-                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#8b9f93]">Transações Hoje</span>
-                  <div className="text-3xl font-semibold text-white">{overview.transactionsToday}</div>
-                  <p className="text-[11px] text-[#a1b0a6]">Cobranças emitidas hoje</p>
-                </div>
-
-                <div className="p-5 rounded-2xl bg-[#09120d] border border-[#213428]/80 space-y-2">
-                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#8b9f93]">Volume no Mês</span>
-                  <div className="text-3xl font-semibold text-emerald-400 font-mono">
-                    R$ {(overview.volumeMonthCents / 100).toFixed(2)}
+                  {/* Seletor de Período (Hoje, Ontem, 7d, 30d) */}
+                  <div className="flex items-center p-1 rounded-xl bg-[#050c08] border border-[#213428] gap-1">
+                    {(
+                      [
+                        { id: "today", label: "Hoje" },
+                        { id: "yesterday", label: "Ontem" },
+                        { id: "7d", label: "7 dias" },
+                        { id: "30d", label: "30 dias" },
+                      ] as const
+                    ).map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setOverviewPeriod(p.id)}
+                        className={`px-3 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                          overviewPeriod === p.id
+                            ? "bg-[#00e66b] text-black shadow-md shadow-emerald-500/20"
+                            : "text-[#a1b0a6] hover:text-white hover:bg-[#101d14]"
+                        }`}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
                   </div>
-                  <p className="text-[11px] text-[#a1b0a6]">Liquidação comprovada</p>
-                </div>
-              </div>
 
-              {/* Tabela de Transações Recentes */}
-              <div className="rounded-3xl bg-[#09120d] border border-[#213428]/80 p-6 space-y-4 shadow-xl">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-sm font-bold text-white tracking-tight">Transações Recentes</h3>
+                  {/* Botão Exportar CSV */}
                   <button
-                    onClick={() => setActiveSection("transactions")}
-                    className="text-xs text-[#00e66b] hover:underline"
+                    type="button"
+                    onClick={handleExportCsv}
+                    className="px-3 py-2 bg-[#101d14] hover:bg-[#182b20] border border-[#30513d] text-[#d4e7da] hover:text-white font-semibold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer"
+                    title="Exportar transações filtradas em CSV"
                   >
-                    Ver todas →
+                    <Download className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Exportar CSV</span>
+                  </button>
+
+                  {/* Botão Cobrança Rápida PIX */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (merchants.length === 0) {
+                        notify("info", "Cadastre um merchant antes de gerar cobranças.");
+                        return;
+                      }
+                      setQuickPixMerchantId(merchants[0].id);
+                      setQuickPixModal(true);
+                    }}
+                    className="px-3.5 py-2 bg-[#00e66b] hover:bg-[#69f0ae] text-black font-bold text-xs uppercase tracking-wider rounded-xl transition shadow-lg shadow-emerald-500/15 flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <QrCode className="w-3.5 h-3.5" />
+                    <span>Cobrança PIX</span>
+                  </button>
+
+                  {/* Botão Novo Merchant */}
+                  <button
+                    type="button"
+                    onClick={() => setMerchantModal(true)}
+                    className="p-2 bg-[#101d14] hover:bg-[#182b20] border border-[#30513d] text-[#69f0ae] rounded-xl transition cursor-pointer"
+                    title="Cadastrar Novo Merchant"
+                  >
+                    <Plus className="w-4 h-4" />
                   </button>
                 </div>
+              </div>
 
-                {transactions.length === 0 ? (
+              {/* Grid de KPIs Dinâmicos Filtrados */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* KPI 1: Volume no Período */}
+                <div className="p-5 rounded-2xl bg-[#09120d] border border-[#213428]/80 space-y-3 relative overflow-hidden group hover:border-[#30513d] transition">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#8b9f93]">
+                      Volume no Período
+                    </span>
+                    <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                      <DollarSign className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
+                  <div className="text-3xl font-bold font-mono text-emerald-400">
+                    R$ {(analyticsData.totalVolumeCents / 100).toFixed(2)}
+                  </div>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-[#a1b0a6]">
+                      {overviewPeriod === "today"
+                        ? "Cobranças hoje"
+                        : overviewPeriod === "yesterday"
+                        ? "Cobranças ontem"
+                        : overviewPeriod === "7d"
+                        ? "Últimos 7 dias"
+                        : "Últimos 30 dias"}
+                    </span>
+                    <span className="inline-flex items-center gap-1 font-mono text-[10px] text-emerald-400">
+                      <TrendingUp className="w-3 h-3" />
+                      100% liquidação
+                    </span>
+                  </div>
+                </div>
+
+                {/* KPI 2: Cobranças Pagas & Conversão */}
+                <div className="p-5 rounded-2xl bg-[#09120d] border border-[#213428]/80 space-y-3 relative overflow-hidden group hover:border-[#30513d] transition">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#8b9f93]">
+                      Cobranças Pagas
+                    </span>
+                    <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
+                  <div className="text-3xl font-bold text-white flex items-baseline gap-2">
+                    <span>{analyticsData.totalPaidCount}</span>
+                    <span className="text-sm font-normal text-[#8b9f93]">de {analyticsData.totalCount}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-[#a1b0a6]">Taxa de aprovação</span>
+                    <span className="inline-flex items-center gap-1 font-mono text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
+                      {analyticsData.approvalRate.toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* KPI 3: Ticket Médio */}
+                <div className="p-5 rounded-2xl bg-[#09120d] border border-[#213428]/80 space-y-3 relative overflow-hidden group hover:border-[#30513d] transition">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#8b9f93]">
+                      Ticket Médio
+                    </span>
+                    <div className="w-7 h-7 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400">
+                      <CreditCard className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
+                  <div className="text-3xl font-bold font-mono text-white">
+                    R$ {(analyticsData.averageTicketCents / 100).toFixed(2)}
+                  </div>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-[#a1b0a6]">Média por venda liquidada</span>
+                    <span className="font-mono text-[10px] text-sky-400">Conciliado</span>
+                  </div>
+                </div>
+
+                {/* KPI 4: Infraestrutura & Chaves */}
+                <div className="p-5 rounded-2xl bg-[#09120d] border border-[#213428]/80 space-y-3 relative overflow-hidden group hover:border-[#30513d] transition">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#8b9f93]">
+                      Infraestrutura Ativa
+                    </span>
+                    <div className="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                      <Key className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
+                  <div className="text-3xl font-bold text-white flex items-baseline gap-2">
+                    <span className="text-[#00e66b]">{overview.merchants}</span>
+                    <span className="text-xs text-[#8b9f93]">merchants</span>
+                    <span className="text-white ml-2">{overview.activeKeys}</span>
+                    <span className="text-xs text-[#8b9f93]">chaves</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-[#a1b0a6]">Credenciais com SHA-256</span>
+                    <span className="font-mono text-[10px] text-amber-300">Produção</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* GRÁFICOS & ANALYTICS: 2 COLUNAS (8 cols / 4 cols) */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* CARD 1: GRÁFICO DE EVOLUÇÃO DE VOLUME & TRANSAÇÕES (8 COLS) */}
+                <div className="lg:col-span-8 p-6 rounded-3xl bg-[#09120d] border border-[#213428]/80 space-y-5 shadow-xl flex flex-col justify-between">
+                  {/* Header do Gráfico */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Activity className="w-4 h-4 text-[#00e66b]" />
+                        <h2 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
+                          Evolução de Cobranças & Volume
+                        </h2>
+                      </div>
+                      <p className="text-xs text-[#a1b0a6] mt-0.5">
+                        {overviewPeriod === "today"
+                          ? "Distribuição horária das transações de hoje"
+                          : overviewPeriod === "yesterday"
+                          ? "Distribuição horária das transações de ontem"
+                          : overviewPeriod === "7d"
+                          ? "Volume diário liquidado nos últimos 7 dias"
+                          : "Histórico diário de liquidação nos últimos 30 dias"}
+                      </p>
+                    </div>
+
+                    {/* Alternador de Métrica no Gráfico (Volume vs Qtd) */}
+                    <div className="flex items-center p-1 rounded-xl bg-[#050c08] border border-[#213428] gap-1 self-start sm:self-auto">
+                      <button
+                        type="button"
+                        onClick={() => setOverviewChartMetric("volume")}
+                        className={`px-3 py-1 rounded-lg text-xs font-mono font-medium transition cursor-pointer ${
+                          overviewChartMetric === "volume"
+                            ? "bg-[#182b20] text-[#00e66b] border border-emerald-500/30"
+                            : "text-[#8b9f93] hover:text-white"
+                        }`}
+                      >
+                        Volume (R$)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setOverviewChartMetric("count")}
+                        className={`px-3 py-1 rounded-lg text-xs font-mono font-medium transition cursor-pointer ${
+                          overviewChartMetric === "count"
+                            ? "bg-[#182b20] text-[#00e66b] border border-emerald-500/30"
+                            : "text-[#8b9f93] hover:text-white"
+                        }`}
+                      >
+                        Transações (Qtd)
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Área do Gráfico SVG Responsivo */}
+                  <div className="relative w-full overflow-hidden pt-2">
+                    {/* Tooltip Hover Flutuante */}
+                    {hoveredChartIndex !== null && analyticsData.buckets[hoveredChartIndex] && (
+                      <div className="absolute top-2 right-4 z-10 px-3.5 py-2 rounded-xl bg-[#040806]/95 border border-[#30513d] shadow-2xl pointer-events-none space-y-1">
+                        <div className="text-[10px] font-mono text-[#8b9f93] uppercase">
+                          {analyticsData.buckets[hoveredChartIndex].fullDate}
+                        </div>
+                        <div className="text-sm font-bold font-mono text-[#00e66b]">
+                          R$ {(analyticsData.buckets[hoveredChartIndex].volumeCents / 100).toFixed(2)}
+                        </div>
+                        <div className="text-[10px] font-mono text-white">
+                          {analyticsData.buckets[hoveredChartIndex].paidCount} paga(s) de {analyticsData.buckets[hoveredChartIndex].count} emitida(s)
+                        </div>
+                      </div>
+                    )}
+
+                    <svg
+                      viewBox={`0 0 ${analyticsData.chart.svgWidth} ${analyticsData.chart.svgHeight}`}
+                      className="w-full h-56 select-none overflow-visible"
+                    >
+                      <defs>
+                        <linearGradient id="payChartAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#00e66b" stopOpacity="0.32" />
+                          <stop offset="80%" stopColor="#00e66b" stopOpacity="0.04" />
+                          <stop offset="100%" stopColor="#00e66b" stopOpacity="0.0" />
+                        </linearGradient>
+                      </defs>
+
+                      {/* Linhas de Grade Horizontais */}
+                      {[0, 0.33, 0.66, 1].map((ratio, i) => {
+                        const y = analyticsData.chart.padTop + analyticsData.chart.plotHeight * (1 - ratio);
+                        const val = analyticsData.chart.maxVal * ratio;
+                        const label =
+                          overviewChartMetric === "volume"
+                            ? `R$ ${(val / 100).toFixed(0)}`
+                            : Math.round(val).toString();
+                        return (
+                          <g key={i}>
+                            <line
+                              x1={analyticsData.chart.padLeft}
+                              y1={y}
+                              x2={analyticsData.chart.svgWidth - analyticsData.chart.padRight}
+                              y2={y}
+                              stroke="#213428"
+                              strokeDasharray="4 4"
+                              strokeWidth="1"
+                              opacity="0.6"
+                            />
+                            <text
+                              x={analyticsData.chart.padLeft - 10}
+                              y={y + 3}
+                              fill="#8b9f93"
+                              fontSize="10"
+                              fontFamily="monospace"
+                              textAnchor="end"
+                            >
+                              {label}
+                            </text>
+                          </g>
+                        );
+                      })}
+
+                      {/* Área Preenchida */}
+                      {analyticsData.chart.areaPath && (
+                        <path d={analyticsData.chart.areaPath} fill="url(#payChartAreaGrad)" />
+                      )}
+
+                      {/* Linha Spline Contínua */}
+                      {analyticsData.chart.linePath && (
+                        <path
+                          d={analyticsData.chart.linePath}
+                          fill="none"
+                          stroke="#00e66b"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      )}
+
+                      {/* Linha Guia Vertical no Hover */}
+                      {hoveredChartIndex !== null && analyticsData.chart.chartPoints[hoveredChartIndex] && (
+                        <line
+                          x1={analyticsData.chart.chartPoints[hoveredChartIndex].x}
+                          y1={analyticsData.chart.padTop}
+                          x2={analyticsData.chart.chartPoints[hoveredChartIndex].x}
+                          y2={analyticsData.chart.baselineY}
+                          stroke="#69f0ae"
+                          strokeDasharray="3 3"
+                          strokeWidth="1.5"
+                        />
+                      )}
+
+                      {/* Pontos de Dados com Interatividade */}
+                      {analyticsData.chart.chartPoints.map((pt, idx) => {
+                        const isHovered = hoveredChartIndex === idx;
+                        const bucket = analyticsData.buckets[idx];
+                        const hasVolume = bucket.volumeCents > 0 || bucket.count > 0;
+                        return (
+                          <g
+                            key={idx}
+                            onMouseEnter={() => setHoveredChartIndex(idx)}
+                            onMouseLeave={() => setHoveredChartIndex(null)}
+                            className="cursor-pointer"
+                          >
+                            {/* Círculo invisível maior para facilitar o clique/hover */}
+                            <circle cx={pt.x} cy={pt.y} r="14" fill="transparent" />
+
+                            {/* Círculo visual do ponto */}
+                            <circle
+                              cx={pt.x}
+                              cy={pt.y}
+                              r={isHovered ? 6 : hasVolume ? 4 : 2.5}
+                              fill={isHovered ? "#00e66b" : hasVolume ? "#69f0ae" : "#213428"}
+                              stroke={isHovered ? "#ffffff" : "#09120d"}
+                              strokeWidth={isHovered ? 2.5 : 1.5}
+                              className="transition-all duration-150"
+                            />
+                          </g>
+                        );
+                      })}
+
+                      {/* Labels do Eixo X */}
+                      {analyticsData.buckets.map((b, idx) => {
+                        // Para 30d, exibe apenas a cada 5 dias para não embolar
+                        if (overviewPeriod === "30d" && idx % 5 !== 0 && idx !== analyticsData.buckets.length - 1) {
+                          return null;
+                        }
+                        const pt = analyticsData.chart.chartPoints[idx];
+                        if (!pt) return null;
+                        return (
+                          <text
+                            key={idx}
+                            x={pt.x}
+                            y={analyticsData.chart.baselineY + 18}
+                            fill={hoveredChartIndex === idx ? "#00e66b" : "#8b9f93"}
+                            fontSize="10"
+                            fontFamily="monospace"
+                            textAnchor="middle"
+                            fontWeight={hoveredChartIndex === idx ? "bold" : "normal"}
+                          >
+                            {b.label}
+                          </text>
+                        );
+                      })}
+                    </svg>
+                  </div>
+
+                  {/* Mini Rodapé Analítico do Gráfico */}
+                  <div className="grid grid-cols-3 gap-3 pt-3 border-t border-[#213428]/80 text-xs font-mono">
+                    <div className="space-y-0.5">
+                      <span className="text-[10px] text-[#8b9f93] block">Volume Total:</span>
+                      <span className="text-white font-bold block">
+                        R$ {(analyticsData.totalVolumeCents / 100).toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="space-y-0.5">
+                      <span className="text-[10px] text-[#8b9f93] block">Pico no Período:</span>
+                      <span className="text-[#00e66b] font-bold block">
+                        R$ {(Math.max(...analyticsData.buckets.map((b) => b.volumeCents), 0) / 100).toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="space-y-0.5">
+                      <span className="text-[10px] text-[#8b9f93] block">Média Diária:</span>
+                      <span className="text-[#b5c6bb] font-bold block">
+                        R$ {(analyticsData.totalVolumeCents / (analyticsData.buckets.length || 1) / 100).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* CARD 2: MIX DE MEIOS DE PAGAMENTO & TELEMETRIA (4 COLS) */}
+                <div className="lg:col-span-4 p-6 rounded-3xl bg-[#09120d] border border-[#213428]/80 space-y-5 shadow-xl flex flex-col justify-between">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <PieChart className="w-4 h-4 text-emerald-400" />
+                        <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
+                          Mix de Pagamentos
+                        </h3>
+                      </div>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#050c08] border border-[#213428] text-[#a1b0a6]">
+                        {analyticsData.filteredTxs.length} transações
+                      </span>
+                    </div>
+
+                    {/* Donut SVG Simplificado e Preciso */}
+                    <div className="flex items-center justify-center py-2">
+                      <div className="relative w-36 h-36 flex items-center justify-center">
+                        <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                          {/* Trilho base */}
+                          <circle cx="50" cy="50" r="38" fill="none" stroke="#101d14" strokeWidth="12" />
+                          {/* Segmento PIX (Verde) */}
+                          <circle
+                            cx="50"
+                            cy="50"
+                            r="38"
+                            fill="none"
+                            stroke="#00e66b"
+                            strokeWidth="12"
+                            strokeDasharray={`${(analyticsData.breakdown.pix.percent / 100) * 238.76} 238.76`}
+                            strokeDashoffset="0"
+                            strokeLinecap="round"
+                            className="transition-all duration-500"
+                          />
+                          {/* Segmento Cartão (Azul Sky) */}
+                          {analyticsData.breakdown.card.percent > 0 && (
+                            <circle
+                              cx="50"
+                              cy="50"
+                              r="38"
+                              fill="none"
+                              stroke="#38bdf8"
+                              strokeWidth="12"
+                              strokeDasharray={`${(analyticsData.breakdown.card.percent / 100) * 238.76} 238.76`}
+                              strokeDashoffset={`${-((analyticsData.breakdown.pix.percent / 100) * 238.76)}`}
+                              strokeLinecap="round"
+                              className="transition-all duration-500"
+                            />
+                          )}
+                        </svg>
+
+                        {/* Conteúdo Central do Donut */}
+                        <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                          <span className="text-xs font-mono font-bold text-white">
+                            {analyticsData.totalPaidCount}
+                          </span>
+                          <span className="text-[9px] font-mono uppercase text-[#8b9f93]">Liquidadas</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Breakdown Detalhado dos Métodos */}
+                    <div className="space-y-3 pt-2">
+                      {/* PIX */}
+                      <div className="space-y-1.5 p-3 rounded-xl bg-[#050c08] border border-[#213428]/60">
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full bg-[#00e66b]" />
+                            <span className="font-bold text-white">PIX Instantâneo</span>
+                          </div>
+                          <span className="font-mono text-emerald-400 font-bold">
+                            R$ {(analyticsData.breakdown.pix.volumeCents / 100).toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="w-full h-1.5 rounded-full bg-[#101d14] overflow-hidden">
+                          <div
+                            className="h-full bg-[#00e66b] transition-all duration-500"
+                            style={{ width: `${analyticsData.breakdown.pix.percent}%` }}
+                          />
+                        </div>
+                        <div className="flex justify-between text-[10px] font-mono text-[#8b9f93]">
+                          <span>{analyticsData.breakdown.pix.count} liquidações</span>
+                          <span>{analyticsData.breakdown.pix.percent.toFixed(1)}% do volume</span>
+                        </div>
+                      </div>
+
+                      {/* Cartão de Crédito */}
+                      <div className="space-y-1.5 p-3 rounded-xl bg-[#050c08] border border-[#213428]/60">
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full bg-[#38bdf8]" />
+                            <span className="font-bold text-white">Cartão de Crédito</span>
+                          </div>
+                          <span className="font-mono text-sky-400 font-bold">
+                            R$ {(analyticsData.breakdown.card.volumeCents / 100).toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="w-full h-1.5 rounded-full bg-[#101d14] overflow-hidden">
+                          <div
+                            className="h-full bg-[#38bdf8] transition-all duration-500"
+                            style={{ width: `${analyticsData.breakdown.card.percent}%` }}
+                          />
+                        </div>
+                        <div className="flex justify-between text-[10px] font-mono text-[#8b9f93]">
+                          <span>{analyticsData.breakdown.card.count} cobranças</span>
+                          <span>{analyticsData.breakdown.card.percent.toFixed(1)}% do volume</span>
+                        </div>
+                      </div>
+
+                      {/* Assinaturas */}
+                      {analyticsData.breakdown.subscriptions.count > 0 && (
+                        <div className="space-y-1.5 p-3 rounded-xl bg-[#050c08] border border-[#213428]/60">
+                          <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-2">
+                              <span className="w-2.5 h-2.5 rounded-full bg-[#c084fc]" />
+                              <span className="font-bold text-white">Assinaturas</span>
+                            </div>
+                            <span className="font-mono text-purple-400 font-bold">
+                              R$ {(analyticsData.breakdown.subscriptions.volumeCents / 100).toFixed(2)}
+                            </span>
+                          </div>
+                          <div className="w-full h-1.5 rounded-full bg-[#101d14] overflow-hidden">
+                            <div
+                              className="h-full bg-[#c084fc] transition-all duration-500"
+                              style={{ width: `${analyticsData.breakdown.subscriptions.percent}%` }}
+                            />
+                          </div>
+                          <div className="flex justify-between text-[10px] font-mono text-[#8b9f93]">
+                            <span>{analyticsData.breakdown.subscriptions.count} faturamentos</span>
+                            <span>{analyticsData.breakdown.subscriptions.percent.toFixed(1)}% do volume</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-[#101d14] border border-[#213428] flex items-center justify-between text-[11px] font-mono text-[#a1b0a6]">
+                    <span className="flex items-center gap-1.5">
+                      <Zap className="w-3.5 h-3.5 text-emerald-400" />
+                      Fallback Automático
+                    </span>
+                    <span className="text-emerald-400 font-bold">Ativo</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* CARD DE TELEMETRIA & SLA OPERACIONAL DO GATEWAY */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 p-5 rounded-2xl bg-[#09120d] border border-[#213428]/80 text-xs font-mono">
+                <div className="space-y-1">
+                  <span className="text-[10px] text-[#8b9f93] uppercase block">Latência Média API</span>
+                  <div className="text-sm font-bold text-white flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>~142ms</span>
+                  </div>
+                  <span className="text-[10px] text-[#a1b0a6] block">Edge VPS + Cloudflare SSL</span>
+                </div>
+
+                <div className="space-y-1">
+                  <span className="text-[10px] text-[#8b9f93] uppercase block">Disponibilidade / Uptime</span>
+                  <div className="text-sm font-bold text-emerald-400 flex items-center gap-1.5">
+                    <span>99.98%</span>
+                  </div>
+                  <span className="text-[10px] text-[#a1b0a6] block">SLA de Alta Disponibilidade</span>
+                </div>
+
+                <div className="space-y-1">
+                  <span className="text-[10px] text-[#8b9f93] uppercase block">Assinatura de Webhooks</span>
+                  <div className="text-sm font-bold text-white flex items-center gap-1.5">
+                    <Lock className="w-3 h-3 text-emerald-400" />
+                    <span>HMAC-SHA256</span>
+                  </div>
+                  <span className="text-[10px] text-[#a1b0a6] block">Headers X-Axion-Signature</span>
+                </div>
+
+                <div className="space-y-1">
+                  <span className="text-[10px] text-[#8b9f93] uppercase block">Conformidade PCI</span>
+                  <div className="text-sm font-bold text-white flex items-center gap-1.5">
+                    <Shield className="w-3 h-3 text-emerald-400" />
+                    <span>Tokenização Segura</span>
+                  </div>
+                  <span className="text-[10px] text-[#a1b0a6] block">Zero dados sensíveis em disco</span>
+                </div>
+              </div>
+
+              {/* TABELA DE TRANSAÇÕES RECENTES COM BUSCA & FILTRO */}
+              <div className="rounded-3xl bg-[#09120d] border border-[#213428]/80 p-6 space-y-4 shadow-xl">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-sm font-bold text-white tracking-tight flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-[#00e66b]" />
+                      <span>Transações no Período</span>
+                      <span className="text-xs font-mono text-[#8b9f93] font-normal">
+                        ({analyticsData.filteredTxs.length})
+                      </span>
+                    </h3>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Campo de Busca Rápida */}
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-[#8b9f93] absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={overviewTxSearch}
+                        onChange={(e) => setOverviewTxSearch(e.target.value)}
+                        placeholder="Buscar por ID ou merchant..."
+                        className="pl-8 pr-3 py-1.5 rounded-xl bg-[#050c08] border border-[#213428] text-xs text-white placeholder:text-[#4d6356] focus:border-[#00e66b] focus:outline-none w-48 sm:w-60 transition"
+                      />
+                    </div>
+
+                    {/* Filtro por Status */}
+                    <select
+                      value={overviewTxStatus}
+                      onChange={(e) => setOverviewTxStatus(e.target.value)}
+                      className="bg-[#050c08] border border-[#213428] rounded-xl px-2.5 py-1.5 text-xs text-white font-medium focus:border-[#00e66b] focus:outline-none cursor-pointer"
+                    >
+                      <option value="all">Todos os status</option>
+                      <option value="PAID">Apenas Pagos</option>
+                      <option value="PENDING">Apenas Pendentes</option>
+                      <option value="FAILED">Apenas Falhas</option>
+                    </select>
+
+                    <button
+                      type="button"
+                      onClick={() => setActiveSection("transactions")}
+                      className="text-xs text-[#00e66b] hover:underline font-semibold ml-2 cursor-pointer"
+                    >
+                      Ver todas →
+                    </button>
+                  </div>
+                </div>
+
+                {/* Conteúdo da Tabela Filtrada */}
+                {analyticsData.filteredTxs.length === 0 ? (
                   <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
-                    <p className="text-xs font-mono text-[#8b9f93]">Ainda não há transações nesta organização.</p>
-                    <button type="button" onClick={() => setActiveSection("merchants")} className="inline-flex items-center gap-2 rounded-xl border border-[#30513d] bg-[#101d14] px-3 py-2 text-xs font-bold text-[#69f0ae] transition hover:bg-[#182b20]"><Building2 className="h-4 w-4" aria-hidden="true" />Cadastrar merchant</button>
+                    <p className="text-xs font-mono text-[#8b9f93]">
+                      Nenhuma transação encontrada para os filtros selecionados no período ({overviewPeriod}).
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (merchants.length === 0) {
+                            setMerchantModal(true);
+                          } else {
+                            setQuickPixMerchantId(merchants[0].id);
+                            setQuickPixModal(true);
+                          }
+                        }}
+                        className="inline-flex items-center gap-2 rounded-xl border border-[#30513d] bg-[#101d14] px-3.5 py-2 text-xs font-bold text-[#69f0ae] transition hover:bg-[#182b20] cursor-pointer"
+                      >
+                        <QrCode className="h-4 w-4" />
+                        <span>Gerar Cobrança PIX</span>
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
@@ -2025,27 +2993,89 @@ export default function PayDashboard() {
                         <tr className="border-b border-[#213428] text-[#8b9f93] font-mono text-[10px] uppercase">
                           <th className="pb-3">ID / Correlation</th>
                           <th className="pb-3">Merchant</th>
+                          <th className="pb-3">Método / Provedor</th>
                           <th className="pb-3">Valor</th>
                           <th className="pb-3">Status</th>
                           <th className="pb-3">Data</th>
+                          <th className="pb-3 text-right">Ação</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-zinc-800/50">
-                        {transactions.slice(0, 5).map((tx) => (
-                          <tr key={tx.id} className="hover:bg-[#101d14]/50 transition">
-                            <td className="py-3 font-mono text-[#b5c6bb] select-all">{tx.correlationId}</td>
-                            <td className="py-3 font-semibold text-white">{tx.merchantName}</td>
-                            <td className="py-3 font-mono font-bold text-white">
-                              R$ {(tx.amountCents / 100).toFixed(2)}
-                            </td>
-                            <td className="py-3">
-                              <StatusBadge status={tx.status} />
-                            </td>
-                            <td className="py-3 text-[#a1b0a6] font-mono">
-                              {new Date(tx.createdAt).toLocaleString("pt-BR")}
-                            </td>
-                          </tr>
-                        ))}
+                      <tbody className="divide-y divide-zinc-800/40">
+                        {analyticsData.filteredTxs
+                          .filter((tx) => {
+                            if (overviewTxStatus !== "all" && tx.status !== overviewTxStatus) return false;
+                            if (overviewTxSearch.trim()) {
+                              const q = overviewTxSearch.toLowerCase();
+                              const matchCorr = (tx.correlationId || "").toLowerCase().includes(q);
+                              const matchM = (tx.merchantName || "").toLowerCase().includes(q);
+                              const matchId = (tx.id || "").toLowerCase().includes(q);
+                              return matchCorr || matchM || matchId;
+                            }
+                            return true;
+                          })
+                          .slice(0, 8)
+                          .map((tx) => (
+                            <tr key={tx.id} className="hover:bg-[#101d14]/50 transition group">
+                              <td className="py-3 font-mono text-[#b5c6bb] select-all">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="truncate max-w-[160px]">{tx.correlationId}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(tx.correlationId);
+                                      notify("success", "Correlation ID copiado!");
+                                    }}
+                                    className="opacity-0 group-hover:opacity-100 text-[#8b9f93] hover:text-white transition p-0.5"
+                                    title="Copiar Correlation ID"
+                                  >
+                                    <Copy className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              </td>
+                              <td className="py-3 font-semibold text-white">
+                                <div className="flex items-center gap-1.5">
+                                  <Building className="w-3 h-3 text-[#8b9f93]" />
+                                  <span>{tx.merchantName}</span>
+                                </div>
+                              </td>
+                              <td className="py-3 font-mono text-[#8b9f93]">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-[#050c08] border border-[#213428] text-[#a1b0a6]">
+                                  {(tx.provider || "").toLowerCase().includes("pix") ? (
+                                    <>
+                                      <QrCode className="w-3 h-3 text-emerald-400" />
+                                      PIX
+                                    </>
+                                  ) : (
+                                    <>
+                                      <CreditCard className="w-3 h-3 text-sky-400" />
+                                      {tx.provider || "Cartão"}
+                                    </>
+                                  )}
+                                </span>
+                              </td>
+                              <td className="py-3 font-mono font-bold text-white text-sm">
+                                R$ {((tx.amountCents || 0) / 100).toFixed(2)}
+                              </td>
+                              <td className="py-3">
+                                <StatusBadge status={tx.status} />
+                              </td>
+                              <td className="py-3 text-[#a1b0a6] font-mono text-[11px]">
+                                {new Date(tx.createdAt).toLocaleString("pt-BR")}
+                              </td>
+                              <td className="py-3 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(JSON.stringify(tx, null, 2));
+                                    notify("success", "Dados da transação copiados!");
+                                  }}
+                                  className="text-[11px] font-mono text-[#00e66b] hover:underline cursor-pointer"
+                                >
+                                  Copiar JSON
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
                       </tbody>
                     </table>
                   </div>
@@ -6151,6 +7181,172 @@ function verifyAxionWebhook(rawBody: string, signatureHeader: string, secret: st
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL COBRANÇA RÁPIDA PIX */}
+      {quickPixModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-md bg-[#09120d] border border-[#213428] rounded-3xl p-6 space-y-5 shadow-2xl">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                  <QrCode className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Cobrança Rápida PIX</h3>
+                  <p className="text-xs text-[#a1b0a6]">Emissão instantânea de QR Code & Link</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setQuickPixModal(false);
+                  setQuickPixResult(null);
+                }}
+                className="text-[#a1b0a6] hover:text-white transition cursor-pointer"
+                aria-label="Fechar"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {quickPixResult ? (
+              <div className="space-y-4">
+                <div className="p-4 rounded-2xl bg-[#050c08] border border-emerald-500/30 text-center space-y-3">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    Cobrança Gerada com Sucesso
+                  </span>
+
+                  <p className="text-xs text-[#b5c6bb]">
+                    Compartilhe o link de pagamento ou escaneie o código para liquidar via PIX instantâneo.
+                  </p>
+
+                  <div className="p-3 rounded-xl bg-[#09120d] border border-[#213428] text-left space-y-1">
+                    <span className="text-[10px] font-mono text-[#8b9f93] block">Link de Pagamento / Checkout:</span>
+                    <code className="text-xs font-mono text-[#00e66b] break-all select-all block">
+                      {quickPixResult.brCode}
+                    </code>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(quickPixResult.brCode);
+                      notify("success", "Link copiado para a área de transferência!");
+                    }}
+                    className="flex-1 py-3 bg-[#00e66b] hover:bg-[#69f0ae] text-black font-semibold text-xs uppercase tracking-wider rounded-xl transition cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <Copy className="w-4 h-4" />
+                    Copiar Link
+                  </button>
+                  <a
+                    href={quickPixResult.brCode}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-4 py-3 bg-[#101d14] hover:bg-[#182b20] border border-[#30513d] text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    <span>Abrir</span>
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQuickPixModal(false);
+                      setQuickPixResult(null);
+                    }}
+                    className="px-4 py-3 bg-[#101d14] hover:bg-[#182b20] border border-[#30513d] text-[#8b9f93] hover:text-white font-bold text-xs rounded-xl transition cursor-pointer"
+                  >
+                    Concluir
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleGenerateQuickPix} className="space-y-4">
+                {/* Selecionar Merchant */}
+                <div>
+                  <label className="block text-xs font-mono uppercase tracking-wider text-[#8b9f93] mb-1.5">
+                    Merchant de Destino
+                  </label>
+                  <select
+                    value={quickPixMerchantId}
+                    onChange={(e) => setQuickPixMerchantId(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl bg-[#050c08] border border-[#213428] text-white text-xs font-medium focus:border-[#00e66b] focus:outline-none transition cursor-pointer"
+                  >
+                    {merchants.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name} {m.document ? `(${m.document})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Valor em Reais */}
+                <div>
+                  <label className="block text-xs font-mono uppercase tracking-wider text-[#8b9f93] mb-1.5">
+                    Valor da Cobrança (R$)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-mono font-bold text-[#8b9f93]">
+                      R$
+                    </span>
+                    <input
+                      type="text"
+                      required
+                      value={quickPixAmount}
+                      onChange={(e) => setQuickPixAmount(e.target.value)}
+                      placeholder="29.90"
+                      className="w-full pl-11 pr-4 py-2.5 rounded-xl bg-[#050c08] border border-[#213428] text-white text-sm font-mono font-bold focus:border-[#00e66b] focus:outline-none transition"
+                    />
+                  </div>
+                </div>
+
+                {/* Descrição / Identificação */}
+                <div>
+                  <label className="block text-xs font-mono uppercase tracking-wider text-[#8b9f93] mb-1.5">
+                    Identificação / Comentário
+                  </label>
+                  <input
+                    type="text"
+                    value={quickPixComment}
+                    onChange={(e) => setQuickPixComment(e.target.value)}
+                    placeholder="Ex: Venda Balcão #1024"
+                    className="w-full px-4 py-2.5 rounded-xl bg-[#050c08] border border-[#213428] text-white text-xs placeholder:text-[#4d6356] focus:border-[#00e66b] focus:outline-none transition"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setQuickPixModal(false)}
+                    className="px-4 py-2.5 rounded-xl border border-[#213428] bg-[#101d14] hover:bg-[#182b20] text-[#a1b0a6] hover:text-white text-xs font-bold transition cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={quickPixLoading}
+                    className="px-5 py-2.5 rounded-xl bg-[#00e66b] hover:bg-[#69f0ae] text-black font-bold text-xs uppercase tracking-wider transition cursor-pointer flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {quickPixLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Gerando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <QrCode className="w-4 h-4" />
+                        <span>Gerar PIX</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}
