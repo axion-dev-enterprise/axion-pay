@@ -424,6 +424,32 @@ export const openapi = {
         responses: { '200': { description: 'Assinatura cancelada.' }, '404': { description: 'Não encontrada.' } },
       },
     },
+    '/v1/subscriptions/{id}/renew-checkout': {
+      post: {
+        summary: 'Renova a Checkout Session de uma assinatura expirada ou pendente sem duplicar o contrato',
+        security: [{ apiKey: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: {
+          '200': {
+            description: 'Novo link de checkout gerado com sucesso para envio ao cliente.',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string', format: 'uuid' },
+                    checkoutUrl: { type: 'string', format: 'uri' },
+                    status: { type: 'string' },
+                    message: { type: 'string' },
+                  },
+                },
+              },
+            },
+          },
+          '404': { description: 'Assinatura não encontrada.' },
+        },
+      },
+    },
     '/v1/payment-links': {
       get: {
         summary: 'Lista todos os links de pagamento do merchant autenticado',

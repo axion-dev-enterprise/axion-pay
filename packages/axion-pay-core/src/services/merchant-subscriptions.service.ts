@@ -118,6 +118,8 @@ export async function createMerchantSubscription(
       mode: 'subscription',
       customer: stripeCustomerId,
       line_items: [{ price: price.id, quantity: 1 }],
+      locale: 'pt-BR',
+      adaptive_pricing: { enabled: false },
       success_url: `https://pay.axionenterprise.cloud/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `https://pay.axionenterprise.cloud/checkout/cancel`,
       metadata: {
@@ -291,3 +293,78 @@ export async function cancelMerchantSubscription(
 
   return canceledData;
 }
+
+export async function renewMerchantSubscriptionCheckout(
+  database: Database,
+  stripe: Stripe,
+  merchantId: string,
+  subscriptionId: string,
+): Promise<{
+  id: string;
+  checkoutUrl: string | null;
+  status: string;
+  message: string;
+}> {
+  const existing = await getMerchantSubscription(database, merchantId, subscriptionId);
+
+  if (existing.status === 'ACTIVE') {
+    return {
+      id: existing.id,
+      checkoutUrl: null,
+      status: existing.status,
+      message: 'Assinatura já está ativa e com pagamento confirmado.',
+    };
+  }
+
+  // Cria preço para a nova Checkout Session
+  const price = await stripe.prices.create({
+    unit_amount: existing.amountCents,
+    currency: existing.currency,
+    recurring: { interval: existing.interval as 'month' | 'year' },
+    product_data: {
+      name: `Assinatura Recorrente (${existing.interval === 'month' ? 'Mensal' : 'Anual'})`,
+      metadata: { axion_merchant_id: merchantId },
+    },
+  });
+
+  // Cria nova sessão de checkout sem duplicar o contrato ou cliente
+  const session = await stripe.checkout.sessions.create({
+    mode: 'subscription',
+    customer: existing.stripeCustomerId,
+    line_items: [{ price: price.id, quantity: 1 }],
+    locale: 'pt-BR',
+    adaptive_pricing: { enabled: false },
+    success_url: `https://pay.axionenterprise.cloud/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `https://pay.axionenterprise.cloud/checkout/cancel`,
+    metadata: {
+      axion_merchant_id: merchantId,
+      customer_email: existing.customerEmail,
+      subscription_id: existing.id,
+    },
+    subscription_data: {
+      metadata: {
+        axion_merchant_id: merchantId,
+        customer_email: existing.customerEmail,
+        subscription_id: existing.id,
+      },
+    },
+  });
+
+  const newStripeSubId = `sub_pending_${session.id}`;
+  await database.query(
+    `UPDATE merchant_subscriptions
+        SET stripe_subscription_id = $1,
+            status = 'PENDING',
+            updated_at = NOW()
+      WHERE id = $2 AND merchant_id = $3`,
+    [newStripeSubId, subscriptionId, merchantId],
+  );
+
+  return {
+    id: existing.id,
+    checkoutUrl: session.url,
+    status: 'PENDING',
+    message: 'Checkout renovado com sucesso. Link pronto para envio ao cliente.',
+  };
+}
+

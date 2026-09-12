@@ -47,6 +47,7 @@ import {
   createMerchantSubscription,
   getMerchantSubscription,
   cancelMerchantSubscription,
+  renewMerchantSubscriptionCheckout,
   MerchantSubscriptionError,
 } from './services/merchant-subscriptions.service.js';
 import {
@@ -930,6 +931,25 @@ export async function buildApp(dependencies: AppDependencies = {}) {
       const stripe = new Stripe(config.STRIPE_SECRET_KEY);
       const subscription = await cancelMerchantSubscription(database, stripe, merchant.merchantId, id, immediately);
       return reply.code(200).send(subscription);
+    } catch (err) {
+      if (err instanceof MerchantSubscriptionError) return reply.code(err.statusCode).send({ error: err.message });
+      throw err;
+    }
+  });
+
+  app.post('/v1/subscriptions/:id/renew-checkout', async (request, reply) => {
+    const merchant = await requireMerchant(request, reply, ['charges:write'], cache, database);
+    if (!merchant) return;
+
+    if (!config.STRIPE_SECRET_KEY) {
+      return reply.code(503).send({ error: 'Assinaturas por cartão ainda não configuradas.' });
+    }
+
+    try {
+      const { id } = subscriptionIdParams.parse(request.params);
+      const stripe = new Stripe(config.STRIPE_SECRET_KEY);
+      const renewed = await renewMerchantSubscriptionCheckout(database, stripe, merchant.merchantId, id);
+      return reply.code(200).send(renewed);
     } catch (err) {
       if (err instanceof MerchantSubscriptionError) return reply.code(err.statusCode).send({ error: err.message });
       throw err;

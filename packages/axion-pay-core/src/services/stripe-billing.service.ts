@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac, timingSafeEqual, randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
 import { dispatchMerchantEventAsync } from './merchant-webhook-dispatcher.service.js';
 
@@ -230,26 +230,174 @@ export async function ingestStripeWebhook(database: BillingDatabase, config: Str
     }
   }
 
-  // Despacha eventos para merchant_subscriptions se a assinatura pertencer a um merchant externo
-  if (subscriptionId) {
-    const mSub = await database.query<{ id: string; merchant_id: string }>(
-      `SELECT id, merchant_id FROM merchant_subscriptions WHERE stripe_subscription_id = $1 LIMIT 1`,
+  // Despacha eventos e sincroniza assinaturas de merchants externos (merchant_subscriptions)
+  if (event.type === 'checkout.session.completed' && typeof object.id === 'string') {
+    const sessionId = object.id;
+    const actualSubId = typeof object.subscription === 'string' ? object.subscription : null;
+    const mSub = await database.query<{
+      id: string;
+      merchant_id: string;
+      amount_cents: string;
+      currency: string;
+      customer_email: string;
+      customer_name: string | null;
+    }>(
+      `SELECT id, merchant_id, amount_cents, currency, customer_email, customer_name
+         FROM merchant_subscriptions
+        WHERE stripe_subscription_id = $1
+           OR stripe_subscription_id = ('sub_pending_' || $2)
+        LIMIT 1`,
+      [actualSubId ?? '', sessionId],
+    );
+
+    if (mSub.rowCount) {
+      const sub = mSub.rows[0];
+      const mId = sub.merchant_id;
+      const chargeId = (typeof object.payment_intent === 'string' ? object.payment_intent : null)
+        || (typeof object.invoice === 'string' ? object.invoice : null)
+        || sessionId;
+
+      await database.query(
+        `UPDATE merchant_subscriptions
+            SET stripe_subscription_id = COALESCE($1, stripe_subscription_id),
+                status = 'ACTIVE',
+                current_period_end = NOW() + INTERVAL '30 days',
+                updated_at = NOW()
+          WHERE id = $2`,
+        [actualSubId, sub.id],
+      );
+
+      // Registra a fatura paga
+      await database.query(
+        `INSERT INTO merchant_subscription_invoices (
+           id, subscription_id, amount_cents, currency, status, paid_at, invoice_pdf_url, created_at
+         ) VALUES (gen_random_uuid(), $1, $2, $3, 'PAID', to_timestamp($4), null, NOW())
+         ON CONFLICT DO NOTHING`,
+        [sub.id, sub.amount_cents, sub.currency || 'BRL', event.created],
+      );
+
+      // Registra payment_intent e transação financeira no dashboard do merchant
+      const piId = randomUUID();
+      await database.query(
+        `INSERT INTO payment_intents (
+           id, merchant_id, idempotency_key, provider, correlation_id, provider_charge_id,
+           amount_cents, currency, status, created_at, updated_at
+         ) VALUES ($1, $2, $3, 'stripe', $4, $5, $6, $7, 'PAID', to_timestamp($8), to_timestamp($8))
+         ON CONFLICT DO NOTHING`,
+        [
+          piId,
+          mId,
+          `checkout_${sessionId}`,
+          `sub_${sub.id}`,
+          chargeId,
+          sub.amount_cents,
+          sub.currency || 'BRL',
+          event.created,
+        ],
+      );
+
+      await database.query(
+        `INSERT INTO financial_transactions (
+           id, payment_intent_id, provider, provider_transaction_id, amount_cents, direction, status, occurred_at, created_at
+         ) VALUES (gen_random_uuid(), $1, 'stripe', $2, $3, 'CREDIT', 'CONFIRMED', to_timestamp($4), to_timestamp($4))
+         ON CONFLICT (provider, provider_transaction_id) DO NOTHING`,
+        [piId, event.id, sub.amount_cents, event.created],
+      );
+
+      dispatchMerchantEventAsync(database, mId, 'subscription.created', {
+        id: sub.id,
+        stripeSubscriptionId: actualSubId,
+        customerEmail: sub.customer_email,
+        status: 'ACTIVE',
+        amountCents: Number(sub.amount_cents),
+      });
+
+      dispatchMerchantEventAsync(database, mId, 'payment.succeeded', {
+        id: piId,
+        providerChargeId: chargeId,
+        amountCents: Number(sub.amount_cents),
+        currency: sub.currency || 'BRL',
+        method: 'card',
+        status: 'PAID',
+      });
+    }
+  } else if (subscriptionId) {
+    const mSub = await database.query<{
+      id: string;
+      merchant_id: string;
+      amount_cents: string;
+      currency: string;
+    }>(
+      `SELECT id, merchant_id, amount_cents, currency FROM merchant_subscriptions WHERE stripe_subscription_id = $1 LIMIT 1`,
       [subscriptionId],
     );
     if (mSub.rowCount) {
-      const mId = mSub.rows[0].merchant_id;
+      const sub = mSub.rows[0];
+      const mId = sub.merchant_id;
       const periodEndTs = typeof object.current_period_end === 'number' ? new Date(object.current_period_end * 1000) : null;
       const subStatus = typeof object.status === 'string' ? object.status.toUpperCase() : 'ACTIVE';
       await database.query(
         `UPDATE merchant_subscriptions SET status = $1, current_period_end = COALESCE($2, current_period_end), updated_at = NOW() WHERE id = $3`,
-        [subStatus, periodEndTs, mSub.rows[0].id],
+        [subStatus, periodEndTs, sub.id],
       );
-      if (event.type === 'invoice.payment_succeeded' || event.type === 'customer.subscription.updated') {
-        dispatchMerchantEventAsync(database, mId, 'subscription.renewed', { subscriptionId: mSub.rows[0].id, stripeSubscriptionId: subscriptionId, status: subStatus });
+
+      if (event.type === 'invoice.payment_succeeded' || event.type === 'invoice.paid') {
+        const invId = typeof object.id === 'string' ? object.id : `inv_${Date.now()}`;
+        const invPdf = typeof object.invoice_pdf === 'string' ? object.invoice_pdf : null;
+        const amountPaid = typeof object.amount_paid === 'number' ? object.amount_paid : Number(sub.amount_cents);
+
+        // Garante fatura registrada
+        await database.query(
+          `INSERT INTO merchant_subscription_invoices (
+             id, subscription_id, amount_cents, currency, status, paid_at, invoice_pdf_url, created_at
+           ) VALUES (gen_random_uuid(), $1, $2, $3, 'PAID', to_timestamp($4), $5, NOW())
+           ON CONFLICT DO NOTHING`,
+          [sub.id, amountPaid, sub.currency || 'BRL', event.created, invPdf],
+        );
+
+        // Garante payment_intent e transação no painel
+        const piId = randomUUID();
+        await database.query(
+          `INSERT INTO payment_intents (
+             id, merchant_id, idempotency_key, provider, correlation_id, provider_charge_id,
+             amount_cents, currency, status, created_at, updated_at
+           ) VALUES ($1, $2, $3, 'stripe', $4, $5, $6, $7, 'PAID', to_timestamp($8), to_timestamp($8))
+           ON CONFLICT DO NOTHING`,
+          [
+            piId,
+            mId,
+            `inv_${invId}`,
+            `sub_${sub.id}`,
+            invId,
+            amountPaid,
+            sub.currency || 'BRL',
+            event.created,
+          ],
+        );
+
+        await database.query(
+          `INSERT INTO financial_transactions (
+             id, payment_intent_id, provider, provider_transaction_id, amount_cents, direction, status, occurred_at, created_at
+           ) VALUES (gen_random_uuid(), $1, 'stripe', $2, $3, 'CREDIT', 'CONFIRMED', to_timestamp($4), to_timestamp($4))
+           ON CONFLICT (provider, provider_transaction_id) DO NOTHING`,
+          [piId, event.id, amountPaid, event.created],
+        );
+
+        dispatchMerchantEventAsync(database, mId, 'subscription.renewed', { subscriptionId: sub.id, stripeSubscriptionId: subscriptionId, status: subStatus });
+        dispatchMerchantEventAsync(database, mId, 'payment.succeeded', {
+          id: piId,
+          providerChargeId: invId,
+          amountCents: amountPaid,
+          currency: sub.currency || 'BRL',
+          method: 'card',
+          status: 'PAID',
+        });
+      } else if (event.type === 'customer.subscription.updated') {
+        dispatchMerchantEventAsync(database, mId, 'subscription.renewed', { subscriptionId: sub.id, stripeSubscriptionId: subscriptionId, status: subStatus });
       } else if (event.type === 'invoice.payment_failed') {
-        dispatchMerchantEventAsync(database, mId, 'subscription.past_due', { subscriptionId: mSub.rows[0].id, stripeSubscriptionId: subscriptionId, status: 'PAST_DUE' });
+        dispatchMerchantEventAsync(database, mId, 'subscription.past_due', { subscriptionId: sub.id, stripeSubscriptionId: subscriptionId, status: 'PAST_DUE' });
       } else if (event.type === 'customer.subscription.deleted') {
-        dispatchMerchantEventAsync(database, mId, 'subscription.canceled', { subscriptionId: mSub.rows[0].id, stripeSubscriptionId: subscriptionId, status: 'CANCELED' });
+        dispatchMerchantEventAsync(database, mId, 'subscription.canceled', { subscriptionId: sub.id, stripeSubscriptionId: subscriptionId, status: 'CANCELED' });
       }
     }
   }
