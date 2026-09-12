@@ -55,6 +55,11 @@ import {
   CheckCheck,
   Smartphone,
   Users,
+  ShoppingBag,
+  BookOpen,
+  Layers,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 
 const AUTH_API = "https://auth.axionenterprise.cloud";
@@ -283,6 +288,327 @@ function getSectionFromPath(pathname: string): string {
   const segment = normalized.split("/")[0]?.trim().toLowerCase() || "";
   return VALID_SECTIONS[segment] || "overview";
 }
+
+type EndpointManual = {
+  id: string;
+  category: "pix" | "card" | "subscriptions" | "links";
+  method: "POST" | "GET" | "DELETE";
+  path: string;
+  title: string;
+  description: string;
+  headers: Array<{ key: string; value: string; required: boolean }>;
+  body: string | null;
+  response: string;
+  curl: string;
+  typescript: string;
+  python: string;
+};
+
+const API_ENDPOINTS_MANUAL: EndpointManual[] = [
+  {
+    id: "pix_create",
+    category: "pix",
+    method: "POST",
+    path: "/v1/charges",
+    title: "Criar Cobrança PIX Instantânea",
+    description: "Gera cobrança PIX imediata com QR Code dinâmico, código BR Code copia-e-cola e conciliação em tempo real.",
+    headers: [
+      { key: "Authorization", value: "Bearer axp_live_...", required: true },
+      { key: "Idempotency-Key", value: "<uuid-v4>", required: true },
+      { key: "Content-Type", value: "application/json", required: true },
+    ],
+    body: `{\n  "correlationId": "order_1001",\n  "value": 2990,\n  "comment": "Assinatura Maná Diário - Pedido #1001"\n}`,
+    response: `{\n  "id": "c7a8b9f0-1234-4567-89ab-cdef01234567",\n  "correlationId": "order_1001",\n  "value": 2990,\n  "status": "ACTIVE",\n  "brCode": "00020126580014br.gov.bcb.pix0136...",\n  "qrCodeImage": "data:image/png;base64,iVBORw0KGgo...",\n  "expiresIn": 3600,\n  "createdAt": "2026-09-12T20:30:00.000Z"\n}`,
+    curl: `curl -X POST https://api.axionenterprise.cloud/v1/charges \\\n  -H "Authorization: Bearer axp_live_..." \\\n  -H "Idempotency-Key: $(uuidgen)" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "correlationId": "order_1001",\n    "value": 2990,\n    "comment": "Assinatura Maná Diário"\n  }'`,
+    typescript: `import axios from 'axios';\n\nconst res = await axios.post(\n  'https://api.axionenterprise.cloud/v1/charges',\n  {\n    correlationId: 'order_1001',\n    value: 2990, // R$ 29,90 em centavos\n    comment: 'Assinatura Maná Diário',\n  },\n  {\n    headers: {\n      Authorization: 'Bearer axp_live_...',\n      'Idempotency-Key': crypto.randomUUID(),\n    },\n  }\n);\nconsole.log(res.data.brCode);`,
+    python: `import requests, uuid\n\nres = requests.post(\n    "https://api.axionenterprise.cloud/v1/charges",\n    headers={\n        "Authorization": "Bearer axp_live_...",\n        "Idempotency-Key": str(uuid.uuid4()),\n        "Content-Type": "application/json"\n    },\n    json={\n        "correlationId": "order_1001",\n        "value": 2990,\n        "comment": "Assinatura Maná Diário"\n    }\n)\nprint(res.json()["brCode"])`,
+  },
+  {
+    id: "pix_get",
+    category: "pix",
+    method: "GET",
+    path: "/v1/charges/{correlationId}",
+    title: "Consultar Cobrança PIX",
+    description: "Consulta o estado de liquidação e metadados de uma cobrança PIX pelo identificador único correlationId.",
+    headers: [
+      { key: "Authorization", value: "Bearer axp_live_...", required: true },
+    ],
+    body: null,
+    response: `{\n  "correlationId": "order_1001",\n  "status": "COMPLETED",\n  "value": 2990,\n  "paidAt": "2026-09-12T20:31:12.000Z",\n  "endToEndId": "E0041696820260912203100000000001"\n}`,
+    curl: `curl -X GET https://api.axionenterprise.cloud/v1/charges/order_1001 \\\n  -H "Authorization: Bearer axp_live_..."`,
+    typescript: `const res = await axios.get(\n  'https://api.axionenterprise.cloud/v1/charges/order_1001',\n  { headers: { Authorization: 'Bearer axp_live_...' } }\n);\nconsole.log('Status do Pix:', res.data.status);`,
+    python: `res = requests.get(\n    "https://api.axionenterprise.cloud/v1/charges/order_1001",\n    headers={"Authorization": "Bearer axp_live_..."}\n)\nprint(res.json()["status"])`,
+  },
+  {
+    id: "card_payment",
+    category: "card",
+    method: "POST",
+    path: "/v1/card-payments",
+    title: "Processar Pagamento em Cartão de Crédito",
+    description: "Processamento seguro S2S de transação avulsa em cartão de crédito tokenizado com antifraude integrado.",
+    headers: [
+      { key: "Authorization", value: "Bearer axp_live_...", required: true },
+      { key: "Idempotency-Key", value: "<uuid-v4>", required: true },
+      { key: "Content-Type", value: "application/json", required: true },
+    ],
+    body: `{\n  "merchantId": "0345a318-2a8f-48d8-94ba-122f0fe7cf3d",\n  "amountCents": 2990,\n  "currency": "BRL",\n  "paymentMethodId": "pm_card_visa",\n  "installments": 1\n}`,
+    response: `{\n  "id": "e9876543-210f-edcb-a987-6543210fedcb",\n  "status": "PAID",\n  "amountCents": 2990,\n  "currency": "BRL",\n  "cardBrand": "visa",\n  "last4": "4242",\n  "createdAt": "2026-09-12T20:32:00.000Z"\n}`,
+    curl: `curl -X POST https://api.axionenterprise.cloud/v1/card-payments \\\n  -H "Authorization: Bearer axp_live_..." \\\n  -H "Idempotency-Key: $(uuidgen)" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "merchantId": "0345a318-2a8f-48d8-94ba-122f0fe7cf3d",\n    "amountCents": 2990,\n    "currency": "BRL",\n    "paymentMethodId": "pm_card_visa"\n  }'`,
+    typescript: `const res = await axios.post(\n  'https://api.axionenterprise.cloud/v1/card-payments',\n  {\n    merchantId: '0345a318-2a8f-48d8-94ba-122f0fe7cf3d',\n    amountCents: 2990,\n    currency: 'BRL',\n    paymentMethodId: 'pm_card_visa'\n  },\n  {\n    headers: {\n      Authorization: 'Bearer axp_live_...',\n      'Idempotency-Key': crypto.randomUUID()\n    }\n  }\n);`,
+    python: `res = requests.post(\n    "https://api.axionenterprise.cloud/v1/card-payments",\n    headers={\n        "Authorization": "Bearer axp_live_...",\n        "Idempotency-Key": str(uuid.uuid4())\n    },\n    json={\n        "merchantId": "0345a318-2a8f-48d8-94ba-122f0fe7cf3d",\n        "amountCents": 2990,\n        "currency": "BRL",\n        "paymentMethodId": "pm_card_visa"\n    }\n)`,
+  },
+  {
+    id: "subscriptions_create",
+    category: "subscriptions",
+    method: "POST",
+    path: "/v1/subscriptions",
+    title: "Criar Assinatura Recorrente",
+    description: "Inicia contrato de recorrência automática. Sem cartão prévio, retorna checkoutUrl segura com preço travado estritamente em BRL.",
+    headers: [
+      { key: "Authorization", value: "Bearer axp_live_...", required: true },
+      { key: "Idempotency-Key", value: "<uuid-v4>", required: true },
+      { key: "Content-Type", value: "application/json", required: true },
+    ],
+    body: `{\n  "customerEmail": "cliente@email.com",\n  "customerName": "Railson Medrado",\n  "amountCents": 2990,\n  "currency": "BRL",\n  "interval": "month"\n}`,
+    response: `{\n  "id": "c2f2a9f6-1f12-4d08-be05-2a43965e6e5a",\n  "status": "PENDING",\n  "amountCents": 2990,\n  "currency": "BRL",\n  "interval": "month",\n  "checkoutUrl": "https://checkout.stripe.com/c/pay/cs_live_...",\n  "currentPeriodEnd": null,\n  "createdAt": "2026-09-12T19:36:11.000Z"\n}`,
+    curl: `curl -X POST https://api.axionenterprise.cloud/v1/subscriptions \\\n  -H "Authorization: Bearer axp_live_..." \\\n  -H "Idempotency-Key: $(uuidgen)" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "customerEmail": "cliente@email.com",\n    "customerName": "Railson Medrado",\n    "amountCents": 2990,\n    "currency": "BRL",\n    "interval": "month"\n  }'`,
+    typescript: `const res = await axios.post(\n  'https://api.axionenterprise.cloud/v1/subscriptions',\n  {\n    customerEmail: 'cliente@email.com',\n    customerName: 'Railson Medrado',\n    amountCents: 2990,\n    currency: 'BRL',\n    interval: 'month'\n  },\n  {\n    headers: {\n      Authorization: 'Bearer axp_live_...',\n      'Idempotency-Key': crypto.randomUUID()\n    }\n  }\n);\nconsole.log('Link de Checkout:', res.data.checkoutUrl);`,
+    python: `res = requests.post(\n    "https://api.axionenterprise.cloud/v1/subscriptions",\n    headers={\n        "Authorization": "Bearer axp_live_...",\n        "Idempotency-Key": str(uuid.uuid4())\n    },\n    json={\n        "customerEmail": "cliente@email.com",\n        "customerName": "Railson Medrado",\n        "amountCents": 2990,\n        "currency": "BRL",\n        "interval": "month"\n    }\n)\nprint(res.json()["checkoutUrl"])`,
+  },
+  {
+    id: "subscriptions_get",
+    category: "subscriptions",
+    method: "GET",
+    path: "/v1/subscriptions/{id}",
+    title: "Consultar Assinatura Recorrente",
+    description: "Recupera status de adimplência, ciclo de faturamento, data de expiração do período e dados cadastrais.",
+    headers: [
+      { key: "Authorization", value: "Bearer axp_live_...", required: true },
+    ],
+    body: null,
+    response: `{\n  "id": "c2f2a9f6-1f12-4d08-be05-2a43965e6e5a",\n  "status": "ACTIVE",\n  "customerEmail": "cliente@email.com",\n  "customerName": "Railson Medrado",\n  "amountCents": 2990,\n  "currency": "BRL",\n  "interval": "month",\n  "currentPeriodEnd": "2026-10-12T19:37:34.000Z",\n  "cancelAtPeriodEnd": false\n}`,
+    curl: `curl -X GET https://api.axionenterprise.cloud/v1/subscriptions/c2f2a9f6-1f12-4d08-be05-2a43965e6e5a \\\n  -H "Authorization: Bearer axp_live_..."`,
+    typescript: `const res = await axios.get(\n  'https://api.axionenterprise.cloud/v1/subscriptions/c2f2a9f6-1f12-4d08-be05-2a43965e6e5a',\n  { headers: { Authorization: 'Bearer axp_live_...' } }\n);\nconsole.log('Status:', res.data.status, 'Vencimento:', res.data.currentPeriodEnd);`,
+    python: `res = requests.get(\n    "https://api.axionenterprise.cloud/v1/subscriptions/c2f2a9f6-1f12-4d08-be05-2a43965e6e5a",\n    headers={"Authorization": "Bearer axp_live_..."}\n)\nprint(res.json()["status"], res.json()["currentPeriodEnd"])`,
+  },
+  {
+    id: "subscriptions_renew_checkout",
+    category: "subscriptions",
+    method: "POST",
+    path: "/v1/subscriptions/{id}/renew-checkout",
+    title: "Renovar Checkout de Assinatura",
+    description: "Gera novo link de checkout para assinaturas pendentes ou com sessão expirada sem duplicar o registro do contrato ou cliente.",
+    headers: [
+      { key: "Authorization", value: "Bearer axp_live_...", required: true },
+    ],
+    body: null,
+    response: `{\n  "id": "c2f2a9f6-1f12-4d08-be05-2a43965e6e5a",\n  "status": "PENDING",\n  "checkoutUrl": "https://checkout.stripe.com/c/pay/cs_live_new_session...",\n  "message": "Checkout renovado com sucesso. Link pronto para envio ao cliente."\n}`,
+    curl: `curl -X POST https://api.axionenterprise.cloud/v1/subscriptions/c2f2a9f6-1f12-4d08-be05-2a43965e6e5a/renew-checkout \\\n  -H "Authorization: Bearer axp_live_..."`,
+    typescript: `const res = await axios.post(\n  'https://api.axionenterprise.cloud/v1/subscriptions/c2f2a9f6-1f12-4d08-be05-2a43965e6e5a/renew-checkout',\n  {},\n  { headers: { Authorization: 'Bearer axp_live_...' } }\n);\nconsole.log('Nova URL:', res.data.checkoutUrl);`,
+    python: `res = requests.post(\n    "https://api.axionenterprise.cloud/v1/subscriptions/c2f2a9f6-1f12-4d08-be05-2a43965e6e5a/renew-checkout",\n    headers={"Authorization": "Bearer axp_live_..."}\n)\nprint(res.json()["checkoutUrl"])`,
+  },
+  {
+    id: "subscriptions_cancel",
+    category: "subscriptions",
+    method: "POST",
+    path: "/v1/subscriptions/{id}/cancel",
+    title: "Cancelar Assinatura Recorrente",
+    description: "Interrompe cobranças recorrentes. immediately=false mantém o plano ativo até o término do ciclo; immediately=true cancela no mesmo instante.",
+    headers: [
+      { key: "Authorization", value: "Bearer axp_live_...", required: true },
+      { key: "Content-Type", value: "application/json", required: true },
+    ],
+    body: `{\n  "immediately": false\n}`,
+    response: `{\n  "id": "c2f2a9f6-1f12-4d08-be05-2a43965e6e5a",\n  "status": "ACTIVE",\n  "cancelAtPeriodEnd": true\n}`,
+    curl: `curl -X POST https://api.axionenterprise.cloud/v1/subscriptions/c2f2a9f6-1f12-4d08-be05-2a43965e6e5a/cancel \\\n  -H "Authorization: Bearer axp_live_..." \\\n  -H "Content-Type: application/json" \\\n  -d '{"immediately": false}'`,
+    typescript: `const res = await axios.post(\n  'https://api.axionenterprise.cloud/v1/subscriptions/c2f2a9f6-1f12-4d08-be05-2a43965e6e5a/cancel',\n  { immediately: false },\n  { headers: { Authorization: 'Bearer axp_live_...' } }\n);`,
+    python: `res = requests.post(\n    "https://api.axionenterprise.cloud/v1/subscriptions/c2f2a9f6-1f12-4d08-be05-2a43965e6e5a/cancel",\n    headers={"Authorization": "Bearer axp_live_..."},\n    json={"immediately": False}\n)`,
+  },
+  {
+    id: "payment_links_create",
+    category: "links",
+    method: "POST",
+    path: "/v1/payment-links",
+    title: "Criar Link de Pagamento Autônomo",
+    description: "Gera página pública de checkout com PIX e Cartão customizados para vendas rápidas, redes sociais ou disparo em massa.",
+    headers: [
+      { key: "Authorization", value: "Bearer axp_live_...", required: true },
+      { key: "Idempotency-Key", value: "<uuid-v4>", required: true },
+      { key: "Content-Type", value: "application/json", required: true },
+    ],
+    body: `{\n  "merchantId": "0345a318-2a8f-48d8-94ba-122f0fe7cf3d",\n  "title": "Acesso Comunidade VIP",\n  "description": "Acesso completo por 12 meses",\n  "amountCents": 19700,\n  "allowedPaymentMethods": ["PIX", "CARD"]\n}`,
+    response: `{\n  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",\n  "url": "https://pay.axionenterprise.cloud/pay/pl_live_9988",\n  "title": "Acesso Comunidade VIP",\n  "amountCents": 19700,\n  "status": "ACTIVE"\n}`,
+    curl: `curl -X POST https://api.axionenterprise.cloud/v1/payment-links \\\n  -H "Authorization: Bearer axp_live_..." \\\n  -H "Idempotency-Key: $(uuidgen)" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "merchantId": "0345a318-2a8f-48d8-94ba-122f0fe7cf3d",\n    "title": "Acesso Comunidade VIP",\n    "amountCents": 19700,\n    "allowedPaymentMethods": ["PIX", "CARD"]\n  }'`,
+    typescript: `const res = await axios.post(\n  'https://api.axionenterprise.cloud/v1/payment-links',\n  {\n    merchantId: '0345a318-2a8f-48d8-94ba-122f0fe7cf3d',\n    title: 'Acesso Comunidade VIP',\n    amountCents: 19700,\n    allowedPaymentMethods: ['PIX', 'CARD']\n  },\n  {\n    headers: {\n      Authorization: 'Bearer axp_live_...',\n      'Idempotency-Key': crypto.randomUUID()\n    }\n  }\n);\nconsole.log('URL pública:', res.data.url);`,
+    python: `res = requests.post(\n    "https://api.axionenterprise.cloud/v1/payment-links",\n    headers={\n        "Authorization": "Bearer axp_live_...",\n        "Idempotency-Key": str(uuid.uuid4())\n    },\n    json={\n        "merchantId": "0345a318-2a8f-48d8-94ba-122f0fe7cf3d",\n        "title": "Acesso Comunidade VIP",\n        "amountCents": 19700,\n        "allowedPaymentMethods": ["PIX", "CARD"]\n    }\n)\nprint(res.json()["url"])`,
+  },
+  {
+    id: "payment_links_get",
+    category: "links",
+    method: "GET",
+    path: "/v1/payment-links/{id}",
+    title: "Consultar Link de Pagamento",
+    description: "Obtém dados públicos e metadados de um link de pagamento autônomo.",
+    headers: [],
+    body: null,
+    response: `{\n  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",\n  "title": "Acesso Comunidade VIP",\n  "amountCents": 19700,\n  "currency": "BRL",\n  "status": "ACTIVE"\n}`,
+    curl: `curl -X GET https://api.axionenterprise.cloud/v1/payment-links/a1b2c3d4-e5f6-7890-abcd-ef1234567890`,
+    typescript: `const res = await axios.get('https://api.axionenterprise.cloud/v1/payment-links/a1b2c3d4-e5f6-7890-abcd-ef1234567890');\nconsole.log(res.data.title, res.data.amountCents);`,
+    python: `res = requests.get('https://api.axionenterprise.cloud/v1/payment-links/a1b2c3d4-e5f6-7890-abcd-ef1234567890')\nprint(res.json()["title"])`,
+  },
+];
+
+type EcommerceConnector = {
+  id: string;
+  name: string;
+  category: string;
+  statusText: string;
+  statusVariant: "warning" | "success" | "info" | "neutral";
+  badge: string;
+  tagline: string;
+  description: string;
+  features: string[];
+  supportedVersions: string;
+  actionText: string;
+};
+
+const ECOMMERCE_CONNECTORS: EcommerceConnector[] = [
+  {
+    id: "shopify",
+    name: "Shopify",
+    category: "E-commerce Global",
+    statusText: "Em Homologação • Q4 2026",
+    statusVariant: "warning",
+    badge: "Checkout Transparente",
+    tagline: "App Oficial para Shopify Plus e Standard",
+    description: "Checkout Transparente integrado diretamente ao carrinho da Shopify. PIX com QR Code dinâmico na tela e confirmação em menos de 1 segundo sem sair da loja.",
+    features: [
+      "PIX Instantâneo sem redirecionamento",
+      "Cartão de crédito com parcelamento",
+      "Sincronização automática de pedidos e inventário",
+      "Webhook com retry exponencial garantido",
+    ],
+    supportedVersions: "Shopify Checkout Extensibility 2026+",
+    actionText: "Solicitar Beta Privado",
+  },
+  {
+    id: "woocommerce",
+    name: "WooCommerce / WordPress",
+    category: "Open-source",
+    statusText: "Beta Privado • Disponível",
+    statusVariant: "success",
+    badge: "Plugin Nativo",
+    tagline: "Plugin WordPress Oficial AXION Pay",
+    description: "Instalação descomplicada via arquivo .zip no painel do WordPress. Compatibilidade integral com WooCommerce Blocks, Elementor Checkout e conciliação instantânea.",
+    features: [
+      "Suporte total a blocos Gutenberg",
+      "Baixa automática de pedidos no admin",
+      "Validação criptográfica HMAC-SHA256",
+      "Painel de conciliação integrado ao WP",
+    ],
+    supportedVersions: "WooCommerce 8.0+ / WP 6.4+",
+    actionText: "Solicitar Plugin",
+  },
+  {
+    id: "nuvemshop",
+    name: "Nuvemshop",
+    category: "Líder Latam",
+    statusText: "Em Desenvolvimento • Q1 2027",
+    statusVariant: "info",
+    badge: "App Store Nuvemshop",
+    tagline: "Conector Oficial de Pagamentos",
+    description: "Aplicativo de pagamento transparente para a plataforma líder da América Latina. Otimizado para alta conversão no mercado brasileiro com suporte a PIX e Cartão.",
+    features: [
+      "Checkout transparente na loja Nuvemshop",
+      "Zero taxa de intermediários",
+      "Split de pagamentos nativo",
+      "Painel unificado de transações",
+    ],
+    supportedVersions: "API Nuvemshop v1 / Next Checkout",
+    actionText: "Registrar Interesse",
+  },
+  {
+    id: "vtex",
+    name: "VTEX IO",
+    category: "Enterprise",
+    statusText: "Roadmap • Q1 2027",
+    statusVariant: "info",
+    badge: "VTEX PPP",
+    tagline: "Payment Provider Protocol (PPP)",
+    description: "Conector certificado para operações de grande porte e marketplaces VTEX IO com suporte a pagamentos compostos e roteamento inteligente de adquirentes.",
+    features: [
+      "Certificação oficial Payment Provider Protocol",
+      "Suporte a alto volume (>10.000 tx/min)",
+      "Múltiplos centros de distribuição e split",
+      "Reconciliação financeira automatizada",
+    ],
+    supportedVersions: "VTEX IO / Store Framework",
+    actionText: "Registrar Interesse",
+  },
+  {
+    id: "tray",
+    name: "Tray E-commerce",
+    category: "Plataforma Nacional",
+    statusText: "Roadmap • Q2 2027",
+    statusVariant: "neutral",
+    badge: "Tray Direct Connect",
+    tagline: "Integração Direta via Token",
+    description: "Setup simplificado para lojistas na Tray. Integração de pagamentos com preenchimento automático das chaves de API sem necessidade de código customizado.",
+    features: [
+      "Configuração simples por Chave de API",
+      "Cálculo automático de parcelamento",
+      "Baixa em tempo real via webhook",
+      "Taxas reduzidas para varejo",
+    ],
+    supportedVersions: "Tray Commerce API v2",
+    actionText: "Registrar Interesse",
+  },
+  {
+    id: "loja_integrada",
+    name: "Loja Integrada",
+    category: "PME E-commerce",
+    statusText: "Roadmap • Q2 2027",
+    statusVariant: "neutral",
+    badge: "Checkout Transparente",
+    tagline: "Gateway Transparente para PMEs",
+    description: "Solução voltada para pequenos e médios varejistas que buscam taxas competitivas de cartão e PIX sem taxa de adesão ou mensalidades abusivas.",
+    features: [
+      "Ativação rápida em menos de 10 minutos",
+      "Suporte a PIX com confirmação em segundos",
+      "Recebimento antecipado opcional",
+      "Relatórios financeiros consolidados",
+    ],
+    supportedVersions: "Loja Integrada Checkout Pro",
+    actionText: "Registrar Interesse",
+  },
+];
+
+const OFFICIAL_SDKS = [
+  {
+    name: "Node.js / TypeScript",
+    package: "@axion/pay-sdk",
+    installCmd: "npm install @axion/pay-sdk",
+    status: "Disponível • v1.2.0",
+  },
+  {
+    name: "Python",
+    package: "axionpay-python",
+    installCmd: "pip install axion-pay",
+    status: "Disponível • v1.1.4",
+  },
+  {
+    name: "PHP",
+    package: "axion/pay-php",
+    installCmd: "composer require axion/pay",
+    status: "Disponível • v1.0.8",
+  },
+  {
+    name: "Go (Golang)",
+    package: "github.com/axion-dev-enterprise/pay-go",
+    installCmd: "go get github.com/axion-dev-enterprise/pay-go",
+    status: "Disponível • v1.0.2",
+  },
+];
 
 export default function PayDashboard() {
   const location = useLocation();
@@ -695,6 +1021,16 @@ export default function PayDashboard() {
   const [inspectingDelivery, setInspectingDelivery] = useState<any | null>(null);
   const [testingWebhookId, setTestingWebhookId] = useState<string | null>(null);
   const [webhookTab, setWebhookTab] = useState<"webhooks" | "endpoints">("webhooks");
+
+  // Estados de Integrações & Conectores E-commerce
+  const [integrationTab, setIntegrationTab] = useState<"manual" | "ecommerces">("manual");
+  const [selectedEndpointCategory, setSelectedEndpointCategory] = useState<"all" | "pix" | "card" | "subscriptions" | "links">("all");
+  const [selectedSnippetLang, setSelectedSnippetLang] = useState<"curl" | "typescript" | "python">("curl");
+  const [expandedEndpoint, setExpandedEndpoint] = useState<string | null>("charges_create");
+  const [partnerModal, setPartnerModal] = useState(false);
+  const [partnerPlatform, setPartnerPlatform] = useState("Shopify");
+  const [partnerEmail, setPartnerEmail] = useState("");
+  const [copiedEndpointId, setCopiedEndpointId] = useState<string | null>(null);
 
   // Estados de Links de Pagamento Autônomos
   const [selectedPaymentLinkMerchantId, setSelectedPaymentLinkMerchantId] = useState<string>("");
@@ -2277,14 +2613,12 @@ export default function PayDashboard() {
             </div>
           )}
 
-          {/* TAB 7: INTEGRAÇÕES & WEBHOOKS */}
-          {(activeSection === "integrations" || activeSection === "webhooks") && (
+          {/* TAB 7: WEBHOOKS POR MERCHANT */}
+          {activeSection === "webhooks" && (
             <div className="space-y-6 animate-fadeIn">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                  <h1 className="text-xl font-bold text-white tracking-tight">
-                    {activeSection === "webhooks" ? "Webhooks por Merchant" : "Integrações & Webhooks"}
-                  </h1>
+                  <h1 className="text-xl font-bold text-white tracking-tight">Webhooks por Merchant</h1>
                   <p className="text-xs text-[#a1b0a6] mt-0.5">
                     Notificações em tempo real com assinatura HMAC-SHA256 e parâmetros de conexão industrial
                   </p>
@@ -2296,7 +2630,7 @@ export default function PayDashboard() {
                       if (selectedWebhookMerchantId) loadWebhooks(selectedWebhookMerchantId);
                     }}
                     disabled={loadingWebhooks}
-                    className="inline-flex items-center gap-2 rounded-xl border border-[#213428] bg-[#09120d] px-3.5 py-2.5 text-xs font-semibold text-[#a1b0a6] hover:text-white transition hover:border-[#30513d] disabled:opacity-50"
+                    className="inline-flex items-center gap-2 rounded-xl border border-[#213428] bg-[#09120d] px-3.5 py-2.5 text-xs font-semibold text-[#a1b0a6] hover:text-white transition hover:border-[#30513d] disabled:opacity-50 cursor-pointer"
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${loadingWebhooks ? "animate-spin text-[#00e66b]" : ""}`} />
                     Atualizar
@@ -2318,44 +2652,8 @@ export default function PayDashboard() {
                 </div>
               </div>
 
-              {/* Subtabs de Navegação */}
-              {activeSection === "integrations" && (
-                <div className="flex border-b border-[#213428] gap-6">
-                  <button
-                    type="button"
-                    onClick={() => setWebhookTab("webhooks")}
-                    className={`pb-3 text-xs font-bold transition relative flex items-center gap-2 cursor-pointer ${
-                      webhookTab === "webhooks"
-                        ? "text-[#00e66b] border-b-2 border-[#00e66b]"
-                        : "text-[#a1b0a6] hover:text-white"
-                    }`}
-                  >
-                    <Webhook className="w-4 h-4" />
-                    Webhooks por Merchant
-                    {webhooks.length > 0 && (
-                      <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-emerald-500/20 text-emerald-300 font-mono">
-                        {webhooks.length}
-                      </span>
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setWebhookTab("endpoints")}
-                    className={`pb-3 text-xs font-bold transition relative flex items-center gap-2 cursor-pointer ${
-                      webhookTab === "endpoints"
-                        ? "text-[#00e66b] border-b-2 border-[#00e66b]"
-                        : "text-[#a1b0a6] hover:text-white"
-                    }`}
-                  >
-                    <Globe className="w-4 h-4" />
-                    Endpoints da API & Status
-                  </button>
-                </div>
-              )}
-
-              {/* CONTEÚDO 1: WEBHOOKS POR MERCHANT */}
-              {(activeSection === "webhooks" || webhookTab === "webhooks") && (
-                <div className="space-y-6">
+              {/* CONTEÚDO: WEBHOOKS POR MERCHANT */}
+              <div className="space-y-6">
                   {/* Seletor de Merchant / Operação Ativa */}
                   <div className="p-4 rounded-2xl bg-[#09120d] border border-[#213428] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
@@ -2689,52 +2987,442 @@ function verifyAxionWebhook(rawBody: string, signatureHeader: string, secret: st
                     </div>
                   </div>
                 </div>
+            </div>
+          )}
+
+          {/* TAB 8: INTEGRAÇÕES & CONECTORES E-COMMERCE */}
+          {activeSection === "integrations" && (
+            <div className="space-y-6 animate-fadeIn">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <h1 className="text-xl font-bold text-white tracking-tight">Integrações & Conectores</h1>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono border border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
+                      API v1.0 • OpenAPI 3.1.0
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono border border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
+                      SSL/TLS 1.3 Strict
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#a1b0a6] mt-0.5">
+                    Manual industrial de endpoints da API AXION Pay e ecossistema de integrações para e-commerces
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText("https://api.axionenterprise.cloud");
+                      notify("success", "Base URL copiada: https://api.axionenterprise.cloud");
+                    }}
+                    className="inline-flex items-center gap-2 rounded-xl border border-[#213428] bg-[#09120d] px-3.5 py-2.5 text-xs font-semibold text-[#a1b0a6] hover:text-white transition hover:border-[#30513d] cursor-pointer"
+                  >
+                    <Copy className="w-3.5 h-3.5 text-emerald-400" />
+                    Copiar Base URL
+                  </button>
+                  <a
+                    href="/docs"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2 rounded-xl bg-[#00e66b] px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-black transition hover:bg-[#69f0ae] shadow-lg shadow-emerald-500/10 cursor-pointer"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    Portal OpenAPI
+                  </a>
+                </div>
+              </div>
+
+              {/* Subtabs de Navegação */}
+              <div className="flex border-b border-[#213428] gap-6">
+                <button
+                  type="button"
+                  onClick={() => setIntegrationTab("manual")}
+                  className={`pb-3 text-xs font-bold transition relative flex items-center gap-2 cursor-pointer ${
+                    integrationTab === "manual"
+                      ? "text-[#00e66b] border-b-2 border-[#00e66b]"
+                      : "text-[#a1b0a6] hover:text-white"
+                  }`}
+                >
+                  <BookOpen className="w-4 h-4" />
+                  Manual Completo de Endpoints
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIntegrationTab("ecommerces")}
+                  className={`pb-3 text-xs font-bold transition relative flex items-center gap-2 cursor-pointer ${
+                    integrationTab === "ecommerces"
+                      ? "text-[#00e66b] border-b-2 border-[#00e66b]"
+                      : "text-[#a1b0a6] hover:text-white"
+                  }`}
+                >
+                  <ShoppingBag className="w-4 h-4" />
+                  E-commerces & Plataformas (Futuras Integrações)
+                  <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-emerald-500/20 text-emerald-300 font-mono">
+                    {ECOMMERCE_CONNECTORS.length} Conectores
+                  </span>
+                </button>
+              </div>
+
+              {/* CONTEÚDO 1: MANUAL COMPLETO DE ENDPOINTS */}
+              {integrationTab === "manual" && (
+                <div className="space-y-6">
+                  {/* Diretrizes de Autenticação & Idempotência */}
+                  <div className="p-5 rounded-2xl bg-[#09120d] border border-[#213428] space-y-4">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                        <Lock className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-white">Padrão de Autenticação & Idempotência Industrial</h3>
+                        <p className="text-xs text-[#a1b0a6]">
+                          Todas as requisições à API exigem cabeçalhos de segurança padronizados para garantir transações atômicas e auditáveis.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="p-3.5 rounded-xl bg-[#050c08] border border-[#213428] space-y-1">
+                        <div className="flex items-center justify-between text-xs font-mono">
+                          <span className="text-emerald-400 font-bold">Authorization</span>
+                          <span className="text-[10px] text-amber-400 font-semibold uppercase">Obrigatório</span>
+                        </div>
+                        <p className="text-xs text-[#a1b0a6] font-mono">Bearer axp_live_...</p>
+                        <p className="text-[11px] text-[#8b9f93]">Chave de API gerada no menu "Chaves de API" com escopos ativos.</p>
+                      </div>
+
+                      <div className="p-3.5 rounded-xl bg-[#050c08] border border-[#213428] space-y-1">
+                        <div className="flex items-center justify-between text-xs font-mono">
+                          <span className="text-emerald-400 font-bold">Idempotency-Key</span>
+                          <span className="text-[10px] text-amber-400 font-semibold uppercase">Obrigatório em Mutações</span>
+                        </div>
+                        <p className="text-xs text-[#a1b0a6] font-mono">&lt;uuid-v4&gt;</p>
+                        <p className="text-[11px] text-[#8b9f93]">Evita cobranças duplicadas em caso de timeouts ou retentativas de rede.</p>
+                      </div>
+
+                      <div className="p-3.5 rounded-xl bg-[#050c08] border border-[#213428] space-y-1">
+                        <div className="flex items-center justify-between text-xs font-mono">
+                          <span className="text-emerald-400 font-bold">Content-Type</span>
+                          <span className="text-[10px] text-amber-400 font-semibold uppercase">Obrigatório</span>
+                        </div>
+                        <p className="text-xs text-[#a1b0a6] font-mono">application/json</p>
+                        <p className="text-[11px] text-[#8b9f93]">Codificação de caracteres estritamente em UTF-8.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Barra de Filtro de Categoria & Seletor de Linguagem */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-[#09120d] border border-[#213428]">
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
+                      {[
+                        { id: "all", label: "Todos os Endpoints" },
+                        { id: "pix", label: "PIX Instantâneo" },
+                        { id: "card", label: "Cartão de Crédito" },
+                        { id: "subscriptions", label: "Assinaturas Recorrentes" },
+                        { id: "links", label: "Links de Pagamento" },
+                      ].map((cat) => (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => setSelectedEndpointCategory(cat.id as any)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                            selectedEndpointCategory === cat.id
+                              ? "bg-[#00e66b] text-black shadow-md shadow-emerald-500/20"
+                              : "bg-[#050c08] border border-[#213428] text-[#a1b0a6] hover:text-white"
+                          }`}
+                        >
+                          {cat.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center gap-1.5 bg-[#050c08] border border-[#213428] p-1 rounded-xl shrink-0">
+                      <span className="text-[10px] font-mono uppercase text-[#8b9f93] px-2">Exemplo:</span>
+                      {(["curl", "typescript", "python"] as const).map((lang) => (
+                        <button
+                          key={lang}
+                          type="button"
+                          onClick={() => setSelectedSnippetLang(lang)}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold transition cursor-pointer ${
+                            selectedSnippetLang === lang
+                              ? "bg-[#182b20] border border-emerald-500/40 text-[#00e66b]"
+                              : "text-[#8b9f93] hover:text-white"
+                          }`}
+                        >
+                          {lang === "curl" ? "cURL" : lang === "typescript" ? "TypeScript" : "Python"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Lista de Endpoints */}
+                  <div className="space-y-4">
+                    {API_ENDPOINTS_MANUAL.filter(
+                      (ep) => selectedEndpointCategory === "all" || ep.category === selectedEndpointCategory
+                    ).map((ep) => {
+                      const isExpanded = expandedEndpoint === ep.id;
+                      const snippet = ep[selectedSnippetLang];
+
+                      return (
+                        <div
+                          key={ep.id}
+                          className="rounded-2xl bg-[#09120d] border border-[#213428] overflow-hidden transition-all duration-200"
+                        >
+                          {/* Header do Endpoint */}
+                          <div
+                            onClick={() => setExpandedEndpoint(isExpanded ? null : ep.id)}
+                            className="p-4 sm:p-5 flex items-center justify-between gap-4 cursor-pointer hover:bg-[#0c1811] transition"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <span
+                                className={`px-2.5 py-1 rounded-lg text-xs font-mono font-extrabold uppercase shrink-0 ${
+                                  ep.method === "POST"
+                                    ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                                    : ep.method === "GET"
+                                    ? "bg-sky-500/20 text-sky-400 border border-sky-500/30"
+                                    : "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                                }`}
+                              >
+                                {ep.method}
+                              </span>
+                              <code className="text-xs font-mono text-white font-semibold truncate select-all">
+                                {ep.path}
+                              </code>
+                              <span className="hidden md:inline-block text-[#213428]">•</span>
+                              <span className="hidden md:inline-block text-xs text-[#a1b0a6] truncate font-medium">
+                                {ep.title}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigator.clipboard.writeText(`https://api.axionenterprise.cloud${ep.path}`);
+                                  setCopiedEndpointId(ep.id);
+                                  setTimeout(() => setCopiedEndpointId(null), 2000);
+                                  notify("success", `Rota copiada: ${ep.path}`);
+                                }}
+                                title="Copiar URL completa"
+                                className="p-1.5 rounded-lg border border-[#213428] bg-[#050c08] hover:border-emerald-500/40 text-[#a1b0a6] hover:text-[#00e66b] transition cursor-pointer"
+                              >
+                                {copiedEndpointId === ep.id ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                              </button>
+                              <div className="text-[#a1b0a6]">
+                                {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Detalhes Expansíveis */}
+                          {isExpanded && (
+                            <div className="p-5 border-t border-[#213428]/80 bg-[#050c08]/60 space-y-5">
+                              <p className="text-xs text-[#d4e7da] leading-relaxed">
+                                {ep.description}
+                              </p>
+
+                              {/* Cabeçalhos Necessários */}
+                              <div className="space-y-2">
+                                <span className="text-[10px] font-mono uppercase tracking-wider text-[#8b9f93] block">
+                                  Cabeçalhos de Requisição
+                                </span>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs font-mono">
+                                  {ep.headers.map((h, i) => (
+                                    <div key={i} className="p-2.5 rounded-xl bg-[#09120d] border border-[#213428] flex items-center justify-between">
+                                      <span className="text-emerald-400">{h.key}:</span>
+                                      <span className="text-white truncate max-w-[140px]">{h.value}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* Grid: Código de Exemplo & Resposta JSON */}
+                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                {/* Snippet na linguagem ativa */}
+                                <div className="space-y-1.5">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-xs font-mono font-bold text-white flex items-center gap-1.5">
+                                      <Code2 className="w-3.5 h-3.5 text-[#00e66b]" />
+                                      Exemplo de Requisição ({selectedSnippetLang.toUpperCase()})
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(snippet);
+                                        notify("success", `Snippet ${selectedSnippetLang} copiado!`);
+                                      }}
+                                      className="text-xs text-[#00e66b] font-mono hover:underline flex items-center gap-1 cursor-pointer"
+                                    >
+                                      <Copy className="w-3 h-3" /> Copiar
+                                    </button>
+                                  </div>
+                                  <pre className="p-4 rounded-xl bg-[#030604] border border-[#213428] font-mono text-xs text-[#a1b0a6] overflow-x-auto max-h-72 select-all leading-5">
+                                    {snippet}
+                                  </pre>
+                                </div>
+
+                                {/* Resposta JSON formatada */}
+                                <div className="space-y-1.5">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-xs font-mono font-bold text-white flex items-center gap-1.5">
+                                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                                      Resposta da API (HTTP {ep.method === "POST" ? "201" : "200"})
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(ep.response);
+                                        notify("success", "Exemplo de resposta copiado!");
+                                      }}
+                                      className="text-xs text-emerald-400 font-mono hover:underline flex items-center gap-1 cursor-pointer"
+                                    >
+                                      <Copy className="w-3 h-3" /> Copiar
+                                    </button>
+                                  </div>
+                                  <pre className="p-4 rounded-xl bg-[#030604] border border-[#213428] font-mono text-xs text-emerald-400 overflow-x-auto max-h-72 select-all leading-5">
+                                    {ep.response}
+                                  </pre>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               )}
 
-              {/* CONTEÚDO 2: ENDPOINTS DA API & PARÂMETROS */}
-              {activeSection === "integrations" && webhookTab === "endpoints" && (
-                <div className="space-y-6">
-                  <div className={`rounded-2xl border p-5 ${integrations?.paymentsEnabled ? "border-emerald-500/30 bg-emerald-500/10" : "border-amber-500/30 bg-amber-500/10"}`}>
-                    <div className="flex items-start gap-3">
-                      {integrations?.paymentsEnabled ? <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" /> : <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />}
+              {/* CONTEÚDO 2: E-COMMERCES & PLATAFORMAS */}
+              {integrationTab === "ecommerces" && (
+                <div className="space-y-8">
+                  {/* Banner de Ecossistema */}
+                  <div className="p-6 rounded-2xl bg-gradient-to-r from-[#09120d] via-[#0d1c13] to-[#09120d] border border-emerald-500/30 space-y-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-xl bg-[#00e66b]/20 border border-[#00e66b]/40 flex items-center justify-center text-[#00e66b]">
+                        <ShoppingBag className="w-5 h-5" />
+                      </div>
                       <div>
-                        <p className="text-sm font-bold text-white">{integrations?.paymentsEnabled ? "PIX operacional" : "PIX aguardando ativação"}</p>
-                        <p className="mt-1 text-xs leading-5 text-[#b5c6bb]">
-                          {integrations?.paymentsEnabled
-                            ? "Infraestrutura AXION Pay ativa. As cobranças podem ser criadas pela API autenticada."
-                            : "A criação de cobranças ficará disponível após a ativação segura da operação PIX AXION Pay."}
+                        <h2 className="text-base font-bold text-white">Ecossistema de Conectores para E-commerces</h2>
+                        <p className="text-xs text-[#a1b0a6]">
+                          Plugins e aplicativos oficiais para integrar sua loja virtual em poucos minutos à taxa industrial AXION Pay.
                         </p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-6 rounded-2xl bg-[#09120d] border border-[#213428]/80 space-y-4">
-                      <div className="flex items-center gap-3">
-                        <Globe className="w-5 h-5 text-[#00e66b]" />
-                        <h3 className="text-sm font-bold text-white">Endpoint de Criação de Cobranças</h3>
+                  {/* Grid de Conectores */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {ECOMMERCE_CONNECTORS.map((connector) => (
+                      <div
+                        key={connector.id}
+                        className="p-5 rounded-2xl bg-[#09120d] border border-[#213428] flex flex-col justify-between space-y-4 hover:border-emerald-500/40 transition group"
+                      >
+                        <div className="space-y-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-mono uppercase font-bold border border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
+                              {connector.badge}
+                            </span>
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
+                                connector.statusVariant === "success"
+                                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                                  : connector.statusVariant === "warning"
+                                  ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                                  : "bg-sky-500/20 text-sky-300 border border-sky-500/30"
+                              }`}
+                            >
+                              {connector.statusText}
+                            </span>
+                          </div>
+
+                          <div>
+                            <h3 className="text-base font-bold text-white group-hover:text-[#00e66b] transition">
+                              {connector.name}
+                            </h3>
+                            <p className="text-[11px] font-mono text-[#8b9f93] mt-0.5">
+                              {connector.tagline}
+                            </p>
+                          </div>
+
+                          <p className="text-xs text-[#a1b0a6] leading-relaxed">
+                            {connector.description}
+                          </p>
+
+                          <ul className="space-y-1.5 pt-2 border-t border-[#213428]/60">
+                            {connector.features.map((feat, idx) => (
+                              <li key={idx} className="flex items-center gap-2 text-[11px] text-[#d4e7da]">
+                                <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                                <span>{feat}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+
+                        <div className="pt-3 border-t border-[#213428]/60 space-y-2">
+                          <span className="text-[10px] font-mono text-[#8b9f93] block">
+                            Versão: {connector.supportedVersions}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPartnerPlatform(connector.name);
+                              setPartnerModal(true);
+                            }}
+                            className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold uppercase tracking-wider transition flex items-center justify-center gap-2 cursor-pointer ${
+                              connector.statusVariant === "success"
+                                ? "bg-[#00e66b] hover:bg-[#69f0ae] text-black shadow-md shadow-emerald-500/10"
+                                : "bg-[#101d14] hover:bg-[#182b20] border border-[#30513d] text-white"
+                            }`}
+                          >
+                            <span>{connector.actionText}</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
-                      <code className="block p-3 rounded-xl bg-[#050c08] border border-[#213428] text-xs font-mono text-[#00e66b] select-all">
-                        POST https://api.axionenterprise.cloud/v1/charges
-                      </code>
-                      <div className="space-y-2 text-xs text-[#a1b0a6] font-mono">
-                        <p>Header: <span className="text-white">Idempotency-Key: &lt;uuid&gt;</span></p>
-                        <p>Header: <span className="text-white">Authorization: Bearer axp_live_...</span></p>
+                    ))}
+                  </div>
+
+                  {/* Seção de SDKs Oficiais */}
+                  <div className="p-6 rounded-2xl bg-[#09120d] border border-[#213428] space-y-5">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                        <Layers className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-white">SDKs & Bibliotecas Oficiais AXION Pay</h3>
+                        <p className="text-xs text-[#a1b0a6]">
+                          Pacotes pré-compilados com tipagem estrita e autenticação integrada para desenvolvedores.
+                        </p>
                       </div>
                     </div>
 
-                    <div className="p-6 rounded-2xl bg-[#09120d] border border-[#213428]/80 space-y-4">
-                      <div className="flex items-center gap-3">
-                        <Zap className="w-5 h-5 text-emerald-400" />
-                        <h3 className="text-sm font-bold text-white">Endpoint de Consulta de Cobrança</h3>
-                      </div>
-                      <code className="block p-3 rounded-xl bg-[#050c08] border border-[#213428] text-xs font-mono text-emerald-400 select-all">
-                        GET https://api.axionenterprise.cloud/v1/charges/&#123;correlationId&#125;
-                      </code>
-                      <div className="space-y-2 text-xs text-[#a1b0a6] font-mono">
-                        <p>Header: <span className="text-white">Authorization: Bearer axp_live_...</span></p>
-                        <p>Resposta: <span className="text-white">Status conciliado em tempo real</span></p>
-                      </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {OFFICIAL_SDKS.map((sdk, i) => (
+                        <div key={i} className="p-4 rounded-xl bg-[#050c08] border border-[#213428] space-y-2.5 flex flex-col justify-between">
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-bold text-white">{sdk.name}</span>
+                              <span className="text-[10px] font-mono text-emerald-400">{sdk.status}</span>
+                            </div>
+                            <code className="block p-2 rounded-lg bg-[#09120d] border border-[#213428] font-mono text-[11px] text-[#00e66b] select-all truncate">
+                              {sdk.installCmd}
+                            </code>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(sdk.installCmd);
+                              notify("success", `Comando copiado: ${sdk.installCmd}`);
+                            }}
+                            className="w-full py-1.5 rounded-lg border border-[#213428] bg-[#101d14] hover:bg-[#182b20] text-[#d4e7da] hover:text-white text-xs font-mono transition flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <Copy className="w-3 h-3" />
+                            <span>Copiar comando</span>
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -5388,6 +6076,81 @@ function verifyAxionWebhook(rawBody: string, signatureHeader: string, secret: st
                 Fechar
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL SOLICITAÇÃO BETA: CONECTORES E-COMMERCE */}
+      {partnerModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-md bg-[#09120d] border border-[#213428] rounded-3xl p-6 space-y-5 shadow-2xl">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                  <ShoppingBag className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Programa Beta: {partnerPlatform}</h3>
+                  <p className="text-xs text-[#a1b0a6]">Solicitar acesso antecipado ao conector</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPartnerModal(false)}
+                className="text-[#a1b0a6] hover:text-white transition cursor-pointer"
+                aria-label="Fechar"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-[#b5c6bb] leading-relaxed">
+              Nossa equipe de engenharia está liberando o conector nativo para <strong className="text-white">{partnerPlatform}</strong> em ondas controladas de homologação. Cadastre seu e-mail para receber o pacote de instalação antecipada e as credenciais de homologação.
+            </p>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!partnerEmail) {
+                  notify("error", "Por favor, informe seu e-mail corporativo.");
+                  return;
+                }
+                notify("success", `Solicitação para ${partnerPlatform} enviada com sucesso! Entraremos em contato via ${partnerEmail}`);
+                setPartnerModal(false);
+                setPartnerEmail("");
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="block text-xs font-mono uppercase tracking-wider text-[#8b9f93] mb-1.5">
+                  E-mail de Contato / Merchant
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={partnerEmail}
+                  onChange={(e) => setPartnerEmail(e.target.value)}
+                  placeholder="seu-email@sua-loja.com.br"
+                  className="w-full px-4 py-2.5 rounded-xl bg-[#050c08] border border-[#213428] text-white text-xs placeholder:text-[#4d6356] focus:border-[#00e66b] focus:outline-none transition"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setPartnerModal(false)}
+                  className="px-4 py-2.5 rounded-xl border border-[#213428] bg-[#101d14] hover:bg-[#182b20] text-[#a1b0a6] hover:text-white text-xs font-bold transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-[#00e66b] hover:bg-[#69f0ae] text-black font-bold text-xs uppercase tracking-wider transition cursor-pointer flex items-center gap-2"
+                >
+                  <span>Solicitar Acesso</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
